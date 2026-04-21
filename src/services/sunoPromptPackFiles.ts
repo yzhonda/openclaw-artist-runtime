@@ -19,6 +19,29 @@ async function nextPromptPackVersion(promptsDir: string): Promise<number> {
   }
 }
 
+export async function readLatestPromptPackMetadata(workspaceRoot: string, songId: string): Promise<{ version: number; metadata: Record<string, unknown> } | undefined> {
+  const promptsDir = join(workspaceRoot, "songs", songId, "prompts");
+  try {
+    const entries = await readdir(promptsDir, { withFileTypes: true });
+    const versions = entries
+      .filter((entry) => entry.isDirectory() && /^prompt-pack-v\d{3}$/.test(entry.name))
+      .map((entry) => Number(entry.name.replace("prompt-pack-v", "")))
+      .filter((value) => Number.isFinite(value));
+    if (versions.length === 0) {
+      return undefined;
+    }
+    const version = Math.max(...versions);
+    const metadataPath = join(promptsDir, `prompt-pack-v${String(version).padStart(3, "0")}`, "metadata.json");
+    const raw = await import("node:fs/promises").then(({ readFile }) => readFile(metadataPath, "utf8"));
+    return {
+      version,
+      metadata: JSON.parse(raw) as Record<string, unknown>
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 async function writeText(path: string, contents: string): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, contents, "utf8");

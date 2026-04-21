@@ -13,6 +13,7 @@ Before publishing:
 - Ensure no lifecycle `postinstall` scripts are required.
 - Ensure no secrets, local profiles, songs, or runtime files are included.
 - Ensure `SECURITY.md`, `PRIVACY.md`, `CAPABILITIES.md`, and `MARKETPLACE.md` are current.
+- Ensure `ui/node_modules` is not included in the tarball.
 
 ## Local verification
 
@@ -26,6 +27,7 @@ npm run pack:dry-run
 ```
 
 Inspect `npm pack --dry-run` output. The tarball must include only intended distributable files.
+In particular, `ui/dist/**` should be present and `ui/node_modules/**` must be absent.
 
 ## ClawHub dry run
 

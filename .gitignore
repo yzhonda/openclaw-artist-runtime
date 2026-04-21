@@ -13,3 +13,4 @@ coverage/
 .openclaw-browser-profiles/
 songs/
 artist/
+.local/
