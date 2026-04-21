@@ -306,6 +306,17 @@ export interface DistributionSummary {
   lastPostUrl?: string;
 }
 
+export interface SocialDistributionWorkerStatus {
+  enabled: boolean;
+  dryRun: boolean;
+  lastSongId?: string;
+  lastAction?: SocialPublishLedgerEntry;
+  enabledPlatforms: SocialPlatform[];
+  blockedReason?: string;
+  postsToday: number;
+  repliesToday: number;
+}
+
 export interface SunoWorkerStatus {
   state: SunoWorkerState;
   connected: boolean;
@@ -448,6 +459,8 @@ export interface AutopilotStatus {
   lastSuccessfulStage?: AutopilotStage;
   pausedReason?: string;
   hardStopReason?: string;
+  blockedReason?: string;
+  lastError?: string;
   retryCount?: number;
 }
 
@@ -458,6 +471,8 @@ export interface AutopilotRunState {
   paused: boolean;
   pausedReason?: string;
   hardStopReason?: string;
+  blockedReason?: string;
+  lastError?: string;
   lastSuccessfulStage?: AutopilotStage;
   retryCount: number;
   cycleCount: number;
@@ -482,6 +497,7 @@ export interface StatusResponse {
   dryRun: boolean;
   autopilot: AutopilotStatus;
   sunoWorker: SunoWorkerStatus;
+  distributionWorker: SocialDistributionWorkerStatus;
   platforms: Record<SocialPlatform, PlatformStatus>;
   musicSummary: MusicSummary;
   distributionSummary: DistributionSummary;

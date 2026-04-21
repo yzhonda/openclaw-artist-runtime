@@ -9,12 +9,31 @@ export class SocialDistributionWorker {
     const songs = await listSongStates(resolved.artist.workspaceRoot);
     const recentSong = songs[0];
     const lastAction = recentSong ? await readLatestSocialAction(resolved.artist.workspaceRoot, recentSong.songId) : undefined;
+    const enabledPlatforms = (Object.entries(resolved.distribution.platforms) as Array<["x" | "instagram" | "tiktok", ArtistRuntimeConfig["distribution"]["platforms"]["x"] | ArtistRuntimeConfig["distribution"]["platforms"]["instagram"] | ArtistRuntimeConfig["distribution"]["platforms"]["tiktok"]]>)
+      .filter(([, platform]) => platform.enabled)
+      .map(([platform]) => platform);
+    const today = new Date().toISOString().slice(0, 10);
+    const postsToday = lastAction && lastAction.timestamp.slice(0, 10) === today && lastAction.action === "publish" ? 1 : 0;
+    const repliesToday = lastAction && lastAction.timestamp.slice(0, 10) === today && lastAction.action === "reply" ? 1 : 0;
+
+    let blockedReason: string | undefined;
+    if (!resolved.distribution.enabled) {
+      blockedReason = "distribution disabled";
+    } else if (enabledPlatforms.length === 0) {
+      blockedReason = "no enabled distribution platforms";
+    } else if (resolved.autopilot.dryRun) {
+      blockedReason = "dry-run prevents live distribution";
+    }
+
     return {
       enabled: resolved.distribution.enabled,
       dryRun: resolved.autopilot.dryRun,
       lastSongId: recentSong?.songId,
       lastAction,
-      blockedReason: resolved.distribution.enabled ? undefined : "distribution disabled"
+      enabledPlatforms,
+      blockedReason,
+      postsToday,
+      repliesToday
     };
   }
 }

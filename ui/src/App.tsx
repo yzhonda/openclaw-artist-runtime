@@ -8,11 +8,22 @@ type StatusResponse = {
     nextAction: string;
     currentRunId?: string;
     currentSongId?: string;
+    blockedReason?: string;
+    lastError?: string;
   };
   sunoWorker: {
     state: string;
     hardStopReason?: string;
     pendingAction?: string;
+  };
+  distributionWorker: {
+    enabled: boolean;
+    dryRun: boolean;
+    lastSongId?: string;
+    enabledPlatforms: string[];
+    blockedReason?: string;
+    postsToday: number;
+    repliesToday: number;
   };
   musicSummary: {
     monthlyRuns: number;
@@ -354,7 +365,7 @@ export function App() {
         <MetricCard
           label="Autopilot"
           value={status?.autopilot.stage ?? "-"}
-          detail={`${status?.autopilot.nextAction ?? "idle"} · ${status?.autopilot.currentRunId ?? "no run"}`}
+          detail={status ? `${status.autopilot.nextAction} · ${status.autopilot.blockedReason ?? status.autopilot.currentRunId ?? "no run"}` : "loading"}
         />
         <MetricCard
           label="Suno"
@@ -369,11 +380,29 @@ export function App() {
         <MetricCard
           label="Distribution"
           value={status ? `${status.distributionSummary.postsToday} posts` : "-"}
-          detail={status ? `${status.distributionSummary.repliesToday} replies · ${status.distributionSummary.lastPlatform ?? "no platform yet"}` : "loading"}
+          detail={status ? `${status.distributionSummary.repliesToday} replies · ${status.distributionWorker.blockedReason ?? status.distributionSummary.lastPlatform ?? "no platform yet"}` : "loading"}
         />
       </section>
 
       <section className="two-column">
+        <article className="panel">
+          <div className="section-title">Distribution Worker</div>
+          <div className="list">
+            <div className="item">
+              <strong>{status?.distributionWorker.enabled ? "enabled" : "disabled"}</strong>
+              <div className="muted">{status?.distributionWorker.blockedReason ?? "distribution ready"}</div>
+            </div>
+            <div className="item">
+              <div className="eyebrow">Enabled Platforms</div>
+              <div className="muted">{status?.distributionWorker.enabledPlatforms.join(" · ") || "none"}</div>
+            </div>
+            <div className="item">
+              <div className="eyebrow">Daily Counters</div>
+              <div className="muted">posts {status?.distributionWorker.postsToday ?? 0} · replies {status?.distributionWorker.repliesToday ?? 0}</div>
+            </div>
+          </div>
+        </article>
+
         <article className="panel">
           <div className="section-title">Suno</div>
           <div className="list">

@@ -173,6 +173,7 @@ describe("suno and social pipelines", () => {
     const status = await buildStatusResponse({
       artist: { workspaceRoot: root },
       distribution: {
+        enabled: true,
         platforms: {
           x: { enabled: true }
         }
@@ -192,6 +193,7 @@ describe("suno and social pipelines", () => {
     expect(Array.isArray(status.alerts)).toBe(true);
     expect(status.musicSummary.monthlyGenerationBudget).toBe(50);
     expect(status.distributionSummary.postsToday).toBeGreaterThanOrEqual(0);
+    expect(status.distributionWorker.blockedReason).toContain("dry-run");
   });
 
   it("runs autopilot one stage at a time and exposes route helpers", async () => {
@@ -255,6 +257,7 @@ describe("suno and social pipelines", () => {
     expect(paused.paused).toBe(true);
     expect(resumed.paused).toBe(false);
     expect(status.autopilot.currentSongId).toBe(songId);
+    expect(status.autopilot.blockedReason).toContain("dry-run");
   });
 
   it("persists dry-run-safe Suno connect and reconnect intents", async () => {

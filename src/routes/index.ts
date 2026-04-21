@@ -240,6 +240,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     mergedConfig.artist.workspaceRoot
   );
   const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot).status();
+  const distributionWorker = await new SocialDistributionWorker().status(mergedConfig);
   const workspaceStatus = await buildWorkspaceSummaries(mergedConfig.artist.workspaceRoot);
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
@@ -253,6 +254,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     dryRun: mergedConfig.autopilot.dryRun,
     autopilot,
     sunoWorker,
+    distributionWorker,
     platforms,
     musicSummary,
     distributionSummary,
