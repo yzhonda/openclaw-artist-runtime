@@ -16,7 +16,7 @@ export interface ServiceRegistration {
 }
 
 export interface RouteRegistration {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PATCH";
   path: string;
   handler: UnknownHandler;
 }

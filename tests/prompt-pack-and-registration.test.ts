@@ -141,6 +141,12 @@ describe("registration shells", () => {
     expect(registered.routes).toContain("/plugins/artist-runtime/api/status");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/run-cycle");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/config");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/connect");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/disconnect");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/connect");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/reconnect");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/runs");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/generate/:songId");
 
     const status = await buildStatusResponse();
     expect(status.dryRun).toBe(true);

@@ -93,9 +93,18 @@ export async function readLatestSunoRun(root: string, songId: string): Promise<S
   return readLastJsonlEntry<SunoRunRecord>(getRunsPath(root, songId));
 }
 
+export async function readAllSunoRuns(root: string, songId: string): Promise<SunoRunRecord[]> {
+  const contents = await readFile(getRunsPath(root, songId), "utf8").catch(() => "");
+  return contents
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as SunoRunRecord)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
 export async function generateSunoRun(input: GenerateSunoRunInput): Promise<SunoRunRecord> {
   const config = applyConfigDefaults(input.config);
-  const connector = new BrowserWorkerSunoConnector();
+  const connector = new BrowserWorkerSunoConnector(input.workspaceRoot);
   const workerStatus = input.workerState ? { state: input.workerState } : await connector.status();
   const { payload, payloadHash, payloadPath } = await loadPayload(input.workspaceRoot, input.songId);
   const authorityDecision = decideMusicAuthority({

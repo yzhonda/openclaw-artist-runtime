@@ -12,6 +12,7 @@ type StatusResponse = {
   sunoWorker: {
     state: string;
     hardStopReason?: string;
+    pendingAction?: string;
   };
   musicSummary: {
     monthlyRuns: number;
@@ -75,8 +76,9 @@ type SongDetail = {
   song: SongSummary;
   brief: string;
   promptLedger: unknown[];
-  sunoRuns: unknown[];
+  sunoRuns: Array<{ runId: string; status: string; urls: string[] }>;
   takeSelections: unknown[];
+  takeHistory?: Array<{ selectedTakeId: string; reason: string; createdAt?: string }>;
   latestPromptPack?: { version: number; metadata?: Record<string, unknown> };
   selectedTake?: { selectedTakeId?: string };
   socialAssets?: Array<{ platform: string; postType: string; sourceTakeId?: string }>;
@@ -99,6 +101,18 @@ type ConfigDraft = {
   xEnabled: boolean;
   instagramEnabled: boolean;
   tiktokEnabled: boolean;
+};
+
+type SunoStatusResponse = {
+  worker: {
+    state: string;
+    hardStopReason?: string;
+    pendingAction?: string;
+  };
+  currentSongId?: string;
+  latestRun?: { runId: string; status: string };
+  recentRuns: Array<{ runId: string; status: string; urls: string[] }>;
+  latestPromptPackVersion?: number;
 };
 
 const apiBase = "/plugins/artist-runtime/api";
@@ -141,11 +155,27 @@ function excerpt(value: string, maxLength = 220): string {
   return trimmed.length > maxLength ? `${trimmed.slice(0, maxLength)}...` : trimmed;
 }
 
+function platformEnabled(draft: ConfigDraft | null, platform: "x" | "instagram" | "tiktok"): boolean {
+  if (!draft) {
+    return false;
+  }
+  switch (platform) {
+    case "instagram":
+      return draft.instagramEnabled;
+    case "tiktok":
+      return draft.tiktokEnabled;
+    case "x":
+    default:
+      return draft.xEnabled;
+  }
+}
+
 export function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [config, setConfig] = useState<ConfigResponse | null>(null);
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [detail, setDetail] = useState<SongDetail | null>(null);
+  const [sunoStatus, setSunoStatus] = useState<SunoStatusResponse | null>(null);
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
   const [platformTests, setPlatformTests] = useState<Record<string, { testedAt: string; status: PlatformDetail }>>({});
@@ -155,10 +185,11 @@ export function App() {
   const refresh = async (preferredSongId?: string | null) => {
     try {
       setError(null);
-      const [nextStatus, nextSongs, nextConfig] = await Promise.all([
+      const [nextStatus, nextSongs, nextConfig, nextSunoStatus] = await Promise.all([
         apiGet<StatusResponse>("/status"),
         apiGet<SongSummary[]>("/songs"),
-        apiGet<ConfigResponse>("/config")
+        apiGet<ConfigResponse>("/config"),
+        apiGet<SunoStatusResponse>("/suno/status")
       ]);
       const nextSelectedSongId = preferredSongId
         ?? selectedSongId
@@ -171,6 +202,7 @@ export function App() {
       startTransition(() => {
         setStatus(nextStatus);
         setConfig(nextConfig);
+        setSunoStatus(nextSunoStatus);
         setSongs(nextSongs);
         setDetail(nextDetail);
         setSelectedSongId(nextSelectedSongId);
@@ -217,7 +249,7 @@ export function App() {
     setBusy(`ack:${alertId}`);
     try {
       await apiPost(`/alerts/${alertId}/ack`);
-      await refresh();
+      await refresh(selectedSongId);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
     } finally {
@@ -246,7 +278,7 @@ export function App() {
           }
         }
       });
-      await refresh();
+      await refresh(selectedSongId);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
     } finally {
@@ -261,6 +293,37 @@ export function App() {
       startTransition(() => {
         setPlatformTests((current) => ({ ...current, [platform]: result }));
       });
+      await refresh(selectedSongId);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const togglePlatform = async (platform: "x" | "instagram" | "tiktok", enabled: boolean) => {
+    setBusy(`platform-toggle:${platform}`);
+    try {
+      await apiPost(`/platforms/${platform}/${enabled ? "connect" : "disconnect"}`);
+      await refresh(selectedSongId);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runSunoAction = async (action: "connect" | "reconnect" | "generate") => {
+    setBusy(`suno:${action}`);
+    try {
+      if (action === "generate") {
+        if (!selectedSongId) {
+          throw new Error("no song selected for Suno generate");
+        }
+        await apiPost(`/suno/generate/${selectedSongId}`);
+      } else {
+        await apiPost(`/suno/${action}`);
+      }
       await refresh(selectedSongId);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
@@ -296,7 +359,7 @@ export function App() {
         <MetricCard
           label="Suno"
           value={status?.sunoWorker.state ?? "-"}
-          detail={status?.sunoWorker.hardStopReason ?? "worker ready"}
+          detail={status?.sunoWorker.pendingAction ?? status?.sunoWorker.hardStopReason ?? "worker ready"}
         />
         <MetricCard
           label="Music Budget"
@@ -311,6 +374,29 @@ export function App() {
       </section>
 
       <section className="two-column">
+        <article className="panel">
+          <div className="section-title">Suno</div>
+          <div className="list">
+            <div className="item">
+              <strong>{sunoStatus?.worker.state ?? "-"}</strong>
+              <div className="muted">{sunoStatus?.worker.pendingAction ?? sunoStatus?.worker.hardStopReason ?? "No pending operator step."}</div>
+            </div>
+            <div className="inline-actions">
+              <button disabled={busy !== null} onClick={() => void runSunoAction("connect")}>Connect</button>
+              <button disabled={busy !== null} onClick={() => void runSunoAction("reconnect")}>Reconnect</button>
+              <button className="primary" disabled={busy !== null || !selectedSongId} onClick={() => void runSunoAction("generate")}>Generate Current Song</button>
+            </div>
+            <div className="item">
+              <div className="eyebrow">Recent Runs</div>
+              <div className="muted">
+                {sunoStatus?.recentRuns.length
+                  ? sunoStatus.recentRuns.slice(0, 3).map((run) => `${run.runId}:${run.status}`).join(" · ")
+                  : "No Suno runs yet."}
+              </div>
+            </div>
+          </div>
+        </article>
+
         <article className="panel">
           <div className="section-title">Config</div>
           {config && configDraft ? (
@@ -328,7 +414,9 @@ export function App() {
             </div>
           ) : <div className="item muted">Loading config.</div>}
         </article>
+      </section>
 
+      <section className="two-column">
         <article className="panel">
           <div className="section-title">Songs</div>
           <div className="list">
@@ -339,6 +427,30 @@ export function App() {
                 <div className="muted">{song.songId} · runs {song.runCount}{song.selectedTakeId ? ` · take ${song.selectedTakeId}` : ""}</div>
               </button>
             )) : <div className="item muted">No songs yet.</div>}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="section-title">Platforms</div>
+          <div className="list">
+            {status ? Object.entries(status.platforms).map(([platform, value]) => (
+              <div className="item" key={platform}>
+                <div className="inline-actions">
+                  <strong>{platform}</strong>
+                  <div className="inline-actions">
+                    <button disabled={busy !== null} onClick={() => void testPlatform(platform as "x" | "instagram" | "tiktok")}>Test</button>
+                    <button disabled={busy !== null} onClick={() => void togglePlatform(platform as "x" | "instagram" | "tiktok", !platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok"))}>
+                      {platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok") ? "Disable" : "Enable"}
+                    </button>
+                  </div>
+                </div>
+                <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
+                <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
+                {platformTests[platform] ? (
+                  <div className="muted">tested {platformTests[platform].testedAt} · {platformTests[platform].status.reason ?? "ok"}</div>
+                ) : null}
+              </div>
+            )) : <div className="item muted">Loading platforms.</div>}
           </div>
         </article>
       </section>
@@ -376,6 +488,7 @@ export function App() {
               <div className="item">
                 <div className="eyebrow">Suno Runs</div>
                 <strong>{detail.sunoRuns.length}</strong>
+                <div className="muted">{detail.sunoRuns.slice(0, 3).map((run) => `${run.runId}:${run.status}`).join(" · ") || "none"}</div>
               </div>
               <div className="item">
                 <div className="eyebrow">Latest Prompt Pack</div>
@@ -385,6 +498,7 @@ export function App() {
               <div className="item">
                 <div className="eyebrow">Selected Take</div>
                 <strong>{detail.selectedTake?.selectedTakeId ?? "none"}</strong>
+                <div className="muted">{detail.takeHistory?.slice(0, 3).map((take) => `${take.selectedTakeId} · ${take.reason}`).join(" · ") || "no take history"}</div>
               </div>
               <div className="item">
                 <div className="eyebrow">Social Assets</div>
@@ -398,25 +512,6 @@ export function App() {
               </div>
             </div>
           ) : <div className="item muted">No current song.</div>}
-        </article>
-
-        <article className="panel">
-          <div className="section-title">Platforms</div>
-          <div className="list">
-            {status ? Object.entries(status.platforms).map(([platform, value]) => (
-              <div className="item" key={platform}>
-                <div className="inline-actions">
-                  <strong>{platform}</strong>
-                  <button disabled={busy !== null} onClick={() => void testPlatform(platform as "x" | "instagram" | "tiktok")}>Test</button>
-                </div>
-                <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
-                <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
-                {platformTests[platform] ? (
-                  <div className="muted">tested {platformTests[platform].testedAt} · {platformTests[platform].status.reason ?? "ok"}</div>
-                ) : null}
-              </div>
-            )) : <div className="item muted">Loading platforms.</div>}
-          </div>
         </article>
       </section>
 

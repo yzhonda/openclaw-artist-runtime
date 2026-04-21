@@ -16,9 +16,10 @@ import { readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
-import { readLatestSunoRun } from "../services/sunoRuns.js";
+import { generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services/sunoRuns.js";
+import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
 import { createSongIdea } from "../services/songIdeation.js";
-import { selectTake } from "../services/takeSelection.js";
+import { readTakeHistory, selectTake } from "../services/takeSelection.js";
 import type { ArtistRuntimeConfig, MusicSummary, PlatformStatus, PromptLedgerEntry, SocialPlatform, StatusResponse, SunoRunRecord, DistributionSummary, SocialPublishLedgerEntry } from "../types.js";
 
 async function readJsonlEntries<T>(path: string): Promise<T[]> {
@@ -125,15 +126,16 @@ export async function buildSongsResponse(config?: Partial<ArtistRuntimeConfig>) 
 export async function buildSongDetailResponse(songId: string, config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = applyConfigDefaults(config);
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
-  const [state, brief, promptLedger, sunoRuns, latestSocialAction, selectedTake, socialAssets, latestPromptPack] = await Promise.all([
+  const [state, brief, promptLedger, sunoRuns, latestSocialAction, selectedTake, socialAssets, latestPromptPack, takeHistory] = await Promise.all([
     readSongState(workspaceRoot, songId),
     readFile(join(workspaceRoot, "songs", songId, "brief.md"), "utf8").catch(() => ""),
     readJsonlEntries<PromptLedgerEntry>(join(workspaceRoot, "songs", songId, "prompts", "prompt-ledger.jsonl")),
-    readJsonlEntries<SunoRunRecord>(join(workspaceRoot, "songs", songId, "suno", "runs.jsonl")),
+    readAllSunoRuns(workspaceRoot, songId),
     readLatestSocialAction(workspaceRoot, songId),
     readFile(join(workspaceRoot, "songs", songId, "suno", "selected-take.json"), "utf8").then((value) => JSON.parse(value) as unknown).catch(() => undefined),
     readFile(join(workspaceRoot, "songs", songId, "social", "assets.json"), "utf8").then((value) => JSON.parse(value) as unknown).catch(() => []),
-    readLatestPromptPackMetadata(workspaceRoot, songId)
+    readLatestPromptPackMetadata(workspaceRoot, songId),
+    readTakeHistory(workspaceRoot, songId)
   ]);
 
   return {
@@ -143,6 +145,7 @@ export async function buildSongDetailResponse(songId: string, config?: Partial<A
     sunoRuns,
     selectedTake,
     takeSelections: promptLedger.filter((entry) => entry.stage === "take_selection"),
+    takeHistory,
     latestPromptPack,
     socialAssets,
     lastSocialAction: latestSocialAction
@@ -157,7 +160,7 @@ export async function buildSongLedgerResponse(songId: string, config?: Partial<A
 export async function buildAlertsResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = applyConfigDefaults(config);
   const platforms = await buildPlatformStatuses(mergedConfig);
-  const sunoWorker = await new BrowserWorkerSunoConnector().status();
+  const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot).status();
   return collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
 }
 
@@ -184,12 +187,13 @@ export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConf
   const mergedConfig = applyConfigDefaults(config);
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
   const recentSong = (await listSongStates(workspaceRoot))[0];
-  const worker = await new BrowserWorkerSunoConnector().status();
+  const worker = await new BrowserWorkerSunoConnector(workspaceRoot).status();
   const latestPromptPack = recentSong ? await readLatestPromptPackMetadata(workspaceRoot, recentSong.songId) : undefined;
   return {
     worker,
     currentSongId: recentSong?.songId,
     latestRun: recentSong ? await readLatestSunoRun(workspaceRoot, recentSong.songId) : undefined,
+    recentRuns: recentSong ? await readAllSunoRuns(workspaceRoot, recentSong.songId) : [],
     latestPromptPackVersion: latestPromptPack?.version,
     latestPromptPackMetadata: latestPromptPack?.metadata
   };
@@ -235,7 +239,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     mergedConfig.autopilot.dryRun,
     mergedConfig.artist.workspaceRoot
   );
-  const sunoWorker = await new BrowserWorkerSunoConnector().status();
+  const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot).status();
   const workspaceStatus = await buildWorkspaceSummaries(mergedConfig.artist.workspaceRoot);
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
@@ -276,6 +280,16 @@ export function registerRoutes(api: unknown): void {
     method: "GET",
     path: "/plugins/artist-runtime/api/config",
     handler: async (input) => buildConfigResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: "PATCH",
+    path: "/plugins/artist-runtime/api/config",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const current = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      return patchResolvedConfig(current.artist.workspaceRoot, payloadRecord(payload.patch) as Partial<ArtistRuntimeConfig>);
+    }
   });
 
   safeRegisterRoute(api, {
@@ -353,9 +367,93 @@ export function registerRoutes(api: unknown): void {
   });
 
   safeRegisterRoute(api, {
+    method: "POST",
+    path: "/plugins/artist-runtime/api/platforms/:id/connect",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
+      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
+        distribution: {
+          platforms: {
+            [platform]: { enabled: true }
+          }
+        } as unknown as ArtistRuntimeConfig["distribution"]
+      } as Partial<ArtistRuntimeConfig>);
+      return buildPlatformDetailResponse(platform, nextConfig);
+    }
+  });
+
+  safeRegisterRoute(api, {
+    method: "POST",
+    path: "/plugins/artist-runtime/api/platforms/:id/disconnect",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
+      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
+        distribution: {
+          platforms: {
+            [platform]: { enabled: false }
+          }
+        } as unknown as ArtistRuntimeConfig["distribution"]
+      } as Partial<ArtistRuntimeConfig>);
+      return buildPlatformDetailResponse(platform, nextConfig);
+    }
+  });
+
+  safeRegisterRoute(api, {
     method: "GET",
     path: "/plugins/artist-runtime/api/suno/status",
     handler: async (input) => buildSunoStatusResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: "GET",
+    path: "/plugins/artist-runtime/api/suno/runs",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const songId = typeof payload.songId === "string"
+        ? payload.songId
+        : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
+      return songId ? readAllSunoRuns(config.artist.workspaceRoot, songId) : [];
+    }
+  });
+
+  safeRegisterRoute(api, {
+    method: "POST",
+    path: "/plugins/artist-runtime/api/suno/connect",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      return new SunoBrowserWorker(config.artist.workspaceRoot).connect();
+    }
+  });
+
+  safeRegisterRoute(api, {
+    method: "POST",
+    path: "/plugins/artist-runtime/api/suno/reconnect",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      return new SunoBrowserWorker(config.artist.workspaceRoot).reconnect();
+    }
+  });
+
+  safeRegisterRoute(api, {
+    method: "POST",
+    path: "/plugins/artist-runtime/api/suno/generate/:songId",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const songId = typeof payload.songId === "string" ? payload.songId : "song-001";
+      return generateSunoRun({
+        workspaceRoot: config.artist.workspaceRoot,
+        songId,
+        config
+      });
+    }
   });
 
   safeRegisterRoute(api, {
