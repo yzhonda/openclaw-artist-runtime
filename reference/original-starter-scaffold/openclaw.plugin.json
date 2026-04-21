@@ -1,0 +1,372 @@
+{
+  "id": "artist-runtime",
+  "name": "Artist Runtime",
+  "description": "Runs an OpenClaw agent as a public autonomous musical artist with Suno generation and social distribution.",
+  "version": "0.1.0",
+  "contracts": {
+    "tools": [
+      "artist_song_ideate",
+      "artist_song_create_brief",
+      "artist_lyrics_write",
+      "artist_suno_create_prompt_pack",
+      "artist_suno_generate",
+      "artist_suno_import_results",
+      "artist_take_select",
+      "artist_social_prepare_assets",
+      "artist_social_publish",
+      "artist_autopilot_pause",
+      "artist_autopilot_resume"
+    ]
+  },
+  "uiHints": {
+    "workspace.path": {
+      "label": "Artist workspace",
+      "help": "Directory where ARTIST.md, songs, ledgers, and artist state are stored."
+    },
+    "autopilot.enabled": {
+      "label": "Artist autopilot",
+      "help": "Allow the artist to create and share autonomously within policy."
+    },
+    "music.suno.authority": {
+      "label": "Suno generation authority",
+      "help": "How far the artist can go in Suno without producer intervention."
+    },
+    "music.suno.monthlyGenerationBudget": {
+      "label": "Monthly Suno generation budget",
+      "help": "Maximum number of Suno generations per month."
+    },
+    "publicPresence.platforms.x.enabled": {
+      "label": "Use X",
+      "help": "Use X as the artist's public voice via Bird."
+    },
+    "publicPresence.platforms.instagram.enabled": {
+      "label": "Use Instagram",
+      "help": "Use Instagram for visual identity, lyric cards, and Reels."
+    },
+    "publicPresence.platforms.tiktok.enabled": {
+      "label": "Use TikTok",
+      "help": "Use TikTok for short-video discovery and hook clips."
+    },
+    "safety.stopOnCaptcha": {
+      "label": "Stop on CAPTCHA",
+      "help": "Pause automation if a CAPTCHA or bot challenge appears."
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "workspace": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string",
+            "default": "./artist-workspace"
+          }
+        }
+      },
+      "artist": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "const": "public_artist",
+            "default": "public_artist"
+          },
+          "profilePath": {
+            "type": "string",
+            "default": "ARTIST.md"
+          }
+        }
+      },
+      "autopilot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "cadence": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "daily",
+              "twice_daily",
+              "active"
+            ],
+            "default": "daily"
+          },
+          "maxSongsPerWeek": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 21,
+            "default": 3
+          },
+          "preferredWorkWindows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "09:00-12:00",
+              "20:00-24:00"
+            ]
+          },
+          "quietWindows": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "01:00-07:00"
+            ]
+          }
+        }
+      },
+      "music": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "engine": {
+            "type": "string",
+            "const": "suno",
+            "default": "suno"
+          },
+          "suno": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "connectionMode": {
+                "type": "string",
+                "enum": [
+                  "manual_copy",
+                  "background_browser_worker",
+                  "api_provider"
+                ],
+                "default": "background_browser_worker"
+              },
+              "authority": {
+                "type": "string",
+                "enum": [
+                  "prepare_only",
+                  "autofill_only",
+                  "auto_create_with_budget",
+                  "auto_create_and_select_take"
+                ],
+                "default": "auto_create_and_select_take"
+              },
+              "monthlyGenerationBudget": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000,
+                "default": 50
+              },
+              "maxGenerationsPerDay": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "default": 4
+              },
+              "minMinutesBetweenCreates": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1440,
+                "default": 20
+              },
+              "promptLogging": {
+                "type": "string",
+                "enum": [
+                  "full"
+                ],
+                "default": "full"
+              },
+              "browserProfilePath": {
+                "type": "string",
+                "default": "./.artist-runtime/browser/suno"
+              }
+            }
+          }
+        }
+      },
+      "publicPresence": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "platforms": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "x": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "connector": {
+                    "type": "string",
+                    "const": "bird",
+                    "default": "bird"
+                  },
+                  "authority": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "draft_only",
+                      "auto_publish",
+                      "auto_posts_and_low_risk_replies",
+                      "full_social_autonomy"
+                    ],
+                    "default": "auto_publish"
+                  },
+                  "maxPostsPerDay": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "default": 3
+                  },
+                  "maxRepliesPerDay": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 0
+                  }
+                }
+              },
+              "instagram": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "connector": {
+                    "type": "string",
+                    "const": "instagram_api",
+                    "default": "instagram_api"
+                  },
+                  "authority": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "draft_only",
+                      "auto_publish_visuals"
+                    ],
+                    "default": "auto_publish_visuals"
+                  },
+                  "maxPostsPerDay": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 25,
+                    "default": 1
+                  }
+                }
+              },
+              "tiktok": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "connector": {
+                    "type": "string",
+                    "const": "tiktok_content_posting",
+                    "default": "tiktok_content_posting"
+                  },
+                  "authority": {
+                    "type": "string",
+                    "enum": [
+                      "disabled",
+                      "draft_only",
+                      "auto_publish_clips"
+                    ],
+                    "default": "auto_publish_clips"
+                  },
+                  "maxPostsPerDay": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 25,
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "distribution": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dailySharing": {
+            "type": "string",
+            "enum": [
+              "off",
+              "auto"
+            ],
+            "default": "auto"
+          },
+          "officialRelease": {
+            "type": "string",
+            "enum": [
+              "manual_approval",
+              "auto_with_policy"
+            ],
+            "default": "manual_approval"
+          }
+        }
+      },
+      "safety": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "stopOnCaptcha": {
+            "type": "boolean",
+            "default": true
+          },
+          "stopOnLoginChallenge": {
+            "type": "boolean",
+            "default": true
+          },
+          "stopOnPaymentPrompt": {
+            "type": "boolean",
+            "default": true
+          },
+          "stopOnUiMismatch": {
+            "type": "boolean",
+            "default": true
+          },
+          "pauseOnPolicyUncertainty": {
+            "type": "boolean",
+            "default": true
+          },
+          "auditLog": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "console": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "routePrefix": {
+            "type": "string",
+            "default": "/plugins/artist-runtime"
+          }
+        }
+      }
+    }
+  }
+}

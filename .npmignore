@@ -1,0 +1,10 @@
+node_modules
+coverage
+.env
+.runtime
+.openclaw-browser-profiles
+songs
+artist
+tests
+scripts/*.ts
+*.zip

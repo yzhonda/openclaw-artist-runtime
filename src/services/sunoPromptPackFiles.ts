@@ -1,0 +1,213 @@
+import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { createSongSkeleton } from "../repositories/songRepository.js";
+import type { PersistSunoPromptPackInput, PersistedPromptPackResult, PromptLedgerEntry } from "../types.js";
+import { ensureArtistWorkspace, readArtistSnapshots } from "./artistWorkspace.js";
+import { updateSongState } from "./artistState.js";
+import { appendPromptLedger, createPromptLedgerEntry, getSongPromptLedgerPath } from "./promptLedger.js";
+import { createSunoPromptPack } from "../suno-production/generatePromptPack.js";
+
+async function nextPromptPackVersion(promptsDir: string): Promise<number> {
+  try {
+    const entries = await readdir(promptsDir, { withFileTypes: true });
+    const versions = entries
+      .filter((entry) => entry.isDirectory() && /^prompt-pack-v\d{3}$/.test(entry.name))
+      .map((entry) => Number(entry.name.replace("prompt-pack-v", "")));
+    return (versions.length > 0 ? Math.max(...versions) : 0) + 1;
+  } catch {
+    return 1;
+  }
+}
+
+async function writeText(path: string, contents: string): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, contents, "utf8");
+}
+
+async function writeJson(path: string, value: unknown): Promise<void> {
+  await writeText(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function appendEntries(ledgerPath: string, entries: PromptLedgerEntry[]): Promise<string[]> {
+  const ids: string[] = [];
+  for (const entry of entries) {
+    const appended = await appendPromptLedger(ledgerPath, entry);
+    ids.push(appended.id);
+  }
+  return ids;
+}
+
+export async function createAndPersistSunoPromptPack(input: PersistSunoPromptPackInput): Promise<PersistedPromptPackResult> {
+  await ensureArtistWorkspace(input.workspaceRoot);
+  await createSongSkeleton(input.workspaceRoot, input.songId);
+
+  const { artistSnapshot, currentStateSnapshot } = await readArtistSnapshots(input.workspaceRoot);
+  const pack = createSunoPromptPack({
+    ...input,
+    artistSnapshot: input.artistSnapshot || artistSnapshot,
+    currentStateSnapshot: input.currentStateSnapshot || currentStateSnapshot
+  });
+
+  const promptsDir = join(input.workspaceRoot, "songs", input.songId, "prompts");
+  const lyricsDir = join(input.workspaceRoot, "songs", input.songId, "lyrics");
+  const sunoDir = join(input.workspaceRoot, "songs", input.songId, "suno");
+  const version = await nextPromptPackVersion(promptsDir);
+  const versionTag = `v${String(version).padStart(3, "0")}`;
+  const snapshotDir = join(promptsDir, `prompt-pack-${versionTag}`);
+  await mkdir(snapshotDir, { recursive: true });
+
+  const lyricsVersioned = join(lyricsDir, `lyrics.v${version}.md`);
+  const yamlLatest = join(lyricsDir, "yaml-suno.md");
+  const styleLatest = join(sunoDir, "style.md");
+  const excludeLatest = join(sunoDir, "exclude.md");
+  const slidersLatest = join(sunoDir, "sliders.json");
+  const payloadLatest = join(sunoDir, "suno-payload.json");
+  const validationLatest = join(sunoDir, "validation.json");
+  const ledgerPath = getSongPromptLedgerPath(input.workspaceRoot, input.songId);
+
+  await Promise.all([
+    writeText(lyricsVersioned, `${input.lyricsText}\n`),
+    writeText(yamlLatest, `${pack.yamlLyrics}\n`),
+    writeText(styleLatest, `${pack.style}\n`),
+    writeText(excludeLatest, `${pack.exclude}\n`),
+    writeJson(slidersLatest, pack.sliders),
+    writeJson(payloadLatest, pack.payload),
+    writeJson(validationLatest, pack.validation),
+    writeText(join(snapshotDir, "lyrics.md"), `${input.lyricsText}\n`),
+    writeText(join(snapshotDir, "yaml-suno.md"), `${pack.yamlLyrics}\n`),
+    writeText(join(snapshotDir, "style.md"), `${pack.style}\n`),
+    writeText(join(snapshotDir, "exclude.md"), `${pack.exclude}\n`),
+    writeJson(join(snapshotDir, "sliders.json"), pack.sliders),
+    writeJson(join(snapshotDir, "suno-payload.json"), pack.payload),
+    writeJson(join(snapshotDir, "validation.json"), pack.validation),
+    writeJson(join(snapshotDir, "metadata.json"), {
+      songId: input.songId,
+      version,
+      promptHash: pack.promptHash,
+      payloadHash: pack.payloadHash,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash
+    })
+  ]);
+
+  const commonRefs = [
+    join(snapshotDir, "lyrics.md"),
+    join(snapshotDir, "yaml-suno.md"),
+    join(snapshotDir, "style.md"),
+    join(snapshotDir, "exclude.md"),
+    join(snapshotDir, "suno-payload.json")
+  ];
+
+  const ledgerEntryIds = await appendEntries(ledgerPath, [
+    createPromptLedgerEntry({
+      stage: "artist_state_snapshot",
+      songId: input.songId,
+      actor: "system",
+      inputRefs: ["ARTIST.md", "artist/CURRENT_STATE.md"],
+      outputRefs: [join(snapshotDir, "metadata.json")],
+      configSnapshot: input.configSnapshot,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash
+    }),
+    createPromptLedgerEntry({
+      stage: "lyrics_generation",
+      songId: input.songId,
+      actor: "artist",
+      artistReason: input.artistReason,
+      inputRefs: ["ARTIST.md", "artist/CURRENT_STATE.md"],
+      outputRefs: [lyricsVersioned, join(snapshotDir, "lyrics.md")],
+      promptText: input.lyricsText,
+      promptHash: pack.promptHash,
+      configSnapshot: input.configSnapshot,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash
+    }),
+    createPromptLedgerEntry({
+      stage: "suno_style_generation",
+      songId: input.songId,
+      actor: "artist",
+      artistReason: input.artistReason,
+      inputRefs: [lyricsVersioned],
+      outputRefs: [styleLatest, join(snapshotDir, "style.md")],
+      outputSummary: pack.style,
+      promptHash: pack.promptHash,
+      configSnapshot: input.configSnapshot,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash
+    }),
+    createPromptLedgerEntry({
+      stage: "suno_exclude_generation",
+      songId: input.songId,
+      actor: "artist",
+      inputRefs: [lyricsVersioned],
+      outputRefs: [excludeLatest, join(snapshotDir, "exclude.md")],
+      outputSummary: pack.exclude,
+      promptHash: pack.promptHash,
+      configSnapshot: input.configSnapshot,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash
+    }),
+    createPromptLedgerEntry({
+      stage: "suno_yaml_generation",
+      songId: input.songId,
+      actor: "artist",
+      inputRefs: [lyricsVersioned],
+      outputRefs: [yamlLatest, join(snapshotDir, "yaml-suno.md")],
+      outputSummary: pack.yamlLyrics,
+      promptHash: pack.promptHash,
+      configSnapshot: input.configSnapshot,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash
+    }),
+    createPromptLedgerEntry({
+      stage: "suno_payload_build",
+      songId: input.songId,
+      actor: "system",
+      artistReason: input.artistReason,
+      inputRefs: commonRefs,
+      outputRefs: [slidersLatest, payloadLatest, validationLatest, join(snapshotDir, "metadata.json")],
+      promptHash: pack.promptHash,
+      outputHash: pack.payloadHash,
+      payloadHash: pack.payloadHash,
+      configSnapshot: input.configSnapshot,
+      artistSnapshotHash: pack.artistSnapshotHash,
+      currentStateHash: pack.currentStateHash,
+      knowledgePackHash: pack.knowledgePackHash,
+      verification: {
+        status: pack.validation.valid ? "verified" : "failed",
+        detail: pack.validation.errors.join("; ")
+      }
+    })
+  ]);
+
+  await updateSongState(input.workspaceRoot, input.songId, {
+    status: "suno_prompt_pack",
+    title: input.songTitle,
+    reason: "Suno prompt pack persisted",
+    lyricsVersion: version
+  });
+
+  return {
+    songId: input.songId,
+    packVersion: version,
+    pack,
+    artifactPaths: {
+      lyricsVersioned,
+      yamlLatest,
+      styleLatest,
+      excludeLatest,
+      slidersLatest,
+      payloadLatest,
+      validationLatest,
+      snapshotDir,
+      promptLedger: ledgerPath
+    },
+    ledgerEntryIds
+  };
+}

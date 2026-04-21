@@ -1,0 +1,15 @@
+# >>> project-bootstrap managed >>>
+.cc-status-bar.voice.json
+# <<< project-bootstrap managed <<<
+
+node_modules/
+dist/
+ui/dist/
+coverage/
+.env
+.DS_Store
+*.log
+.runtime/
+.openclaw-browser-profiles/
+songs/
+artist/

@@ -1,0 +1,28 @@
+{
+  "name": "@your-org/openclaw-artist-runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "OpenClaw plugin that runs an agent as a public autonomous musical artist.",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "echo 'Run inside an OpenClaw plugin workspace after SDK verification.'"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "latest"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  },
+  "openclaw": {
+    "extensions": ["./src/index.ts"],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": ">=2026.3.24-beta.2"
+    }
+  }
+}

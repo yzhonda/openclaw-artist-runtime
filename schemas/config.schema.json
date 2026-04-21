@@ -1,0 +1,360 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "artist": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "public_artist",
+          "default": "public_artist"
+        },
+        "artistId": {
+          "type": "string",
+          "default": "artist"
+        },
+        "profilePath": {
+          "type": "string",
+          "default": "ARTIST.md"
+        },
+        "workspaceRoot": {
+          "type": "string",
+          "default": "."
+        }
+      },
+      "required": [
+        "mode"
+      ]
+    },
+    "autopilot": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "dryRun": {
+          "type": "boolean",
+          "default": true
+        },
+        "songsPerWeek": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 21,
+          "default": 3
+        },
+        "cycleIntervalMinutes": {
+          "type": "integer",
+          "minimum": 15,
+          "maximum": 1440,
+          "default": 180
+        },
+        "producerDigest": {
+          "type": "string",
+          "enum": [
+            "off",
+            "daily",
+            "important_events",
+            "high_touch"
+          ],
+          "default": "daily"
+        }
+      }
+    },
+    "music": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": [
+            "suno"
+          ],
+          "default": "suno"
+        },
+        "suno": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "connectionMode": {
+              "type": "string",
+              "enum": [
+                "manual_copy",
+                "background_browser_worker",
+                "api_provider"
+              ],
+              "default": "background_browser_worker"
+            },
+            "authority": {
+              "type": "string",
+              "enum": [
+                "prepare_only",
+                "autofill_only",
+                "auto_create_with_budget",
+                "auto_create_and_select_take"
+              ],
+              "default": "auto_create_and_select_take"
+            },
+            "monthlyGenerationBudget": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000,
+              "default": 50
+            },
+            "maxGenerationsPerDay": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 4
+            },
+            "minMinutesBetweenCreates": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1440,
+              "default": 20
+            },
+            "stopOnLoginChallenge": {
+              "type": "boolean",
+              "default": true
+            },
+            "stopOnCaptcha": {
+              "type": "boolean",
+              "default": true
+            },
+            "stopOnPaymentPrompt": {
+              "type": "boolean",
+              "default": true
+            },
+            "promptLogging": {
+              "type": "string",
+              "enum": [
+                "full"
+              ],
+              "default": "full"
+            }
+          }
+        }
+      }
+    },
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "dailySharing": {
+          "type": "string",
+          "enum": [
+            "off",
+            "draft_only",
+            "auto"
+          ],
+          "default": "auto"
+        },
+        "officialRelease": {
+          "type": "string",
+          "enum": [
+            "manual_approval",
+            "auto_with_release_policy"
+          ],
+          "default": "manual_approval"
+        },
+        "platforms": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": {
+              "$ref": "#/$defs/xPlatform"
+            },
+            "instagram": {
+              "$ref": "#/$defs/visualPlatform"
+            },
+            "tiktok": {
+              "$ref": "#/$defs/videoPlatform"
+            }
+          }
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "auditLog": {
+          "type": "boolean",
+          "default": true
+        },
+        "failClosed": {
+          "type": "boolean",
+          "default": true
+        },
+        "forbiddenTopics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "politics",
+            "medical",
+            "financial",
+            "religion",
+            "private_individuals",
+            "legal_claims"
+          ]
+        },
+        "forbidCaptchaBypass": {
+          "type": "boolean",
+          "default": true
+        },
+        "forbidCredentialLogging": {
+          "type": "boolean",
+          "default": true
+        },
+        "requireApprovalForHighRisk": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "xPlatform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "connector": {
+          "type": "string",
+          "const": "bird",
+          "default": "bird"
+        },
+        "authority": {
+          "type": "string",
+          "enum": [
+            "draft_only",
+            "auto_publish",
+            "auto_publish_and_low_risk_replies"
+          ],
+          "default": "auto_publish"
+        },
+        "maxPostsPerDay": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50,
+          "default": 3
+        },
+        "maxRepliesPerDay": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 200,
+          "default": 0
+        },
+        "autoPostTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "observation",
+            "studio_note",
+            "lyric_fragment",
+            "demo_teaser",
+            "new_song_link"
+          ]
+        }
+      }
+    },
+    "visualPlatform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "connector": {
+          "type": "string",
+          "const": "instagram_content_publishing",
+          "default": "instagram_content_publishing"
+        },
+        "authority": {
+          "type": "string",
+          "enum": [
+            "draft_only",
+            "auto_publish_visuals"
+          ],
+          "default": "auto_publish_visuals"
+        },
+        "maxPostsPerDay": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "default": 1
+        },
+        "autoPostTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "lyric_card",
+            "reel_teaser",
+            "cover_visual"
+          ]
+        }
+      }
+    },
+    "videoPlatform": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "connector": {
+          "type": "string",
+          "const": "tiktok_content_posting",
+          "default": "tiktok_content_posting"
+        },
+        "authority": {
+          "type": "string",
+          "enum": [
+            "draft_only",
+            "auto_publish_clips"
+          ],
+          "default": "auto_publish_clips"
+        },
+        "maxPostsPerDay": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20,
+          "default": 1
+        },
+        "autoPostTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "hook_clip",
+            "demo_teaser"
+          ]
+        }
+      }
+    }
+  }
+}
