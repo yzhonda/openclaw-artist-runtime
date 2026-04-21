@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildAlertsResponse, buildConfigResponse, buildPlatformDetailResponse, buildSongDetailResponse, buildSongLedgerResponse, buildSongsResponse, buildStatusResponse } from "../src/routes";
+import { buildAlertsResponse, buildConfigResponse, buildPlatformDetailResponse, buildSongDetailResponse, buildSongLedgerResponse, buildSongsResponse, buildStatusResponse, buildSunoStatusResponse } from "../src/routes";
 import { acknowledgeAlert } from "../src/services/alertAcks";
 import { createSongSkeleton } from "../src/repositories/songRepository";
 import { readSongState, updateSongState, writeSongBrief } from "../src/services/artistState";
@@ -15,7 +15,8 @@ import { prepareSocialAssets } from "../src/services/socialAssets";
 import { publishSocialAction } from "../src/services/socialPublishing";
 import { generateSunoRun, importSunoResults } from "../src/services/sunoRuns";
 import { createSongIdea } from "../src/services/songIdeation";
-import { selectTake } from "../src/services/takeSelection";
+import { SunoBrowserWorker } from "../src/services/sunoBrowserWorker";
+import { readTakeHistory, selectTake } from "../src/services/takeSelection";
 import { patchResolvedConfig } from "../src/services/runtimeConfig";
 
 describe("artist state", () => {
@@ -140,9 +141,11 @@ describe("suno and social pipelines", () => {
 
     const selected = await readFile(join(root, "songs", "song-001", "suno", "selected-take.json"), "utf8");
     const state = await readSongState(root, "song-001");
+    const takeHistory = await readTakeHistory(root, "song-001");
 
     expect(selection.selectedTakeId).toBe("take-2");
     expect(selected).toContain("take-2");
+    expect(takeHistory[0]?.selectedTakeId).toBe("take-2");
     expect(assets[0]?.platform).toBe("x");
     expect(state.status).toBe("social_assets");
   });
@@ -226,6 +229,7 @@ describe("suno and social pipelines", () => {
     const alerts = await buildAlertsResponse(config);
     const platform = await buildPlatformDetailResponse("instagram", config);
     const cfg = await buildConfigResponse({ artist: { workspaceRoot: root } });
+    const sunoStatus = await buildSunoStatusResponse({ artist: { workspaceRoot: root } });
     const paused = await pauseAutopilot(root, "maintenance");
     const resumed = await resumeAutopilot(root);
     const status = await buildStatusResponse({
@@ -242,13 +246,30 @@ describe("suno and social pipelines", () => {
     expect(songs).toHaveLength(1);
     expect(detail.song.songId).toBe(songId);
     expect(detail.latestPromptPack?.version).toBe(1);
+    expect(detail.takeHistory?.length).toBeGreaterThan(0);
     expect(ledger.length).toBeGreaterThan(0);
     expect(alerts.some((alert) => alert.message.includes("instagram"))).toBe(true);
     expect(platform.authority).toBe("auto_publish_visuals");
     expect(cfg.artist.workspaceRoot).toBe(root);
+    expect(sunoStatus.recentRuns.length).toBeGreaterThan(0);
     expect(paused.paused).toBe(true);
     expect(resumed.paused).toBe(false);
     expect(status.autopilot.currentSongId).toBe(songId);
+  });
+
+  it("persists dry-run-safe Suno connect and reconnect intents", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-worker-"));
+    await ensureArtistWorkspace(root);
+    const worker = new SunoBrowserWorker(root);
+
+    const connectStatus = await worker.connect();
+    const reconnectStatus = await worker.reconnect();
+    const status = await buildSunoStatusResponse({ artist: { workspaceRoot: root } });
+
+    expect(connectStatus.pendingAction).toBe("operator_login_required");
+    expect(reconnectStatus.pendingAction).toBe("reconnect_requested");
+    expect(status.worker.pendingAction).toBe("reconnect_requested");
+    expect(status.worker.state).toBe("disconnected");
   });
 
   it("acknowledges structured alerts", async () => {

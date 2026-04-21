@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { TakeSelectionRecord } from "../types.js";
 import { updateSongState } from "./artistState.js";
@@ -15,6 +15,19 @@ export interface SelectTakeInput {
 function inferTakeId(url: string, index: number): string {
   const lastSegment = url.split("/").filter(Boolean).at(-1);
   return lastSegment ? lastSegment.replace(/[^a-zA-Z0-9_-]/g, "-") : `take-${index + 1}`;
+}
+
+function takeHistoryPath(root: string, songId: string): string {
+  return join(root, "songs", songId, "suno", "take-history.jsonl");
+}
+
+export async function readTakeHistory(root: string, songId: string): Promise<TakeSelectionRecord[]> {
+  const contents = await readFile(takeHistoryPath(root, songId), "utf8").catch(() => "");
+  return contents
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as TakeSelectionRecord)
+    .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
 }
 
 export async function selectTake(input: SelectTakeInput): Promise<TakeSelectionRecord> {
@@ -38,11 +51,14 @@ export async function selectTake(input: SelectTakeInput): Promise<TakeSelectionR
     selectedTakeId,
     reason,
     sourceUrls: urls,
-    verification: { status: "verified", detail: reason }
+    verification: { status: "verified", detail: reason },
+    createdAt: new Date().toISOString()
   };
 
   const outputPath = join(input.workspaceRoot, "songs", input.songId, "suno", "selected-take.json");
+  await mkdir(join(input.workspaceRoot, "songs", input.songId, "suno"), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(record, null, 2)}\n`, "utf8");
+  await appendFile(takeHistoryPath(input.workspaceRoot, input.songId), `${JSON.stringify(record)}\n`, "utf8");
   await appendPromptLedger(
     getSongPromptLedgerPath(input.workspaceRoot, input.songId),
     createPromptLedgerEntry({

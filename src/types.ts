@@ -312,6 +312,7 @@ export interface SunoWorkerStatus {
   hardStopReason?: string;
   lastTransitionAt?: string;
   failureCount?: number;
+  pendingAction?: string;
 }
 
 export interface SunoCreateRequest {
@@ -352,6 +353,7 @@ export interface TakeSelectionRecord {
   reason: string;
   sourceUrls: string[];
   verification: VerificationResult;
+  createdAt?: string;
 }
 
 export interface SunoSliders {

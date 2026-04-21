@@ -3,7 +3,7 @@ import { SunoBrowserWorker } from "../../services/sunoBrowserWorker.js";
 import type { SunoConnector } from "./SunoConnector.js";
 
 export class BrowserWorkerSunoConnector implements SunoConnector {
-  constructor(private readonly worker = new SunoBrowserWorker()) {}
+  constructor(private readonly workspaceRoot = ".", private readonly worker = new SunoBrowserWorker(workspaceRoot)) {}
 
   async status() {
     return this.worker.status();
