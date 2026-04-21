@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import { defaultArtistRuntimeConfig } from "../config/defaultConfig.js";
@@ -448,9 +448,33 @@ export function registerRoutes(api: unknown): void {
   });
 }
 
-async function builtProducerConsoleHtml(): Promise<string | undefined> {
+export async function uiBuildIsFresh(projectRoot = process.cwd()): Promise<boolean> {
+  const uiRoot = join(projectRoot, "ui");
+  const distIndexPath = join(uiRoot, "dist", "index.html");
+  const distIndexStat = await stat(distIndexPath).catch(() => undefined);
+  if (!distIndexStat) {
+    return false;
+  }
+
+  const sourcePaths = [
+    join(uiRoot, "index.html"),
+    join(uiRoot, "package.json"),
+    join(uiRoot, "vite.config.ts"),
+    join(uiRoot, "src", "App.tsx"),
+    join(uiRoot, "src", "main.tsx"),
+    join(uiRoot, "src", "styles.css")
+  ];
+  const sourceStats = await Promise.all(sourcePaths.map(async (path) => stat(path).catch(() => undefined)));
+  return sourceStats.every((sourceStat) => !sourceStat || sourceStat.mtimeMs <= distIndexStat.mtimeMs);
+}
+
+async function builtProducerConsoleHtml(projectRoot = process.cwd()): Promise<string | undefined> {
   try {
-    const uiRoot = join(process.cwd(), "ui", "dist");
+    if (!(await uiBuildIsFresh(projectRoot))) {
+      return undefined;
+    }
+
+    const uiRoot = join(projectRoot, "ui", "dist");
     const indexHtml = await readFile(join(uiRoot, "index.html"), "utf8");
     const cssMatches = Array.from(indexHtml.matchAll(/<link[^>]+href="([^"]+\.css)"[^>]*>/g)).map((match) => match[1]);
     const scriptMatches = Array.from(indexHtml.matchAll(/<script[^>]+src="([^"]+\.js)"[^>]*><\/script>/g)).map((match) => match[1]);
