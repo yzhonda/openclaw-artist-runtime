@@ -1,5 +1,6 @@
 import { safeRegisterService } from "../pluginApi.js";
 import { ArtistAutopilotService } from "./autopilotService.js";
+import { SocialDistributionWorker } from "./socialDistributionWorker.js";
 import { SunoBrowserWorker } from "./sunoBrowserWorker.js";
 
 export function registerServices(api: unknown): void {
@@ -15,6 +16,6 @@ export function registerServices(api: unknown): void {
 
   safeRegisterService(api, {
     name: "socialDistributionWorker",
-    create: () => ({ status: "stub" })
+    create: () => new SocialDistributionWorker()
   });
 }

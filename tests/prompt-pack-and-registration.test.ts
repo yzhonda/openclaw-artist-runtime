@@ -7,7 +7,7 @@ import { createSunoPromptPack } from "../src/suno-production/generatePromptPack"
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
 import { validateSunoPromptPack } from "../src/validators/promptPackValidator";
 import { registerHooks } from "../src/hooks";
-import { buildStatusResponse, registerRoutes } from "../src/routes";
+import { buildConfigResponse, buildStatusResponse, producerConsoleHtml, registerRoutes } from "../src/routes";
 import { registerServices } from "../src/services";
 import { registerTools } from "../src/tools";
 
@@ -52,6 +52,30 @@ describe("prompt pack", () => {
     expect(readFileSync(result.artifactPaths.lyricsVersioned, "utf8")).toContain("駅の光だけが");
     expect(readFileSync(result.artifactPaths.promptLedger, "utf8")).toContain("\"stage\":\"suno_payload_build\"");
   });
+
+  it("reads the latest prompt pack metadata dynamically", async () => {
+    const workspaceRoot = mkdtempSync(join(tmpdir(), "artist-runtime-pack-latest-"));
+    await createAndPersistSunoPromptPack({
+      workspaceRoot,
+      songId: "song-001",
+      songTitle: "Ghost Station",
+      artistReason: "night transit residue",
+      lyricsText: "one",
+      knowledgePackVersion: "test-pack"
+    });
+    const second = await createAndPersistSunoPromptPack({
+      workspaceRoot,
+      songId: "song-001",
+      songTitle: "Ghost Station",
+      artistReason: "night transit residue again",
+      lyricsText: "two",
+      knowledgePackVersion: "test-pack"
+    });
+
+    expect(second.packVersion).toBe(2);
+    const detail = await buildStatusResponse({ artist: { workspaceRoot } });
+    expect(detail.musicSummary.latestPromptPackVersion).toBe(2);
+  });
 });
 
 describe("registration shells", () => {
@@ -83,12 +107,19 @@ describe("registration shells", () => {
     registerRoutes(api);
 
     expect(registered.tools).toContain("artist_suno_create_prompt_pack");
+    expect(registered.tools).toContain("artist_song_ideate");
     expect(registered.hooks).toContain("agent:bootstrap");
     expect(registered.services).toContain("artistAutopilotService");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/status");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/run-cycle");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/config");
 
     const status = await buildStatusResponse();
     expect(status.dryRun).toBe(true);
     expect(status.platforms.x.authority).toBe("auto_publish");
+    const consoleHtml = await producerConsoleHtml();
+    expect(consoleHtml).toContain("Artist Runtime");
+    expect(consoleHtml).toContain("Run Cycle");
+    expect((await buildConfigResponse()).artist.artistId).toBe("artist");
   });
 });

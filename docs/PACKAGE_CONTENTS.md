@@ -22,6 +22,7 @@ Artist Runtime is not a simple tool plugin. It includes:
 - dry-run and live connector separation.
 
 A compact package would be easier to publish, but worse for Codex-driven implementation because the subtle product constraints would be lost. Keep the detailed docs until the implementation is mature.
+The package still needs curation: built UI assets belong in the tarball, while local `ui/node_modules/` does not.
 
 ## Important directories
 
@@ -32,7 +33,7 @@ A compact package would be easier to publish, but worse for Codex-driven impleme
 ├── openclaw.plugin.json              # OpenClaw manifest/config schema surface
 ├── schemas/config.schema.json         # external config schema copy
 ├── src/                               # package runtime skeleton
-├── ui/                                # Producer Console skeleton
+├── ui/                                # Producer Console source and built bundle
 ├── workspace-template/                # files created in an artist workspace
 ├── docs/full-spec/                    # original detailed product/architecture specs
 ├── docs/codex-detailed-specs/         # same detailed specs retained for compatibility

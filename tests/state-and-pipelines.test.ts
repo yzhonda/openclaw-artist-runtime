@@ -3,13 +3,20 @@ import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildStatusResponse } from "../src/routes";
+import { buildAlertsResponse, buildConfigResponse, buildPlatformDetailResponse, buildSongDetailResponse, buildSongLedgerResponse, buildSongsResponse, buildStatusResponse } from "../src/routes";
+import { acknowledgeAlert } from "../src/services/alertAcks";
 import { createSongSkeleton } from "../src/repositories/songRepository";
 import { readSongState, updateSongState, writeSongBrief } from "../src/services/artistState";
+import { ArtistAutopilotService, pauseAutopilot, resumeAutopilot } from "../src/services/autopilotService";
 import { ensureArtistWorkspace } from "../src/services/artistWorkspace";
+import { draftLyrics } from "../src/services/lyricsDrafting";
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
+import { prepareSocialAssets } from "../src/services/socialAssets";
 import { publishSocialAction } from "../src/services/socialPublishing";
 import { generateSunoRun, importSunoResults } from "../src/services/sunoRuns";
+import { createSongIdea } from "../src/services/songIdeation";
+import { selectTake } from "../src/services/takeSelection";
+import { patchResolvedConfig } from "../src/services/runtimeConfig";
 
 describe("artist state", () => {
   it("updates song status without clobbering notes and syncs songbook", async () => {
@@ -41,6 +48,24 @@ describe("artist state", () => {
 });
 
 describe("suno and social pipelines", () => {
+  it("creates song ideas with a brief and prompt ledger trail", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-idea-"));
+    await ensureArtistWorkspace(root);
+
+    const idea = await createSongIdea({
+      workspaceRoot: root,
+      artistReason: "found in the station static"
+    });
+
+    const brief = await readFile(idea.briefPath, "utf8");
+    const ledger = await readFile(join(root, "songs", idea.songId, "prompts", "prompt-ledger.jsonl"), "utf8");
+
+    expect(idea.status).toBe("brief");
+    expect(brief).toContain("Why this song exists");
+    expect(ledger).toContain("\"stage\":\"song_ideation\"");
+    expect(ledger).toContain("\"stage\":\"song_brief_creation\"");
+  });
+
   it("records dry-run Suno generate and import into persisted ledgers", async () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-run-"));
     await ensureArtistWorkspace(root);
@@ -73,6 +98,53 @@ describe("suno and social pipelines", () => {
     expect(promptLedger).toContain("\"stage\":\"suno_result_import\"");
     expect(state.status).toBe("takes_imported");
     expect(state.selectedTakeId).toBe("take-1");
+  });
+
+  it("selects a take and prepares social assets from imported results", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-assets-"));
+    await ensureArtistWorkspace(root);
+    await createSongIdea({ workspaceRoot: root, artistReason: "quiet frequency" });
+    await draftLyrics({ workspaceRoot: root, songId: "song-001" });
+    await createAndPersistSunoPromptPack({
+      workspaceRoot: root,
+      songId: "song-001",
+      songTitle: "Ghost Station",
+      artistReason: "night transit residue",
+      lyricsText: "station after midnight\nsignal under frost",
+      knowledgePackVersion: "test-pack"
+    });
+
+    await importSunoResults({
+      workspaceRoot: root,
+      songId: "song-001",
+      runId: "run-1",
+      urls: ["https://example.com/take-1", "https://example.com/take-2"]
+    });
+    const selection = await selectTake({
+      workspaceRoot: root,
+      songId: "song-001",
+      selectedTakeId: "take-2",
+      reason: "take-2 holds the colder vocal"
+    });
+    const assets = await prepareSocialAssets({
+      workspaceRoot: root,
+      songId: "song-001",
+      config: {
+        distribution: {
+          platforms: {
+            x: { enabled: true }
+          }
+        }
+      }
+    });
+
+    const selected = await readFile(join(root, "songs", "song-001", "suno", "selected-take.json"), "utf8");
+    const state = await readSongState(root, "song-001");
+
+    expect(selection.selectedTakeId).toBe("take-2");
+    expect(selected).toContain("take-2");
+    expect(assets[0]?.platform).toBe("x");
+    expect(state.status).toBe("social_assets");
   });
 
   it("records denied social publish and exposes persisted status summaries", async () => {
@@ -114,5 +186,99 @@ describe("suno and social pipelines", () => {
     expect(status.recentSong?.songId).toBe("song-001");
     expect(status.lastSunoRun?.songId).toBe("song-001");
     expect(status.lastSocialAction?.platform).toBe("x");
+    expect(Array.isArray(status.alerts)).toBe(true);
+    expect(status.musicSummary.monthlyGenerationBudget).toBe(50);
+    expect(status.distributionSummary.postsToday).toBeGreaterThanOrEqual(0);
+  });
+
+  it("runs autopilot one stage at a time and exposes route helpers", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-autopilot-"));
+    await ensureArtistWorkspace(root);
+    const service = new ArtistAutopilotService();
+    const config = {
+      artist: { workspaceRoot: root },
+      autopilot: { enabled: true },
+      distribution: {
+        platforms: {
+          instagram: { enabled: true }
+        }
+      }
+    };
+
+    const first = await service.runCycle({ workspaceRoot: root, config });
+    const second = await service.runCycle({ workspaceRoot: root, config });
+    const third = await service.runCycle({ workspaceRoot: root, config });
+
+    const songId = first.currentSongId ?? "song-001";
+    await importSunoResults({
+      workspaceRoot: root,
+      songId,
+      runId: "auto-import",
+      urls: ["https://example.com/auto-take-1"]
+    });
+    const fourth = await service.runCycle({ workspaceRoot: root, config });
+    const fifth = await service.runCycle({ workspaceRoot: root, config });
+    const sixth = await service.runCycle({ workspaceRoot: root, config });
+
+    const songs = await buildSongsResponse({ artist: { workspaceRoot: root } });
+    const detail = await buildSongDetailResponse(songId, { artist: { workspaceRoot: root } });
+    const ledger = await buildSongLedgerResponse(songId, { artist: { workspaceRoot: root } });
+    const alerts = await buildAlertsResponse(config);
+    const platform = await buildPlatformDetailResponse("instagram", config);
+    const cfg = await buildConfigResponse({ artist: { workspaceRoot: root } });
+    const paused = await pauseAutopilot(root, "maintenance");
+    const resumed = await resumeAutopilot(root);
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root },
+      autopilot: { enabled: true }
+    });
+
+    expect(first.stage).toBe("planning");
+    expect(second.lastSuccessfulStage).toBe("prompt_pack");
+    expect(third.lastSuccessfulStage).toBe("suno_generation");
+    expect(fourth.lastSuccessfulStage).toBe("take_selection");
+    expect(fifth.lastSuccessfulStage).toBe("asset_generation");
+    expect(sixth.lastSuccessfulStage).toBe("publishing");
+    expect(songs).toHaveLength(1);
+    expect(detail.song.songId).toBe(songId);
+    expect(detail.latestPromptPack?.version).toBe(1);
+    expect(ledger.length).toBeGreaterThan(0);
+    expect(alerts.some((alert) => alert.message.includes("instagram"))).toBe(true);
+    expect(platform.authority).toBe("auto_publish_visuals");
+    expect(cfg.artist.workspaceRoot).toBe(root);
+    expect(paused.paused).toBe(true);
+    expect(resumed.paused).toBe(false);
+    expect(status.autopilot.currentSongId).toBe(songId);
+  });
+
+  it("acknowledges structured alerts", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-alert-ack-"));
+    await ensureArtistWorkspace(root);
+    await pauseAutopilot(root, "maintenance");
+
+    const before = await buildAlertsResponse({ artist: { workspaceRoot: root } });
+    const autopilotAlert = before.find((alert) => alert.source === "autopilot");
+    expect(autopilotAlert).toBeTruthy();
+
+    await acknowledgeAlert(root, autopilotAlert!.id);
+
+    const after = await buildAlertsResponse({ artist: { workspaceRoot: root } });
+    expect(after.find((alert) => alert.id === autopilotAlert!.id)?.ackedAt).toBeTruthy();
+  });
+
+  it("persists config overrides for route-backed reads", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-config-"));
+    await ensureArtistWorkspace(root);
+
+    await patchResolvedConfig(root, {
+      artist: { workspaceRoot: root, artistId: "ghost-artist" },
+      autopilot: { enabled: true, dryRun: false }
+    });
+
+    const config = await buildConfigResponse({ artist: { workspaceRoot: root } });
+
+    expect(config.artist.artistId).toBe("ghost-artist");
+    expect(config.autopilot.enabled).toBe(true);
+    expect(config.autopilot.dryRun).toBe(false);
   });
 });

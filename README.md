@@ -109,6 +109,9 @@ npm run build
 npm run pack:verify
 ```
 
+`npm run build` builds both the runtime TypeScript output and the Producer Console bundle.
+The UI bundle is built from `ui/` and included in package verification.
+
 Before public distribution, update:
 
 - package scope/name;
@@ -117,6 +120,17 @@ Before public distribution, update:
 - compatibility versions;
 - OAuth application IDs and documentation;
 - marketplace screenshots and demo flow.
+
+## Producer Console bundle
+
+The plugin serves a built Producer Console from `ui/dist/` when present.
+If the bundle is missing, the plugin falls back to a minimal inline Console shell for safe inspection-only use.
+
+To build just the Console:
+
+```bash
+npm run build:ui
+```
 
 ## Full implementation specification
 

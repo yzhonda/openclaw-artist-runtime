@@ -1,3 +1,4 @@
+import { readAlertAcks } from "./alertAcks.js";
 import { inspectAuditLog } from "./auditLog.js";
 import { listSongStates } from "./artistState.js";
 import type { AlertRecord, ArtistRuntimeConfig, PlatformStatus, SunoWorkerStatus } from "../types.js";
@@ -19,6 +20,7 @@ export async function collectAlerts(
   config: ArtistRuntimeConfig
 ): Promise<AlertRecord[]> {
   const alerts: AlertRecord[] = [];
+  const ackMap = await readAlertAcks(workspaceRoot);
   const songs = await listSongStates(workspaceRoot);
   for (const song of songs) {
     const promptLedger = await inspectJsonlFile(`${workspaceRoot}/songs/${song.songId}/prompts/prompt-ledger.jsonl`);
@@ -121,5 +123,8 @@ export async function collectAlerts(
     }
   }
 
-  return alerts;
+  return alerts.map((alert) => ({
+    ...alert,
+    ackedAt: ackMap[alert.id]
+  }));
 }

@@ -291,6 +291,21 @@ export interface PlatformStatus {
   reason?: string;
 }
 
+export interface MusicSummary {
+  monthlyGenerationBudget: number;
+  monthlyRuns: number;
+  dailyRuns: number;
+  latestPromptPackVersion?: number;
+  latestPromptPackMetadata?: Record<string, unknown>;
+}
+
+export interface DistributionSummary {
+  postsToday: number;
+  repliesToday: number;
+  lastPlatform?: SocialPlatform;
+  lastPostUrl?: string;
+}
+
 export interface SunoWorkerStatus {
   state: SunoWorkerState;
   connected: boolean;
@@ -457,6 +472,7 @@ export interface AlertRecord {
   songId?: string;
   detail?: string;
   createdAt: string;
+  ackedAt?: string;
 }
 
 export interface StatusResponse {
@@ -465,6 +481,8 @@ export interface StatusResponse {
   autopilot: AutopilotStatus;
   sunoWorker: SunoWorkerStatus;
   platforms: Record<SocialPlatform, PlatformStatus>;
+  musicSummary: MusicSummary;
+  distributionSummary: DistributionSummary;
   alerts: AlertRecord[];
   recentSong?: SongState;
   lastSunoRun?: SunoRunRecord;

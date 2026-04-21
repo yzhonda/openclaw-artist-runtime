@@ -8,7 +8,9 @@ const required = [
   "PRIVACY.md",
   "CAPABILITIES.md",
   "CHANGELOG.md",
-  "LICENSE"
+  "LICENSE",
+  "dist/index.js",
+  "ui/dist/index.html"
 ];
 
 let ok = true;
