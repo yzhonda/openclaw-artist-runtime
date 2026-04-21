@@ -20,7 +20,19 @@ import { generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services
 import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
 import { createSongIdea } from "../services/songIdeation.js";
 import { readTakeHistory, selectTake } from "../services/takeSelection.js";
-import type { ArtistRuntimeConfig, MusicSummary, PlatformStatus, PromptLedgerEntry, SocialPlatform, StatusResponse, SunoRunRecord, DistributionSummary, SocialPublishLedgerEntry } from "../types.js";
+import type {
+  ArtistRuntimeConfig,
+  DistributionSummary,
+  MusicSummary,
+  PlatformStatus,
+  PromptLedgerEntry,
+  SetupChecklistItem,
+  SetupReadiness,
+  SocialPlatform,
+  SocialPublishLedgerEntry,
+  StatusResponse,
+  SunoRunRecord
+} from "../types.js";
 
 async function readJsonlEntries<T>(path: string): Promise<T[]> {
   const contents = await readFile(path, "utf8").catch(() => "");
@@ -115,6 +127,135 @@ async function buildWorkspaceSummaries(workspaceRoot: string): Promise<Pick<Stat
     recentSong,
     lastSunoRun: await readLatestSunoRun(workspaceRoot, recentSong.songId),
     lastSocialAction: await readLatestSocialAction(workspaceRoot, recentSong.songId)
+  };
+}
+
+async function fileHasContent(path: string): Promise<boolean> {
+  const contents = await readFile(path, "utf8").catch(() => "");
+  return contents.trim().length > 0;
+}
+
+async function buildSetupReadiness(
+  config: ArtistRuntimeConfig,
+  autopilot: StatusResponse["autopilot"],
+  sunoWorker: StatusResponse["sunoWorker"],
+  platforms: Record<SocialPlatform, PlatformStatus>,
+  workspaceStatus: Pick<StatusResponse, "recentSong" | "lastSunoRun" | "lastSocialAction">
+): Promise<SetupReadiness> {
+  const workspaceRoot = config.artist.workspaceRoot;
+  const enabledPlatforms = (Object.entries(config.distribution.platforms) as Array<[SocialPlatform, ArtistRuntimeConfig["distribution"]["platforms"][SocialPlatform]]>)
+    .filter(([, platformConfig]) => platformConfig.enabled)
+    .map(([platform]) => platform);
+  const artistProfileReady = await Promise.all([
+    fileHasContent(join(workspaceRoot, "ARTIST.md")),
+    fileHasContent(join(workspaceRoot, "SOUL.md")),
+    fileHasContent(join(workspaceRoot, "artist", "SOCIAL_VOICE.md")),
+    fileHasContent(join(workspaceRoot, "artist", "RELEASE_POLICY.md"))
+  ]).then((values) => values.every(Boolean));
+  const selectedPlatformsConnected = enabledPlatforms.length > 0 && enabledPlatforms.every((platform) => platforms[platform].connected);
+  const budgetsReady = config.autopilot.cycleIntervalMinutes > 0
+    && config.autopilot.songsPerWeek > 0
+    && config.music.suno.monthlyGenerationBudget > 0
+    && config.music.suno.maxGenerationsPerDay > 0;
+  const hardStopsConfirmed = config.safety.failClosed
+    && config.music.suno.stopOnLoginChallenge
+    && config.music.suno.stopOnCaptcha
+    && config.music.suno.stopOnPaymentPrompt;
+  const dryRunCycleCompleted = Boolean(
+    workspaceStatus.recentSong
+    || workspaceStatus.lastSunoRun
+    || workspaceStatus.lastSocialAction
+    || autopilot.currentRunId
+    || autopilot.lastSuccessfulStage
+  );
+
+  const checklist: SetupChecklistItem[] = [
+    {
+      id: "create_artist",
+      label: "Create artist",
+      state: artistProfileReady ? "complete" : "pending",
+      detail: artistProfileReady
+        ? "ARTIST.md, SOUL.md, SOCIAL_VOICE, and RELEASE_POLICY are present."
+        : "Finish the artist constitution and voice files in the workspace template."
+    },
+    {
+      id: "choose_platforms",
+      label: "Choose platforms",
+      state: enabledPlatforms.length > 0 ? "complete" : "pending",
+      detail: enabledPlatforms.length > 0
+        ? `Selected: ${enabledPlatforms.join(", ")}`
+        : "Enable at least one public platform for daily sharing."
+    },
+    {
+      id: "connect_suno",
+      label: "Connect Suno",
+      state: sunoWorker.connected ? "complete" : "pending",
+      detail: sunoWorker.connected
+        ? "Suno browser worker is connected."
+        : sunoWorker.pendingAction ?? "Request operator login and keep the worker profile alive."
+    },
+    {
+      id: "connect_social",
+      label: "Connect selected social platforms",
+      state: enabledPlatforms.length === 0 ? "pending" : selectedPlatformsConnected ? "complete" : "pending",
+      detail: enabledPlatforms.length === 0
+        ? "Choose platforms before checking social connections."
+        : selectedPlatformsConnected
+          ? "All enabled platforms report connected."
+          : `Waiting on connections for ${enabledPlatforms.filter((platform) => !platforms[platform].connected).join(", ")}.`
+    },
+    {
+      id: "budgets_and_cadence",
+      label: "Choose budgets and cadence",
+      state: budgetsReady ? "complete" : "attention",
+      detail: budgetsReady
+        ? `Cycle ${config.autopilot.cycleIntervalMinutes} min · ${config.music.suno.monthlyGenerationBudget} Suno runs/month.`
+        : "Set positive cadence, weekly song target, and Suno budget limits."
+    },
+    {
+      id: "confirm_hard_stops",
+      label: "Confirm hard stops",
+      state: hardStopsConfirmed ? "complete" : "attention",
+      detail: hardStopsConfirmed
+        ? "Fail-closed and Suno hard-stop rules are active."
+        : "Turn on fail-closed mode and all Suno stop conditions."
+    },
+    {
+      id: "run_dry_run_cycle",
+      label: "Run dry-run cycle",
+      state: dryRunCycleCompleted ? "complete" : "pending",
+      detail: dryRunCycleCompleted
+        ? `Observed via ${workspaceStatus.recentSong ? `song ${workspaceStatus.recentSong.songId}` : autopilot.currentRunId ?? "autopilot state"}.`
+        : "Run one dry-run cycle to create initial song/runtime evidence."
+    }
+  ];
+
+  const readyForAutopilot = checklist.every((item) => item.state === "complete");
+  const autopilotLiveState: SetupChecklistItem = {
+    id: "turn_on_autopilot",
+    label: "Turn on autopilot",
+    state: config.autopilot.enabled && !config.autopilot.dryRun
+      ? readyForAutopilot ? "complete" : "attention"
+      : "pending",
+    detail: config.autopilot.enabled && !config.autopilot.dryRun
+      ? readyForAutopilot
+        ? "Live autopilot is enabled."
+        : "Autopilot is live before setup is complete."
+      : readyForAutopilot
+        ? "Setup is ready; you can switch off dry-run and enable live autopilot."
+        : "Keep dry-run on until the preceding setup items are complete."
+  };
+  checklist.push(autopilotLiveState);
+
+  const completeCount = checklist.filter((item) => item.state === "complete").length;
+  const nextIncomplete = checklist.find((item) => item.state !== "complete");
+
+  return {
+    completeCount,
+    totalCount: checklist.length,
+    readyForAutopilot,
+    nextRecommendedAction: nextIncomplete?.label ?? "Setup complete",
+    checklist
   };
 }
 
@@ -248,6 +389,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     buildMusicSummary(mergedConfig),
     buildDistributionSummary(mergedConfig, platforms)
   ]);
+  const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
 
   return {
     config: mergedConfig,
@@ -258,6 +400,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     platforms,
     musicSummary,
     distributionSummary,
+    setupReadiness,
     alerts,
     recentSong: workspaceStatus.recentSong,
     lastSunoRun: workspaceStatus.lastSunoRun,

@@ -23,6 +23,7 @@ export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generat
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "published", "archived", "failed"] as const;
 export const sunoRunStatuses = ["blocked_dry_run", "blocked_authority", "accepted", "imported", "failed"] as const;
 export const alertSeverities = ["info", "warning", "critical"] as const;
+export const setupChecklistStates = ["complete", "pending", "attention"] as const;
 
 export type ProducerDigestMode = (typeof producerDigestModes)[number];
 export type SunoConnectionMode = (typeof sunoConnectionModes)[number];
@@ -41,6 +42,7 @@ export type AutopilotStage = (typeof autopilotStages)[number];
 export type SongStatus = (typeof songStatuses)[number];
 export type SunoRunStatus = (typeof sunoRunStatuses)[number];
 export type AlertSeverity = (typeof alertSeverities)[number];
+export type SetupChecklistState = (typeof setupChecklistStates)[number];
 
 export interface ArtistConfig {
   mode: "public_artist";
@@ -306,6 +308,21 @@ export interface DistributionSummary {
   lastPostUrl?: string;
 }
 
+export interface SetupChecklistItem {
+  id: string;
+  label: string;
+  state: SetupChecklistState;
+  detail: string;
+}
+
+export interface SetupReadiness {
+  completeCount: number;
+  totalCount: number;
+  readyForAutopilot: boolean;
+  nextRecommendedAction: string;
+  checklist: SetupChecklistItem[];
+}
+
 export interface SocialDistributionWorkerStatus {
   enabled: boolean;
   dryRun: boolean;
@@ -501,6 +518,7 @@ export interface StatusResponse {
   platforms: Record<SocialPlatform, PlatformStatus>;
   musicSummary: MusicSummary;
   distributionSummary: DistributionSummary;
+  setupReadiness: SetupReadiness;
   alerts: AlertRecord[];
   recentSong?: SongState;
   lastSunoRun?: SunoRunRecord;

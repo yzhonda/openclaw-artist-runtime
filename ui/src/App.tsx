@@ -3,6 +3,18 @@ import "./styles.css";
 
 type StatusResponse = {
   dryRun: boolean;
+  setupReadiness: {
+    completeCount: number;
+    totalCount: number;
+    readyForAutopilot: boolean;
+    nextRecommendedAction: string;
+    checklist: Array<{
+      id: string;
+      label: string;
+      state: "complete" | "pending" | "attention";
+      detail: string;
+    }>;
+  };
   autopilot: {
     stage: string;
     nextAction: string;
@@ -382,9 +394,33 @@ export function App() {
           value={status ? `${status.distributionSummary.postsToday} posts` : "-"}
           detail={status ? `${status.distributionSummary.repliesToday} replies · ${status.distributionWorker.blockedReason ?? status.distributionSummary.lastPlatform ?? "no platform yet"}` : "loading"}
         />
+        <MetricCard
+          label="Setup"
+          value={status ? `${status.setupReadiness.completeCount}/${status.setupReadiness.totalCount}` : "-"}
+          detail={status ? `${status.setupReadiness.readyForAutopilot ? "ready for live autopilot" : "setup incomplete"} · ${status.setupReadiness.nextRecommendedAction}` : "loading"}
+        />
       </section>
 
       <section className="two-column">
+        <article className="panel">
+          <div className="section-title">Setup Readiness</div>
+          <div className="list">
+            <div className="item">
+              <strong>{status?.setupReadiness.readyForAutopilot ? "ready for live autopilot" : "setup in progress"}</strong>
+              <div className="muted">{status ? `next: ${status.setupReadiness.nextRecommendedAction}` : "loading"}</div>
+            </div>
+            {status?.setupReadiness.checklist.map((item) => (
+              <div className={`item setup-${item.state}`} key={item.id}>
+                <div className="inline-actions">
+                  <strong>{item.label}</strong>
+                  <span className={`pill pill-${item.state}`}>{item.state}</span>
+                </div>
+                <div className="muted">{item.detail}</div>
+              </div>
+            )) ?? <div className="item muted">Loading setup state.</div>}
+          </div>
+        </article>
+
         <article className="panel">
           <div className="section-title">Distribution Worker</div>
           <div className="list">

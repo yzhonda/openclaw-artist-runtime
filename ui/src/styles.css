@@ -181,6 +181,33 @@ input[type="checkbox"] {
   font-size: 0.8rem;
 }
 
+.pill-complete {
+  background: #dfeee3;
+  color: #1d6a45;
+}
+
+.pill-pending {
+  background: #efe2d6;
+  color: var(--accent);
+}
+
+.pill-attention {
+  background: #f4e3c4;
+  color: var(--warning);
+}
+
+.setup-complete {
+  border-left: 4px solid #1d6a45;
+}
+
+.setup-pending {
+  border-left: 4px solid var(--accent);
+}
+
+.setup-attention {
+  border-left: 4px solid var(--warning);
+}
+
 .alert-info {
   border-left: 4px solid var(--accent);
 }

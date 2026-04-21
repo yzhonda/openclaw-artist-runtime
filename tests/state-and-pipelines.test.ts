@@ -20,6 +20,22 @@ import { readTakeHistory, selectTake } from "../src/services/takeSelection";
 import { patchResolvedConfig } from "../src/services/runtimeConfig";
 
 describe("artist state", () => {
+  it("surfaces setup readiness for a fresh workspace", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-setup-"));
+    await ensureArtistWorkspace(root);
+
+    const status = await buildStatusResponse({ artist: { workspaceRoot: root } });
+    const createArtist = status.setupReadiness.checklist.find((item) => item.id === "create_artist");
+    const choosePlatforms = status.setupReadiness.checklist.find((item) => item.id === "choose_platforms");
+    const connectSuno = status.setupReadiness.checklist.find((item) => item.id === "connect_suno");
+
+    expect(status.setupReadiness.readyForAutopilot).toBe(false);
+    expect(status.setupReadiness.nextRecommendedAction).toBe("Choose platforms");
+    expect(createArtist?.state).toBe("complete");
+    expect(choosePlatforms?.state).toBe("pending");
+    expect(connectSuno?.state).toBe("pending");
+  });
+
   it("updates song status without clobbering notes and syncs songbook", async () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-state-"));
     await ensureArtistWorkspace(root);
@@ -194,6 +210,7 @@ describe("suno and social pipelines", () => {
     expect(status.musicSummary.monthlyGenerationBudget).toBe(50);
     expect(status.distributionSummary.postsToday).toBeGreaterThanOrEqual(0);
     expect(status.distributionWorker.blockedReason).toContain("dry-run");
+    expect(status.setupReadiness.checklist.find((item) => item.id === "run_dry_run_cycle")?.state).toBe("complete");
   });
 
   it("runs autopilot one stage at a time and exposes route helpers", async () => {
@@ -258,6 +275,7 @@ describe("suno and social pipelines", () => {
     expect(resumed.paused).toBe(false);
     expect(status.autopilot.currentSongId).toBe(songId);
     expect(status.autopilot.blockedReason).toContain("dry-run");
+    expect(status.setupReadiness.checklist.find((item) => item.id === "run_dry_run_cycle")?.state).toBe("complete");
   });
 
   it("persists dry-run-safe Suno connect and reconnect intents", async () => {
