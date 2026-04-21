@@ -206,6 +206,7 @@ export class ArtistAutopilotService {
       return writeAutopilotState(input.workspaceRoot, {
         ...existing,
         stage: "idle",
+        blockedReason: "autopilot disabled by config",
         lastRunAt: nowIso()
       });
     }
@@ -213,6 +214,7 @@ export class ArtistAutopilotService {
       return writeAutopilotState(input.workspaceRoot, {
         ...existing,
         stage: "paused",
+        blockedReason: existing.pausedReason ?? "paused by operator",
         lastRunAt: nowIso()
       });
     }
@@ -220,6 +222,7 @@ export class ArtistAutopilotService {
       return writeAutopilotState(input.workspaceRoot, {
         ...existing,
         stage: "failed_closed",
+        blockedReason: existing.hardStopReason,
         lastRunAt: nowIso()
       });
     }
@@ -246,6 +249,8 @@ export class ArtistAutopilotService {
           ...baseState,
           currentSongId: idea.songId,
           stage: "planning",
+          blockedReason: undefined,
+          lastError: undefined,
           lastSuccessfulStage: "planning",
           cycleCount: existing.cycleCount + 1
         });
@@ -258,16 +263,20 @@ export class ArtistAutopilotService {
             ...baseState,
             currentSongId: song.songId,
             stage: "prompt_pack",
+            blockedReason: undefined,
+            lastError: undefined,
             lastSuccessfulStage: "prompt_pack",
             cycleCount: existing.cycleCount + 1
           });
         }
         case "suno_generation": {
-          await generateSunoRun({ workspaceRoot: input.workspaceRoot, songId: song.songId, config });
+          const run = await generateSunoRun({ workspaceRoot: input.workspaceRoot, songId: song.songId, config });
           return writeAutopilotState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "suno_generation",
+            blockedReason: run.status === "accepted" || run.status === "blocked_dry_run" ? "waiting for Suno result import" : run.authorityDecision.reason,
+            lastError: run.error?.message,
             lastSuccessfulStage: "suno_generation",
             cycleCount: existing.cycleCount + 1
           });
@@ -278,6 +287,8 @@ export class ArtistAutopilotService {
             ...baseState,
             currentSongId: song.songId,
             stage: "take_selection",
+            blockedReason: undefined,
+            lastError: undefined,
             lastSuccessfulStage: "take_selection",
             cycleCount: existing.cycleCount + 1
           });
@@ -288,6 +299,8 @@ export class ArtistAutopilotService {
             ...baseState,
             currentSongId: song.songId,
             stage: "asset_generation",
+            blockedReason: undefined,
+            lastError: undefined,
             lastSuccessfulStage: "asset_generation",
             cycleCount: existing.cycleCount + 1
           });
@@ -302,7 +315,7 @@ export class ArtistAutopilotService {
             `${platform}-${platform === "x" ? "post" : "caption"}.md`
           );
           const text = await readFile(assetPath, "utf8").catch(() => song.title);
-          await publishSocialAction({
+          const published = await publishSocialAction({
             workspaceRoot: input.workspaceRoot,
             songId: song.songId,
             platform,
@@ -315,6 +328,8 @@ export class ArtistAutopilotService {
             ...baseState,
             currentSongId: song.songId,
             stage: "publishing",
+            blockedReason: published.result.accepted ? undefined : published.result.reason,
+            lastError: published.result.accepted ? undefined : published.result.reason,
             lastSuccessfulStage: "publishing",
             cycleCount: existing.cycleCount + 1
           });
@@ -324,6 +339,8 @@ export class ArtistAutopilotService {
             ...baseState,
             currentSongId: song.songId,
             stage: "completed",
+            blockedReason: undefined,
+            lastError: undefined,
             lastSuccessfulStage: "completed",
             cycleCount: existing.cycleCount + 1
           });
@@ -333,13 +350,16 @@ export class ArtistAutopilotService {
             ...baseState,
             currentSongId: song.songId,
             stage: "failed_closed",
-            hardStopReason: song.lastReason ?? "song marked failed"
+            hardStopReason: song.lastReason ?? "song marked failed",
+            blockedReason: song.lastReason ?? "song marked failed"
           });
         }
         default:
           return writeAutopilotState(input.workspaceRoot, {
             ...baseState,
             stage: "planning",
+            blockedReason: undefined,
+            lastError: undefined,
             lastSuccessfulStage: "planning",
             cycleCount: existing.cycleCount + 1
           });
@@ -350,6 +370,8 @@ export class ArtistAutopilotService {
         ...baseState,
         stage: "failed_closed",
         hardStopReason: message,
+        blockedReason: message,
+        lastError: message,
         retryCount: existing.retryCount + 1
       });
     }
@@ -377,6 +399,8 @@ export class ArtistAutopilotService {
       lastSuccessfulStage: state.lastSuccessfulStage,
       pausedReason: state.pausedReason,
       hardStopReason: state.hardStopReason,
+      blockedReason: state.blockedReason,
+      lastError: state.lastError,
       retryCount: state.retryCount
     };
   }
