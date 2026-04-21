@@ -1,5 +1,4 @@
-import { mkdtempSync } from "node:fs";
-import { readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -7,7 +6,7 @@ import { createSunoPromptPack } from "../src/suno-production/generatePromptPack"
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
 import { validateSunoPromptPack } from "../src/validators/promptPackValidator";
 import { registerHooks } from "../src/hooks";
-import { buildConfigResponse, buildStatusResponse, producerConsoleHtml, registerRoutes } from "../src/routes";
+import { buildConfigResponse, buildStatusResponse, producerConsoleHtml, registerRoutes, uiBuildIsFresh } from "../src/routes";
 import { registerServices } from "../src/services";
 import { registerTools } from "../src/tools";
 
@@ -75,6 +74,35 @@ describe("prompt pack", () => {
     expect(second.packVersion).toBe(2);
     const detail = await buildStatusResponse({ artist: { workspaceRoot } });
     expect(detail.musicSummary.latestPromptPackVersion).toBe(2);
+  });
+
+  it("detects stale producer console bundles", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-ui-fresh-"));
+    mkdirSync(join(root, "ui", "src"), { recursive: true });
+    mkdirSync(join(root, "ui", "dist"), { recursive: true });
+    writeFileSync(join(root, "ui", "index.html"), "<!doctype html>", "utf8");
+    writeFileSync(join(root, "ui", "package.json"), "{}", "utf8");
+    writeFileSync(join(root, "ui", "vite.config.ts"), "export default {}", "utf8");
+    writeFileSync(join(root, "ui", "src", "App.tsx"), "export const App = () => null;", "utf8");
+    writeFileSync(join(root, "ui", "src", "main.tsx"), "console.log('main');", "utf8");
+    writeFileSync(join(root, "ui", "src", "styles.css"), "body{}", "utf8");
+    writeFileSync(join(root, "ui", "dist", "index.html"), "<!doctype html><div>built</div>", "utf8");
+
+    const older = new Date("2024-01-01T00:00:00.000Z");
+    const newer = new Date("2024-01-02T00:00:00.000Z");
+    utimesSync(join(root, "ui", "index.html"), older, older);
+    utimesSync(join(root, "ui", "package.json"), older, older);
+    utimesSync(join(root, "ui", "vite.config.ts"), older, older);
+    utimesSync(join(root, "ui", "src", "main.tsx"), older, older);
+    utimesSync(join(root, "ui", "src", "styles.css"), older, older);
+    utimesSync(join(root, "ui", "dist", "index.html"), older, older);
+    utimesSync(join(root, "ui", "src", "App.tsx"), newer, newer);
+
+    expect(await uiBuildIsFresh(root)).toBe(false);
+
+    const newest = new Date("2024-01-03T00:00:00.000Z");
+    utimesSync(join(root, "ui", "dist", "index.html"), newest, newest);
+    expect(await uiBuildIsFresh(root)).toBe(true);
   });
 });
 
