@@ -1,0 +1,100 @@
+{
+  "name": "@your-org/openclaw-artist-runtime",
+  "version": "0.1.0",
+  "description": "OpenClaw native plugin that runs a public autonomous AI musician with Suno generation and social distribution.",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist/**",
+    "ui/dist/**",
+    "templates/**",
+    "prompts/**",
+    "schemas/**",
+    "openclaw.plugin.json",
+    "README.md",
+    "SECURITY.md",
+    "PRIVACY.md",
+    "CAPABILITIES.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE.md",
+    "SPEC_INDEX.md",
+    "docs/",
+    "templates/",
+    "workspace-template/",
+    "prompts/",
+    "schemas/",
+    "src/",
+    "ui/",
+    "MARKETPLACE.md",
+    "PUBLISHING.md",
+    "AGENTS.md",
+    "CODEX_START_HERE.md",
+    "AGENTS.distribution-short.md",
+    "CONTRIBUTING.md",
+    "docs/**",
+    "workspace-template/**",
+    "src/**",
+    "ui/**"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "pack:verify": "node ./scripts/verify-package.mjs",
+    "pack:dry-run": "npm pack --dry-run",
+    "clawhub:dry-run": "clawhub package publish . --dry-run",
+    "prepublish:local": "npm run typecheck && npm test && npm run build && npm run pack:verify && npm run pack:dry-run"
+  },
+  "keywords": [
+    "openclaw",
+    "plugin",
+    "artist",
+    "suno",
+    "music",
+    "x",
+    "instagram",
+    "tiktok",
+    "autonomous-agent"
+  ],
+  "author": "Your Name or Organization",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/openclaw-artist-runtime.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/openclaw-artist-runtime/issues"
+  },
+  "homepage": "https://github.com/your-org/openclaw-artist-runtime#readme",
+  "dependencies": {
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.0"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2",
+      "pluginSdkVersion": "2026.3.24-beta.2"
+    }
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

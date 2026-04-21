@@ -1,0 +1,63 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { defaultArtistRuntimeConfig } from "../src/config/defaultConfig";
+import { applyConfigDefaults, validateConfig } from "../src/config/schema";
+
+type JsonSchema = {
+  properties?: Record<string, JsonSchema>;
+  $defs?: Record<string, JsonSchema>;
+  default?: unknown;
+  $ref?: string;
+};
+
+function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function extractDefaults(schema: JsonSchema, root: JsonSchema): unknown {
+  if (schema.$ref) {
+    const refKey = schema.$ref.replace("#/$defs/", "");
+    return extractDefaults(root.$defs?.[refKey] ?? {}, root);
+  }
+  if (schema.properties) {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(schema.properties)) {
+      const extracted = extractDefaults(value, root);
+      if (extracted !== undefined) {
+        result[key] = extracted;
+      }
+    }
+    return result;
+  }
+  return schema.default;
+}
+
+describe("config schema", () => {
+  it("starts in dry-run", () => {
+    expect(defaultArtistRuntimeConfig.autopilot.dryRun).toBe(true);
+  });
+
+  it("rejects unknown keys", () => {
+    const result = validateConfig({ unknown: true });
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toContain("not allowed");
+  });
+
+  it("applies defaults to partial config", () => {
+    const merged = applyConfigDefaults({ autopilot: { enabled: true } });
+    expect(merged.autopilot.enabled).toBe(true);
+    expect(merged.autopilot.dryRun).toBe(true);
+    expect(merged.music.suno.authority).toBe("auto_create_and_select_take");
+  });
+
+  it("keeps manifest schema and schema copy aligned", () => {
+    const manifest = readJson("./openclaw.plugin.json") as { configSchema: unknown };
+    const schemaCopy = readJson("./schemas/config.schema.json");
+    expect(manifest.configSchema).toEqual(schemaCopy);
+  });
+
+  it("keeps default config aligned with schema defaults", () => {
+    const schema = readJson("./schemas/config.schema.json") as JsonSchema;
+    expect(extractDefaults(schema, schema)).toEqual(defaultArtistRuntimeConfig);
+  });
+});
