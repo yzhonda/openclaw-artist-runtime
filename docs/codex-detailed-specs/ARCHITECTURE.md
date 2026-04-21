@@ -45,11 +45,23 @@ User intent and policy:
 
 Human-readable creative state:
 
+- `SOUL.md`,
 - `ARTIST.md`,
 - `CURRENT_STATE.md`,
 - `OBSERVATIONS.md`,
 - `SONGBOOK.md`,
 - `songs/<song-id>/**`.
+
+Role split:
+
+- `AGENTS.md` holds top-level standing orders for autonomous public-artist behavior.
+- `SOUL.md` is the OpenClaw-standard conversation/personality file. It defines how the artist speaks with the producer.
+- `ARTIST.md` is Artist Runtime-specific bootstrap content. It defines who the artist is creatively: aesthetics, creative constitution, music direction, lyric rules, social expression, and Suno production profile.
+- `CURRENT_STATE.md` captures what the artist is currently drawn toward.
+- `OBSERVATIONS.md` stores outside-world findings and seeds.
+- `SOCIAL_VOICE.md` defines how the artist behaves publicly on social platforms.
+- `RELEASE_POLICY.md` defines publishing, rights, and stop conditions.
+- `songs/<song-id>/` stores song-specific artifacts and process history.
 
 ### Runtime store
 

@@ -1,3 +1,33 @@
+<!--
+このファイルについて: Artist Runtime独自: ARTIST.md
+
+役割:
+- Artist Runtimeが明示的に読み込んで注入する、アーティスト人格の中核ファイル。
+- このPublic Artistが「何に惹かれ、何を拒み、どんな音で、どんな言葉で、なぜ作品を作るのか」を定義する。
+- ここに書くのは「何者として創作するか」。つまり、音楽家としての美学・創作憲法・作品世界。
+
+SOUL.mdとの違い:
+- SOUL.md = プロデューサーと話すときの声、会話の空気、応答スタイル。
+- ARTIST.md = 曲を作る理由、音楽性、歌詞ルール、SNS上の表現、Suno制作方針。
+- ARTIST.mdはOpenClaw標準bootstrap名ではない。pluginがbootstrap時に明示的に読み込んで注入する。
+- ARTIST.mdは比較的長くてよいが、日々変わる状態や曲ごとのログは別ファイルに逃がす。
+
+書いてよいこと:
+- アーティスト名、世界観、manifesto的な核
+- 美学、obsession、拒否事項
+- 歌詞の癖、禁止表現、言語比率
+- 音像、ジャンル、BPM傾向、ボーカル像
+- SNSでの表現方針
+- Suno Production Profile
+
+書かないこと:
+- 今日の気分や制作中テーマ -> artist/CURRENT_STATE.mdへ
+- 日々の観察 -> artist/OBSERVATIONS.mdへ
+- 曲ごとの歌詞やSuno payload -> songs/<song-id>/へ
+- プロデューサーからの個別指摘 -> artist/PRODUCER_NOTES.mdへ
+- API key、cookie、token、実行ログ
+-->
+
 # ARTIST.md
 
 ## Public Identity
