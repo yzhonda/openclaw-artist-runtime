@@ -169,12 +169,25 @@ Always keep:
 - `openclaw.plugin.json`
 - `package.json`
 
+`CAPABILITIES.md` and `SECURITY.md` now also carry the connector auth contract
+for distribution operators:
+
+- X requires the `bird` CLI plus its authenticated local session store
+- Instagram probes `OPENCLAW_INSTAGRAM_AUTH` / `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`
+- TikTok probes `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN`
+
 Also keep the built UI bundle and its source provenance together:
 
 - `ui/dist/**`
 - `ui/index.html`
 - `ui/src/**`
 - `ui/vite.config.ts`
+
+That UI source now explicitly includes:
+
+- `ui/src/SunoOutcomeCard.tsx` for the compact Suno status/outcome block
+- `ui/src/configEditor.ts` authority-aware config draft / payload shaping
+- bundled + fallback parity for Suno dry-run badges and authority selectors
 
 Also keep the repo-local verification scripts because they are the documented safe-install and safe-smoke path for this plugin:
 

@@ -51,10 +51,18 @@ dispatch under the current OpenClaw Gateway matcher, and CI regression gates on
 - Producer Console config editing now covers both platform enablement and
   `distribution.platforms.*.authority`, so X / Instagram / TikTok safety modes
   can be switched live from the bundled UI or the fallback inline shell.
+- Connector readiness is now documented end to end: X uses the `bird` CLI and
+  its local auth store, while Instagram and TikTok expose env-based auth probe
+  contracts through `CAPABILITIES.md` and `SECURITY.md` so operators know which
+  credentials must exist before any live authority is enabled.
 - Producer Console now surfaces Suno worker lifecycle and automation outcomes end
   to end: `currentRunId`, `lastImportedRunId`, `lastCreateOutcome`, and
   `lastImportOutcome` are exposed from `/api/suno/status` and rendered in both
   the bundled React UI and the fallback inline Console.
+- The Suno outcome surface is now isolated into a dedicated compact component
+  with explicit dry-run badges on the latest create/import outcomes, so the
+  operator can distinguish simulated automation from future live worker results
+  at a glance.
 - All read routes, mutating routes, and `/api/config/update` now resolve config
   through the same persisted runtime-config pattern, so Console behavior is
   consistent when `runtime/config-overrides.json` is present.

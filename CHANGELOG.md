@@ -5,6 +5,13 @@
 ### Added
 - Producer Console config editing now includes `distribution.platforms.x.authority`, `distribution.platforms.instagram.authority`, and `distribution.platforms.tiktok.authority` selectors in both the bundled React UI and the fallback inline shell (`5836e96`).
 - Instagram and TikTok connectors now match the X/Bird dry-run contract with env-based auth probes plus fail-closed publish/reply skeletons (`d4a3a3b`).
+- Producer Console Suno outcome rendering now flows through a dedicated `SunoOutcomeCard` component, and both the bundled UI and fallback Console show `Dry-run` badges on mock create/import outcomes (`4965dc9`).
+
+### Changed
+- README / package contents were refreshed for the post-0.2.0 authority-editor and three-platform connector parity state (`3831a99`).
+
+### Security
+- Connector auth contracts are now explicitly documented for X/Bird, Instagram, and TikTok so operator env/CLI requirements are visible before live distribution is enabled (`c5f2ef3`).
 
 ## 0.2.0 - 2026-04-22
 
