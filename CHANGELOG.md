@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## 0.2.0 - 2026-04-22
+
 ### Added
 - Producer Console live config editor for `autopilot` and `distribution.platforms.*` via `/api/config/update` (`a3f5a93`).
 - `ui/src/configEditor.ts` pure payload builder / validator and dirty-state guard for in-flight edits (`a3f5a93`).
