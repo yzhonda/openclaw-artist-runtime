@@ -171,6 +171,88 @@ function buildCombinedOutput(result: CommandResult): string {
   return [result.stdout, result.stderr].filter(Boolean).join("\n");
 }
 
+function resolveRecentPublishes(state: PublishGuardState, limit: number): PublishRecord[] {
+  return state.recentPublishes.slice(-limit);
+}
+
+function checkPublishGuards(
+  recentPublishes: PublishRecord[],
+  textDigest: string,
+  nowMs: number,
+  minPublishIntervalMs: number
+): SocialPublishResult | undefined {
+  const duplicate = recentPublishes.some((entry) => entry.textHash === textDigest);
+  if (duplicate) {
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_duplicate_text_blocked"
+    };
+  }
+
+  const latestPublish = recentPublishes.at(-1);
+  if (latestPublish && nowMs - latestPublish.publishedAtMs < minPublishIntervalMs) {
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_min_interval_blocked"
+    };
+  }
+
+  return undefined;
+}
+
+function buildPublishFailure(result: CommandResult): SocialPublishResult {
+  const combinedOutput = buildCombinedOutput(result);
+  if (result.errorCode === "ENOENT") {
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_cli_not_installed"
+    };
+  }
+
+  if (looksLikeAuthFailure(combinedOutput)) {
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_auth_expired"
+    };
+  }
+
+  if (looksLikeRateLimitFailure(combinedOutput)) {
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_rate_limited"
+    };
+  }
+
+  return {
+    accepted: false,
+    platform: "x",
+    dryRun: false,
+    reason: "bird_publish_failed"
+  };
+}
+
+function resolveReplyTarget(input: SocialPublishRequest): string | undefined {
+  const targetUrl = input.targetUrl?.trim();
+  if (targetUrl) {
+    return targetUrl;
+  }
+  const targetId = input.targetId?.trim();
+  if (targetId) {
+    return targetId;
+  }
+  return undefined;
+}
+
 export class XBirdConnector implements SocialConnector {
   private readonly now: () => number;
   private readonly publishGuardState: PublishGuardState;
@@ -253,37 +335,14 @@ export class XBirdConnector implements SocialConnector {
 
     const nowMs = this.now();
     const textDigest = hashText(text);
-    const recentPublishes = this.publishGuardState.recentPublishes.slice(-this.dedupeHistoryLimit);
-    const duplicate = recentPublishes.some((entry) => entry.textHash === textDigest);
-    if (duplicate) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_duplicate_text_blocked"
-      };
-    }
-
-    const latestPublish = recentPublishes.at(-1);
-    if (latestPublish && nowMs - latestPublish.publishedAtMs < this.minPublishIntervalMs) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_min_interval_blocked"
-      };
+    const recentPublishes = resolveRecentPublishes(this.publishGuardState, this.dedupeHistoryLimit);
+    const guardFailure = checkPublishGuards(recentPublishes, textDigest, nowMs, this.minPublishIntervalMs);
+    if (guardFailure) {
+      return guardFailure;
     }
 
     const publishResult = await runCommand(this.spawnImpl, "bird", ["--plain", "tweet", text], BIRD_PUBLISH_TIMEOUT_MS);
     const combinedOutput = buildCombinedOutput(publishResult);
-    if (publishResult.errorCode === "ENOENT") {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_cli_not_installed"
-      };
-    }
 
     if (publishResult.code === 0) {
       this.publishGuardState.recentPublishes = [...recentPublishes, { textHash: textDigest, publishedAtMs: nowMs }].slice(-this.dedupeHistoryLimit);
@@ -298,38 +357,75 @@ export class XBirdConnector implements SocialConnector {
       };
     }
 
-    if (looksLikeAuthFailure(combinedOutput)) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_auth_expired"
-      };
-    }
-
-    if (looksLikeRateLimitFailure(combinedOutput)) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_rate_limited"
-      };
-    }
-
-    return {
-      accepted: false,
-      platform: "x",
-      dryRun: false,
-      reason: "bird_publish_failed"
-    };
+    return buildPublishFailure(publishResult);
   }
 
   async reply(input: SocialPublishRequest): Promise<SocialPublishResult> {
+    if (input.dryRun) {
+      return {
+        accepted: false,
+        platform: "x",
+        dryRun: true,
+        reason: "dry-run blocks reply"
+      };
+    }
+
+    if (input.mediaPaths?.length) {
+      return {
+        accepted: false,
+        platform: "x",
+        dryRun: false,
+        reason: "bird_text_only_reply_only"
+      };
+    }
+
+    const text = input.text?.trim() ?? "";
+    if (!text) {
+      return {
+        accepted: false,
+        platform: "x",
+        dryRun: false,
+        reason: "bird_text_required"
+      };
+    }
+
+    const target = resolveReplyTarget(input);
+    if (!target) {
+      return {
+        accepted: false,
+        platform: "x",
+        dryRun: false,
+        reason: "bird_reply_target_required"
+      };
+    }
+
+    const nowMs = this.now();
+    const textDigest = hashText(text);
+    const recentPublishes = resolveRecentPublishes(this.publishGuardState, this.dedupeHistoryLimit);
+    const guardFailure = checkPublishGuards(recentPublishes, textDigest, nowMs, this.minPublishIntervalMs);
+    if (guardFailure) {
+      return guardFailure;
+    }
+
+    const replyResult = await runCommand(this.spawnImpl, "bird", ["--plain", "reply", target, text], BIRD_PUBLISH_TIMEOUT_MS);
+    const combinedOutput = buildCombinedOutput(replyResult);
+    if (replyResult.code === 0) {
+      this.publishGuardState.recentPublishes = [...recentPublishes, { textHash: textDigest, publishedAtMs: nowMs }].slice(-this.dedupeHistoryLimit);
+      return {
+        accepted: true,
+        platform: "x",
+        dryRun: false,
+        reason: "bird_reply_ok",
+        id: parseTweetId(combinedOutput),
+        url: parseTweetUrl(combinedOutput),
+        raw: combinedOutput || undefined
+      };
+    }
+
+    const failure = buildPublishFailure(replyResult);
     return {
-      accepted: false,
-      platform: "x",
-      dryRun: input.dryRun,
-      reason: input.dryRun ? "dry-run blocks reply" : "Bird reply is not enabled in this environment"
+      ...failure,
+      reason: failure.reason === "bird_publish_failed" ? "bird_reply_failed" : failure.reason
     };
   }
 }

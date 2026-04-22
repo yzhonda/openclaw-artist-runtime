@@ -243,6 +243,8 @@ export interface SocialPublishRequest {
   postType: string;
   text?: string;
   mediaPaths?: string[];
+  targetId?: string;
+  targetUrl?: string;
 }
 
 export interface SocialPublishResult {

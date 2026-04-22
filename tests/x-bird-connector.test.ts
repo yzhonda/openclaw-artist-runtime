@@ -230,3 +230,138 @@ describe("XBirdConnector.publish", () => {
     });
   });
 });
+
+describe("XBirdConnector.reply", () => {
+  it("keeps dry-run replies blocked", async () => {
+    const connector = new XBirdConnector(createSpawnMock([]));
+
+    await expect(
+      connector.reply({
+        dryRun: true,
+        authority: "auto_publish",
+        postType: "reply",
+        text: "answering the static",
+        targetId: "123"
+      })
+    ).resolves.toEqual({
+      accepted: false,
+      platform: "x",
+      dryRun: true,
+      reason: "dry-run blocks reply"
+    });
+  });
+
+  it("replies to a target tweet and parses the returned URL", async () => {
+    const connector = new XBirdConnector(
+      createSpawnMock([
+        {
+          code: 0,
+          stdout: "reply posted https://x.com/ghost_station/status/987654321098765432"
+        }
+      ]),
+      {
+        now: () => 3000,
+        publishGuardState: { recentPublishes: [] },
+        minPublishIntervalMs: 100
+      }
+    );
+
+    await expect(
+      connector.reply({
+        dryRun: false,
+        authority: "auto_publish",
+        postType: "reply",
+        text: "answering the static",
+        targetUrl: "https://x.com/ghost_station/status/1234567890123456789"
+      })
+    ).resolves.toEqual({
+      accepted: true,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_reply_ok",
+      id: "987654321098765432",
+      url: "https://x.com/ghost_station/status/987654321098765432",
+      raw: "reply posted https://x.com/ghost_station/status/987654321098765432"
+    });
+  });
+
+  it("returns auth expired when reply publish reports auth failure", async () => {
+    const connector = new XBirdConnector(
+      createSpawnMock([
+        {
+          code: 1,
+          stderr: "401 Unauthorized: Could not authenticate"
+        }
+      ]),
+      {
+        publishGuardState: { recentPublishes: [] }
+      }
+    );
+
+    await expect(
+      connector.reply({
+        dryRun: false,
+        authority: "auto_publish",
+        postType: "reply",
+        text: "answering the static",
+        targetId: "1234567890123456789"
+      })
+    ).resolves.toEqual({
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_auth_expired"
+    });
+  });
+
+  it("fails closed when reply target is missing", async () => {
+    const connector = new XBirdConnector(createSpawnMock([]));
+
+    await expect(
+      connector.reply({
+        dryRun: false,
+        authority: "auto_publish",
+        postType: "reply",
+        text: "answering the static"
+      })
+    ).resolves.toEqual({
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_reply_target_required"
+    });
+  });
+
+  it("blocks replies inside the minimum publish interval", async () => {
+    const connector = new XBirdConnector(
+      createSpawnMock([]),
+      {
+        now: () => 1200,
+        publishGuardState: {
+          recentPublishes: [
+            {
+              textHash: "different-hash",
+              publishedAtMs: 1000
+            }
+          ]
+        },
+        minPublishIntervalMs: 500
+      }
+    );
+
+    await expect(
+      connector.reply({
+        dryRun: false,
+        authority: "auto_publish",
+        postType: "reply",
+        text: "fresh words, too soon",
+        targetId: "1234567890123456789"
+      })
+    ).resolves.toEqual({
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: "bird_min_interval_blocked"
+    });
+  });
+});
