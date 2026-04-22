@@ -164,6 +164,8 @@ workaround.
 - `tests/config.test.ts`
 - `tests/x-bird-connector.test.ts`
 - `tests/instagram-connector.test.ts`
+  This suite now fixes the Round 42 Graph skeleton contract: auth missing,
+  dry-run stage traversal, and non-dry-run `requires_explicit_live_go`.
 - `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
@@ -221,6 +223,11 @@ for distribution operators:
 - X requires the `bird` CLI plus its authenticated local session store
 - Instagram probes `OPENCLAW_INSTAGRAM_AUTH` / `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`
 - TikTok probes `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN`
+
+`docs/CONNECTOR_AUTH.md` now also documents the Instagram Graph API skeleton
+route (`/me/accounts -> /media -> /media_publish`) plus the required scopes and
+the fact that Round 42 still blocks live posting with
+`requires_explicit_live_go`.
 
 Also keep the built UI bundle and its source provenance together:
 
