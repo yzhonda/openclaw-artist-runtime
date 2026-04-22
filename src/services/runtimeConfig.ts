@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { defaultArtistRuntimeConfig } from "../config/defaultConfig.js";
 import { applyConfigDefaults, validateConfig } from "../config/schema.js";
 import type { ArtistRuntimeConfig } from "../types.js";
 
@@ -17,6 +18,15 @@ export async function readConfigOverrides(root: string): Promise<Partial<ArtistR
 
 export async function readResolvedConfig(root: string): Promise<ArtistRuntimeConfig> {
   return applyConfigDefaults(await readConfigOverrides(root));
+}
+
+export async function resolveRuntimeConfig(
+  payloadConfig?: Partial<ArtistRuntimeConfig>,
+  fallbackWorkspaceRoot = defaultArtistRuntimeConfig.artist.workspaceRoot
+): Promise<ArtistRuntimeConfig> {
+  const workspaceRoot = payloadConfig?.artist?.workspaceRoot ?? fallbackWorkspaceRoot;
+  const persisted = await readResolvedConfig(workspaceRoot);
+  return payloadConfig ? mergeResolvedConfig(persisted, payloadConfig) : persisted;
 }
 
 export function mergeResolvedConfig(current: ArtistRuntimeConfig, patch: Partial<ArtistRuntimeConfig>): ArtistRuntimeConfig {
