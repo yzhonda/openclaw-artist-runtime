@@ -23,6 +23,8 @@ Depending on enabled platforms, the plugin sends:
 
 Connector credential contracts are local-only:
 
+See `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh flow.
+
 - `OPENCLAW_INSTAGRAM_AUTH` / `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` are read from the
   local shell environment when Instagram capability checks run.
 - `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN` are read from the
