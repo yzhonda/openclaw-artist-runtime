@@ -264,12 +264,22 @@ export class SunoBrowserWorker {
     const runId = request.runId ?? `worker_${Date.now().toString(36)}`;
 
     if (!dryRun && current.state !== "connected") {
-      return {
+      const blockedResult = {
         accepted: false,
         runId,
         reason: "suno_worker_not_connected",
         urls: []
       };
+      await this.transition({
+        lastCreateOutcome: {
+          runId,
+          accepted: false,
+          reason: blockedResult.reason,
+          at: now(),
+          dryRun
+        }
+      });
+      return blockedResult;
     }
 
     await this.transition({
@@ -285,7 +295,14 @@ export class SunoBrowserWorker {
         state: "connected",
         connected: true,
         pendingAction: undefined,
-        currentRunId: runId
+        currentRunId: runId,
+        lastCreateOutcome: {
+          runId,
+          accepted: false,
+          reason: "dry-run blocks Suno create",
+          at: now(),
+          dryRun: true
+        }
       });
       return {
         accepted: false,
@@ -302,7 +319,14 @@ export class SunoBrowserWorker {
         connected: true,
         pendingAction: undefined,
         currentRunId: runId,
-        hardStopReason: "Suno browser driver create() is not configured."
+        hardStopReason: "Suno browser driver create() is not configured.",
+        lastCreateOutcome: {
+          runId,
+          accepted: false,
+          reason: "suno_browser_driver_missing_create",
+          at: now(),
+          dryRun
+        }
       });
       return {
         accepted: false,
@@ -318,7 +342,14 @@ export class SunoBrowserWorker {
       connected: true,
       pendingAction: result.accepted ? "waiting_for_results" : undefined,
       currentRunId: result.runId,
-      hardStopReason: result.accepted ? undefined : result.reason
+      hardStopReason: result.accepted ? undefined : result.reason,
+      lastCreateOutcome: {
+        runId: result.runId,
+        accepted: result.accepted,
+        reason: result.reason,
+        at: now(),
+        dryRun: result.dryRun ?? dryRun
+      }
     });
     return result;
   }
@@ -328,11 +359,21 @@ export class SunoBrowserWorker {
     const dryRun = options.dryRun ?? false;
 
     if (!dryRun && current.state !== "connected" && current.state !== "generating") {
-      return {
+      const blockedResult = {
         runId,
         urls: [],
         reason: "suno_worker_not_ready_for_import"
       };
+      await this.transition({
+        lastImportOutcome: {
+          runId,
+          urlCount: 0,
+          reason: blockedResult.reason,
+          at: now(),
+          dryRun
+        }
+      });
+      return blockedResult;
     }
 
     await this.transition({
@@ -349,7 +390,14 @@ export class SunoBrowserWorker {
         connected: true,
         pendingAction: undefined,
         currentRunId: runId,
-        lastImportedRunId: runId
+        lastImportedRunId: runId,
+        lastImportOutcome: {
+          runId,
+          urlCount: 0,
+          reason: "dry-run blocks Suno import",
+          at: now(),
+          dryRun: true
+        }
       });
       return {
         runId,
@@ -366,7 +414,14 @@ export class SunoBrowserWorker {
         connected: true,
         pendingAction: undefined,
         currentRunId: runId,
-        hardStopReason: "Suno browser driver importResults() is not configured."
+        hardStopReason: "Suno browser driver importResults() is not configured.",
+        lastImportOutcome: {
+          runId,
+          urlCount: 0,
+          reason: "suno_browser_driver_missing_import",
+          at: now(),
+          dryRun
+        }
       });
       return {
         runId,
@@ -382,7 +437,14 @@ export class SunoBrowserWorker {
       pendingAction: undefined,
       currentRunId: result.runId ?? runId,
       lastImportedRunId: result.runId ?? runId,
-      hardStopReason: undefined
+      hardStopReason: undefined,
+      lastImportOutcome: {
+        runId: result.runId ?? runId,
+        urlCount: result.urls.length,
+        reason: result.reason,
+        at: result.importedAt ?? now(),
+        dryRun: result.dryRun
+      }
     });
     return {
       ...result,
