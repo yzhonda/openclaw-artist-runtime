@@ -62,6 +62,30 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/sunoPromptPackFiles.ts`
 - `src/services/artistState.ts`
 
+These services now share one runtime-config resolution path and feed the same
+Producer Console status surfaces. In practice that means:
+
+- `src/services/runtimeConfig.ts` owns the persisted-config resolver now used by
+  read routes, mutating routes, and `/api/config/update`.
+- `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
+  create/import automation outcomes for the Suno lane.
+- `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
+  the cycle/ticker status that the Console polls every 3 seconds.
+
+### Route/SDK glue
+
+- `src/routes/index.ts`
+- `src/pluginApi.ts`
+
+These are part of the package surface because the current OpenClaw Gateway treats
+`/api/:param` style paths literally. The package now keeps URL compatibility by:
+
+- statically registering platform test routes for `x`, `instagram`, and `tiktok`
+- dispatching `songs`, `alerts`, `platforms`, and `suno` under family-level
+  prefix routes
+- attaching `requestMethod` / `requestPath` metadata in the plugin API bridge
+  so route handlers can still parse the original path safely
+
 ### Producer Console source
 
 - `ui/index.html`
@@ -70,6 +94,13 @@ These files are now part of the package because the plugin has moved beyond a th
 - `ui/src/configEditor.ts`
 - `ui/src/main.tsx`
 - `ui/src/styles.css`
+
+The Console source now includes:
+
+- a live config editor (`ui/src/configEditor.ts`)
+- ticker and recent X dry-run status
+- Suno lifecycle plus create/import outcome cards rendered from `/api/suno/status`
+- the same Suno/status markers mirrored in the fallback inline Console shell
 
 ### Repo-local OpenClaw sandbox scripts
 
@@ -94,6 +125,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `tests/config-update-route.test.ts`
 - `tests/config-editor-payload.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
+- `tests/suno-worker-automation.test.ts`
 - `tests/status-ticker.test.ts`
 - `tests/persisted-config-helper-routes.test.ts`
 - `tests/mutating-route-config-resolution.test.ts`
@@ -149,6 +181,16 @@ Also keep the CI workflow and tracked workspace template files because they now 
 - `.github/workflows/ci.yml`
 - `workspace-template/artist/*.md`
 - `workspace-template/songs/.gitkeep`
+
+Also keep the route/SDK glue and Suno outcome-bearing UI source together, because
+the current package relies on them for live Gateway compatibility and Producer
+Console parity:
+
+- `src/pluginApi.ts`
+- `src/routes/index.ts`
+- `ui/src/App.tsx`
+- `tests/suno-worker-automation.test.ts`
+- `tests/prompt-pack-and-registration.test.ts`
 
 ## What may be slimmed later
 

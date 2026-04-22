@@ -37,8 +37,9 @@ openclaw plugins install npm:@your-org/openclaw-artist-runtime
 ## Current status
 
 This package now includes a working dry-run runtime with a bundled Producer Console,
-repo-local OpenClaw sandbox tooling, persisted-config-aware routes, and CI regression
-gates on `main` pushes and pull requests.
+repo-local OpenClaw sandbox tooling, persisted-config-aware routes, live-safe route
+dispatch under the current OpenClaw Gateway matcher, and CI regression gates on
+`main` pushes and pull requests.
 
 - Full-cycle smoke tests cover `planning → prompt_pack → suno_generation →
   take_selection → asset_generation → publishing (dry-run) → completed`, and a
@@ -47,14 +48,27 @@ gates on `main` pushes and pull requests.
 - Producer Console exposes a live config editor for `autopilot` and
   `distribution.platforms.*`, ticker status, recent X dry-run results, and a
   dry-run simulate-reply form backed by plugin API routes only.
+- Producer Console now surfaces Suno worker lifecycle and automation outcomes end
+  to end: `currentRunId`, `lastImportedRunId`, `lastCreateOutcome`, and
+  `lastImportOutcome` are exposed from `/api/suno/status` and rendered in both
+  the bundled React UI and the fallback inline Console.
 - All read routes, mutating routes, and `/api/config/update` now resolve config
   through the same persisted runtime-config pattern, so Console behavior is
   consistent when `runtime/config-overrides.json` is present.
+- Route dispatch is now hardened against the current OpenClaw Gateway's literal
+  `:param` matcher behavior: platform test routes are registered statically and
+  the `songs`, `alerts`, `platforms`, and `suno` API families use prefix
+  dispatch so the existing URLs still work live.
+- Suno worker automation now has a full mock-only skeleton: lifecycle state,
+  manual login handoff, create/import driver contracts, connector wiring, and
+  persisted outcomes are all in place without executing a real browser or Suno run.
 - Repo-local verification includes `scripts/openclaw-local-gateway`,
   `scripts/openclaw-local-http-smoke.sh`, `scripts/openclaw-local-write-smoke.sh`,
   and `scripts/openclaw-local-ticker-observe.sh`.
 - The repo now includes a GitHub Actions CI workflow that runs `typecheck`, `test`,
   and `build` on pushes and pull requests to `main`.
+- CI regression gates have stayed stable through repeated post-fix runs, including
+  the workspace-template tracking correction and the lock-file-free workflow update.
 - `workspace-template/artist/*` and `workspace-template/songs/.gitkeep` are tracked,
   so fresh CI/workspace bootstrap runs get the same artist files as local development.
 - Real Bird / Instagram / TikTok posting, real Suno browser automation, and real
@@ -164,8 +178,8 @@ Before public distribution, update:
 The plugin serves a built Producer Console from `ui/dist/` when present.
 If the bundle is missing, the plugin falls back to a minimal inline Console shell for safe inspection-only use.
 The bundled Console includes the config editor, ticker/status cards, recent X result
-surface, and auto-refresh polling; the fallback Console keeps the same core control
-tower actions available for safe operation.
+surface, Suno outcome cards, and auto-refresh polling; the fallback Console keeps the
+same core control tower actions available for safe operation.
 
 To build just the Console:
 
