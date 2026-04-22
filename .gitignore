@@ -11,8 +11,8 @@ coverage/
 *.log
 .runtime/
 .openclaw-browser-profiles/
-songs/
-artist/
+/songs/
+/artist/
 .local/
 
 # workspace artifacts generated at repo root when workspaceRoot defaults to "."
