@@ -374,7 +374,7 @@ export function App() {
     }
     setBusy("config");
     try {
-      await apiPost("/config", {
+      await apiPost("/config/update", {
         patch: {
           autopilot: {
             enabled: configDraft.autopilotEnabled,
