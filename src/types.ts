@@ -18,7 +18,7 @@ export const socialAuthorityModes = [
 ] as const;
 export const socialRiskLevels = ["low", "medium", "high"] as const;
 export const capabilityStates = [true, false, "unknown"] as const;
-export const sunoWorkerStates = ["disconnected", "connecting", "connected", "login_required", "login_challenge", "captcha", "payment_prompt", "ui_mismatch", "quota_exhausted", "paused", "stopped"] as const;
+export const sunoWorkerStates = ["disconnected", "connecting", "connected", "generating", "importing", "login_required", "login_challenge", "captcha", "payment_prompt", "ui_mismatch", "quota_exhausted", "paused", "stopped"] as const;
 export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generation", "take_selection", "asset_generation", "publishing", "completed", "paused", "failed_closed"] as const;
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "published", "archived", "failed"] as const;
 export const sunoRunStatuses = ["blocked_dry_run", "blocked_authority", "accepted", "imported", "failed"] as const;
@@ -354,12 +354,17 @@ export interface SunoWorkerStatus {
   failureCount?: number;
   pendingAction?: string;
   loginHandoff?: SunoLoginHandoff;
+  currentRunId?: string;
+  lastImportedRunId?: string;
 }
 
 export interface SunoCreateRequest {
   dryRun: boolean;
   authority: SunoAuthority;
   payload: Record<string, unknown>;
+  songId?: string;
+  runId?: string;
+  payloadHash?: string;
 }
 
 export interface SunoCreateResult {
@@ -367,11 +372,20 @@ export interface SunoCreateResult {
   runId: string;
   reason: string;
   urls: string[];
+  dryRun?: boolean;
+}
+
+export interface SunoImportRequest {
+  runId: string;
 }
 
 export interface SunoImportResult {
   urls: string[];
   runId?: string;
+  selectedTakeId?: string;
+  importedAt?: string;
+  reason?: string;
+  dryRun?: boolean;
 }
 
 export interface SunoRunRecord {
