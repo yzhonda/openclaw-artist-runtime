@@ -42,6 +42,7 @@ The package still needs curation: built UI assets belong in the tarball, while l
 ├── docs/codex-detailed-specs/         # same detailed specs retained for compatibility
 ├── docs/*.md                          # distribution-focused docs
 ├── docs/API_ROUTES.md                 # plugin HTTP route catalog for Console consumers
+├── docs/CONNECTOR_AUTH.md             # operator-facing connector setup / refresh guide
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -112,11 +113,16 @@ The config editor source now owns both:
 ### API route catalog
 
 - `docs/API_ROUTES.md`
+- `docs/CONNECTOR_AUTH.md`
 
 This document exists so plugin consumers do not have to reverse-read
 `src/routes/index.ts` just to understand the HTTP surface. It catalogs the
 Console shell route plus the `/api/*` read and mutating routes, including the
 family-dispatch note required by the current OpenClaw Gateway matcher behavior.
+
+`docs/CONNECTOR_AUTH.md` sits beside it as the operator-focused credential and
+refresh guide, with direct links back into the platform test route anchors in
+`docs/API_ROUTES.md`.
 
 ### Repo-local OpenClaw sandbox scripts
 
@@ -136,18 +142,22 @@ family-dispatch note required by the current OpenClaw Gateway matcher behavior.
 - `tests/hooks-heartbeat.test.ts`
 - `tests/autopilot-ticker.test.ts`
 - `tests/autopilot-full-cycle.test.ts`
+- `tests/authority.test.ts`
+- `tests/config.test.ts`
 - `tests/x-bird-connector.test.ts`
 - `tests/instagram-connector.test.ts`
 - `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
 - `tests/config-editor-payload.test.ts`
+- `tests/repository-and-ledger.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/status-ticker.test.ts`
 - `tests/persisted-config-helper-routes.test.ts`
 - `tests/mutating-route-config-resolution.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
+- `tests/state-and-pipelines.test.ts`
 
 ### Workspace template files that must stay tracked
 

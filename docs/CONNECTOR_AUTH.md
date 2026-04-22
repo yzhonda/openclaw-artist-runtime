@@ -33,7 +33,7 @@ Use it together with:
 ### Refresh
 
 1. Re-authenticate Bird so its local session store is current.
-2. Re-run `POST /plugins/artist-runtime/api/platforms/x/test`.
+2. Re-run [`POST /plugins/artist-runtime/api/platforms/x/test`](./API_ROUTES.md#post-apiplatformsxtest).
 3. If the route still returns `bird_cli_not_installed`, `bird_auth_expired`, or
    `bird_probe_failed`, inspect the local Bird install/session outside the plugin
    before retrying distribution.
@@ -58,7 +58,7 @@ Use it together with:
 1. Update `OPENCLAW_INSTAGRAM_AUTH` or `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` in the
    active shell environment or launch profile.
 2. Reload the shell/session that launches OpenClaw so the environment is current.
-3. Re-run `POST /plugins/artist-runtime/api/platforms/instagram/test`.
+3. Re-run [`POST /plugins/artist-runtime/api/platforms/instagram/test`](./API_ROUTES.md#post-apiplatformsinstagramtest).
 
 ### Dry-run behavior
 
@@ -81,7 +81,7 @@ Use it together with:
 1. Update `OPENCLAW_TIKTOK_AUTH` or `OPENCLAW_TIKTOK_ACCESS_TOKEN` in the active
    shell environment or launch profile.
 2. Reload the shell/session that launches OpenClaw so the environment is current.
-3. Re-run `POST /plugins/artist-runtime/api/platforms/tiktok/test`.
+3. Re-run [`POST /plugins/artist-runtime/api/platforms/tiktok/test`](./API_ROUTES.md#post-apiplatformstiktoktest).
 
 ### Dry-run behavior
 
