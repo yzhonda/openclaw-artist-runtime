@@ -35,6 +35,7 @@ The package still needs curation: built UI assets belong in the tarball, while l
 ├── src/                               # package runtime skeleton
 ├── ui/                                # Producer Console source and built bundle
 ├── scripts/                           # repo-local OpenClaw sandbox + smoke helpers
+├── .github/workflows/                 # CI verification workflow
 ├── tests/                             # runtime, connector, route, and smoke tests
 ├── workspace-template/                # files created in an artist workspace
 ├── docs/full-spec/                    # original detailed product/architecture specs
@@ -79,6 +80,10 @@ These files are now part of the package because the plugin has moved beyond a th
 - `scripts/openclaw-local-ticker-observe.sh`
 - `scripts/openclaw-local-install.sh`
 
+### CI / regression gate
+
+- `.github/workflows/ci.yml`
+
 ### Notable test coverage
 
 - `tests/hooks-heartbeat.test.ts`
@@ -90,7 +95,24 @@ These files are now part of the package because the plugin has moved beyond a th
 - `tests/config-editor-payload.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/status-ticker.test.ts`
+- `tests/persisted-config-helper-routes.test.ts`
+- `tests/mutating-route-config-resolution.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
+
+### Workspace template files that must stay tracked
+
+- `workspace-template/AGENTS.md`
+- `workspace-template/ARTIST.md`
+- `workspace-template/SOUL.md`
+- `workspace-template/HEARTBEAT.md`
+- `workspace-template/README.md`
+- `workspace-template/artist/CURRENT_STATE.md`
+- `workspace-template/artist/OBSERVATIONS.md`
+- `workspace-template/artist/PRODUCER_NOTES.md`
+- `workspace-template/artist/RELEASE_POLICY.md`
+- `workspace-template/artist/SOCIAL_VOICE.md`
+- `workspace-template/artist/SONGBOOK.md`
+- `workspace-template/songs/.gitkeep`
 
 ## What should be kept for marketplace publication
 
@@ -121,6 +143,12 @@ Also keep the repo-local verification scripts because they are the documented sa
 - `scripts/openclaw-local-http-smoke.sh`
 - `scripts/openclaw-local-write-smoke.sh`
 - `scripts/openclaw-local-ticker-observe.sh`
+
+Also keep the CI workflow and tracked workspace template files because they now form part of the package's regression discipline and bootstrap contract:
+
+- `.github/workflows/ci.yml`
+- `workspace-template/artist/*.md`
+- `workspace-template/songs/.gitkeep`
 
 ## What may be slimmed later
 

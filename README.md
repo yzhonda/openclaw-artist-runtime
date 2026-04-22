@@ -36,18 +36,32 @@ openclaw plugins install npm:@your-org/openclaw-artist-runtime
 
 ## Current status
 
-This package includes a working dry-run pipeline: autopilot state machine, Suno worker
-lifecycle skeleton, Bird (X) text publish / reply code paths, a periodic `runCycle`
-ticker, and a bundled React Producer Console served from `ui/dist/`.
+This package now includes a working dry-run runtime with a bundled Producer Console,
+repo-local OpenClaw sandbox tooling, persisted-config-aware routes, and CI regression
+gates on `main` pushes and pull requests.
 
-- Full-cycle smoke test covers `planning → prompt_pack → suno_generation → take_selection
-  → asset_generation → publishing (dry-run) → completed` with zero external calls
-  (`spawn` and `fetch` are mocked and asserted unused in the test).
+- Full-cycle smoke tests cover `planning → prompt_pack → suno_generation →
+  take_selection → asset_generation → publishing (dry-run) → completed`, and a
+  second rotation into `song-002`, with zero external calls (`spawn` and `fetch`
+  are mocked and asserted unused).
+- Producer Console exposes a live config editor for `autopilot` and
+  `distribution.platforms.*`, ticker status, recent X dry-run results, and a
+  dry-run simulate-reply form backed by plugin API routes only.
+- All read routes, mutating routes, and `/api/config/update` now resolve config
+  through the same persisted runtime-config pattern, so Console behavior is
+  consistent when `runtime/config-overrides.json` is present.
+- Repo-local verification includes `scripts/openclaw-local-gateway`,
+  `scripts/openclaw-local-http-smoke.sh`, `scripts/openclaw-local-write-smoke.sh`,
+  and `scripts/openclaw-local-ticker-observe.sh`.
+- The repo now includes a GitHub Actions CI workflow that runs `typecheck`, `test`,
+  and `build` on pushes and pull requests to `main`.
+- `workspace-template/artist/*` and `workspace-template/songs/.gitkeep` are tracked,
+  so fresh CI/workspace bootstrap runs get the same artist files as local development.
 - Real Bird / Instagram / TikTok posting, real Suno browser automation, and real
   platform writes are **not** enabled by default and require explicit operator action.
 - `autopilot.dryRun` defaults to `true`; the plugin ships safe-by-default.
-- Producer Console exposes `Ticker`, `Recent X Result`, and `Simulate Reply` (dry-run-only)
-  for live inspection and a 3-second polling loop against `/api/status`.
+- Producer Console uses a bundled React app from `ui/dist/` when available and falls
+  back to an inline inspection shell when the bundle is missing or stale.
 
 See `CHANGELOG.md` for the active feature set. For implementation details and
 contributor onboarding, start with `AGENTS.md`, then `CODEX_START_HERE.md`, then the
@@ -149,6 +163,9 @@ Before public distribution, update:
 
 The plugin serves a built Producer Console from `ui/dist/` when present.
 If the bundle is missing, the plugin falls back to a minimal inline Console shell for safe inspection-only use.
+The bundled Console includes the config editor, ticker/status cards, recent X result
+surface, and auto-refresh polling; the fallback Console keeps the same core control
+tower actions available for safe operation.
 
 To build just the Console:
 
