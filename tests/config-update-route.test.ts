@@ -1,13 +1,51 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { patchResolvedConfig, readResolvedConfig } from "../src/services/runtimeConfig.js";
+import { registerRoutes } from "../src/routes";
+import { patchResolvedConfig, readResolvedConfig, resolveRuntimeConfig } from "../src/services/runtimeConfig.js";
 
 function makeWorkspace(): string {
   const root = mkdtempSync(join(tmpdir(), "config-update-"));
   mkdirSync(join(root, "runtime"), { recursive: true });
   return root;
+}
+
+function createMockRequest(method: string, url: string, body?: string, headers?: Record<string, string>): IncomingMessage {
+  const req = Readable.from(body ? [body] : []) as IncomingMessage;
+  req.method = method;
+  req.url = url;
+  req.headers = headers ?? {};
+  return req;
+}
+
+function createMockResponse() {
+  let body = "";
+  const headers: Record<string, string> = {};
+  const res = {
+    statusCode: 200,
+    headersSent: false,
+    setHeader(name: string, value: string) {
+      headers[name.toLowerCase()] = value;
+      return this;
+    },
+    end(chunk?: string | Buffer) {
+      if (chunk) {
+        body += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+      }
+      this.headersSent = true;
+      return this;
+    }
+  } as unknown as ServerResponse;
+
+  return {
+    res,
+    readBody: () => body,
+    readHeader: (name: string) => headers[name.toLowerCase()],
+    readStatus: () => (res as unknown as { statusCode: number }).statusCode
+  };
 }
 
 describe("config/update behaviour", () => {
@@ -54,5 +92,63 @@ describe("config/update behaviour", () => {
 
     const result = await patchResolvedConfig(root, {});
     expect(result.autopilot.enabled).toBe(true);
+  });
+
+  it("resolveRuntimeConfig merges persisted overrides with payload config", async () => {
+    const root = makeWorkspace();
+
+    await patchResolvedConfig(root, {
+      artist: { workspaceRoot: root, mode: "public_artist", artistId: "artist", profilePath: "ARTIST.md" },
+      autopilot: { enabled: true, dryRun: true, songsPerWeek: 6 }
+    });
+
+    const resolved = await resolveRuntimeConfig({
+      artist: { workspaceRoot: root },
+      autopilot: { cycleIntervalMinutes: 15 }
+    });
+
+    expect(resolved.autopilot.enabled).toBe(true);
+    expect(resolved.autopilot.songsPerWeek).toBe(6);
+    expect(resolved.autopilot.cycleIntervalMinutes).toBe(15);
+  });
+
+  it("config/update route preserves persisted settings when patching through payload config context", async () => {
+    const root = makeWorkspace();
+    await patchResolvedConfig(root, {
+      artist: { workspaceRoot: root, mode: "public_artist", artistId: "artist", profilePath: "ARTIST.md" },
+      autopilot: { enabled: true, dryRun: true, songsPerWeek: 6 }
+    });
+
+    const registered = new Map<string, (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void>();
+    registerRoutes({
+      registerHttpRoute(definition: { path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void }) {
+        registered.set(definition.path, definition.handler);
+      }
+    });
+
+    const handler = registered.get("/plugins/artist-runtime/api/config/update");
+    expect(handler).toBeTruthy();
+
+    const response = createMockResponse();
+    await handler?.(
+      createMockRequest(
+        "POST",
+        "/plugins/artist-runtime/api/config/update",
+        JSON.stringify({
+          config: { artist: { workspaceRoot: root } },
+          patch: { autopilot: { cycleIntervalMinutes: 15 } }
+        }),
+        { "content-type": "application/json" }
+      ),
+      response.res
+    );
+
+    expect(response.readStatus()).toBe(200);
+    expect(response.readHeader("content-type")).toContain("application/json");
+
+    const updated = JSON.parse(response.readBody()) as Awaited<ReturnType<typeof readResolvedConfig>>;
+    expect(updated.autopilot.enabled).toBe(true);
+    expect(updated.autopilot.songsPerWeek).toBe(6);
+    expect(updated.autopilot.cycleIntervalMinutes).toBe(15);
   });
 });
