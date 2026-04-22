@@ -212,6 +212,7 @@ describe("registration shells", () => {
     expect(consoleHtml).toContain("Last Imported");
     expect(consoleHtml).toContain("Last Create");
     expect(consoleHtml).toContain("Last Import");
+    expect(consoleHtml).toContain("Dry-run");
     expect((await buildConfigResponse()).artist.artistId).toBe("artist");
 
     const rootHandler = registered.routeHandlers.get("/plugins/artist-runtime");
