@@ -76,22 +76,36 @@ Use it together with:
   - `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`
 - If neither variable is present, the connector reports
   `instagram_auth_not_configured`.
+- Round 42 adds a Graph API publish skeleton behind the same env contract. The
+  runtime now models these three stages, still fail-closed:
+  1. `GET /me/accounts`
+  2. `POST /{instagram_business_account_id}/media`
+  3. `POST /{instagram_business_account_id}/media_publish`
+- Required Meta scopes for the eventual live lane:
+  - `pages_show_list`
+  - `instagram_basic`
+  - `instagram_content_publish`
 
 ### Refresh
 
 1. Obtain an Instagram Graph API access token via Meta for Developers
    (requires an Instagram Business/Creator account linked to a Facebook Page
    and a Meta app). A raw login password is **not** accepted.
-2. Update `OPENCLAW_INSTAGRAM_AUTH` or `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` in the
-   active shell environment or launch profile.
-3. Reload the shell/session that launches OpenClaw so the environment is current.
-4. Re-run [`POST /plugins/artist-runtime/api/platforms/instagram/test`](./API_ROUTES.md#post-apiplatformsinstagramtest).
+2. Confirm the Facebook Page is linked to the intended Instagram Business or
+   Creator account, because the runtime resolves the Instagram business id from
+   the `GET /me/accounts` response.
+3. Keep the token in `OPENCLAW_INSTAGRAM_AUTH` or
+   `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`.
+4. Reload the shell/session that launches OpenClaw so the environment is current.
+5. Re-run [`POST /plugins/artist-runtime/api/platforms/instagram/test`](./API_ROUTES.md#post-apiplatformsinstagramtest).
 
 ### Dry-run behavior
 
-- Instagram remains a dry-run-safe skeleton today. Capability checks can report
-  configured/not-configured state, but publish/reply stay fail-closed until a
-  real adapter is introduced.
+- Instagram now runs the Graph API skeleton in dry-run only: the runtime is
+  wired for the Graph account lookup, media container, and publish-stage fetch
+  sequence, but this round still returns `dry-run blocks publish`.
+- Non-dry-run publish attempts are rejected with `requires_explicit_live_go`
+  even when auth is configured. Live posting remains outside the current lane.
 
 ## TikTok
 
