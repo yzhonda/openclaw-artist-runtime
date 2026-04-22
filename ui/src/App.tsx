@@ -23,6 +23,11 @@ type StatusResponse = {
     blockedReason?: string;
     lastError?: string;
   };
+  ticker: {
+    lastOutcome?: string;
+    lastTickAt?: string;
+    intervalMs: number;
+  };
   sunoWorker: {
     state: string;
     hardStopReason?: string;
@@ -67,6 +72,13 @@ type StatusResponse = {
     status: string;
     runCount: number;
   };
+  lastSocialAction?: {
+    platform: string;
+    action: string;
+    accepted: boolean;
+    url?: string;
+    reason?: string;
+  };
 };
 
 type ConfigResponse = {
@@ -105,7 +117,7 @@ type SongDetail = {
   latestPromptPack?: { version: number; metadata?: Record<string, unknown> };
   selectedTake?: { selectedTakeId?: string };
   socialAssets?: Array<{ platform: string; postType: string; sourceTakeId?: string }>;
-  lastSocialAction?: { platform: string; action: string; accepted: boolean; url?: string };
+  lastSocialAction?: { platform: string; action: string; accepted: boolean; url?: string; reason?: string };
 };
 
 type PlatformDetail = {
@@ -278,6 +290,8 @@ export function App() {
   const [activeView, setActiveView] = useState<ConsoleView>("dashboard");
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
   const [platformTests, setPlatformTests] = useState<Record<string, { testedAt: string; status: PlatformDetail }>>({});
+  const [replyTargetId, setReplyTargetId] = useState("");
+  const [replyText, setReplyText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -333,6 +347,16 @@ export function App() {
   useEffect(() => {
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (busy) {
+        return;
+      }
+      void refresh(selectedSongId);
+    }, 3000);
+    return () => clearInterval(intervalId);
+  }, [busy, selectedSongId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runAction = async (action: "pause" | "resume" | "run-cycle" | "ideate") => {
     setBusy(action);
@@ -443,6 +467,27 @@ export function App() {
     }
   };
 
+  const simulateReply = async () => {
+    if (!selectedSongId) {
+      setError("select a song before simulating a reply");
+      return;
+    }
+    setBusy("simulate-reply");
+    try {
+      await apiPost("/platforms/x/simulate-reply", {
+        songId: selectedSongId,
+        targetId: replyTargetId,
+        text: replyText
+      });
+      setReplyText("");
+      await refresh(selectedSongId);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const setupPanel = (
     <article className="panel">
       <div className="section-title">Setup Readiness</div>
@@ -479,6 +524,49 @@ export function App() {
         <div className="item">
           <div className="eyebrow">Daily Counters</div>
           <div className="muted">posts {status?.distributionWorker.postsToday ?? 0} · replies {status?.distributionWorker.repliesToday ?? 0}</div>
+        </div>
+      </div>
+    </article>
+  );
+
+  const recentXResultPanel = (
+    <article className="panel">
+      <div className="section-title">Recent X Result</div>
+      <div className="list">
+        <div className="item">
+          <strong>{status?.lastSocialAction?.platform === "x" ? `${status.lastSocialAction.action}` : "none"}</strong>
+          <div className="muted">
+            {status?.lastSocialAction?.platform === "x"
+              ? `${status.lastSocialAction.accepted ? "accepted" : "blocked"} · ${status.lastSocialAction.reason ?? "no reason"}`
+              : "No X publish or reply result yet."}
+          </div>
+          <div className="muted">{status?.lastSocialAction?.platform === "x" ? (status.lastSocialAction.url ?? "no url") : ""}</div>
+        </div>
+      </div>
+    </article>
+  );
+
+  const replySimulationPanel = (
+    <article className="panel">
+      <div className="section-title">Simulate Reply</div>
+      <div className="config-form">
+        <label>
+          <div className="eyebrow">Target Tweet ID or URL</div>
+          <input value={replyTargetId} onChange={(event) => setReplyTargetId(event.target.value)} placeholder="1900000000000000000 or https://x.com/..." />
+        </label>
+        <label>
+          <div className="eyebrow">Reply Text</div>
+          <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} rows={4} placeholder="dry-run reply text" />
+        </label>
+        <div className="muted">This route is forced to dry-run. No live reply is sent.</div>
+        <div className="inline-actions">
+          <button
+            className="primary"
+            disabled={busy !== null || !selectedSongId || !replyTargetId.trim() || !replyText.trim()}
+            onClick={() => void simulateReply()}
+          >
+            Simulate Reply
+          </button>
         </div>
       </div>
     </article>
@@ -747,6 +835,11 @@ export function App() {
           detail={status ? `${status.autopilot.nextAction} · ${status.autopilot.blockedReason ?? status.autopilot.currentRunId ?? "no run"}` : "loading"}
         />
         <MetricCard
+          label="Ticker"
+          value={status?.ticker.lastOutcome ?? "never"}
+          detail={status?.ticker.lastTickAt ? `${status.ticker.lastTickAt} · ${status.ticker.intervalMs}ms` : status ? `interval ${status.ticker.intervalMs}ms` : "loading"}
+        />
+        <MetricCard
           label="Suno"
           value={status?.sunoWorker.state ?? "-"}
           detail={status?.sunoWorker.pendingAction ?? status?.sunoWorker.hardStopReason ?? "worker ready"}
@@ -781,10 +874,10 @@ export function App() {
         ))}
       </nav>
 
-      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}</section> : null}
+      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
-      {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}</section> : null}
-      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}</section> : null}
+      {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
+      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{replySimulationPanel}</section> : null}
       {activeView === "songs" ? <section className="two-column">{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}

@@ -510,6 +510,12 @@ export interface AutopilotRunState {
   lastRunAt?: string;
 }
 
+export interface AutopilotTickerStatus {
+  lastOutcome?: string;
+  lastTickAt?: string;
+  intervalMs: number;
+}
+
 export interface AlertRecord {
   id: string;
   severity: AlertSeverity;
@@ -526,6 +532,7 @@ export interface StatusResponse {
   config: ArtistRuntimeConfig;
   dryRun: boolean;
   autopilot: AutopilotStatus;
+  ticker: AutopilotTickerStatus;
   sunoWorker: SunoWorkerStatus;
   distributionWorker: SocialDistributionWorkerStatus;
   platforms: Record<SocialPlatform, PlatformStatus>;

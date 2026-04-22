@@ -50,6 +50,21 @@ input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
+input,
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  border-radius: 14px;
+  padding: 0.8rem 0.9rem;
+  font: inherit;
+}
+
+textarea {
+  resize: vertical;
+}
+
 .console-shell {
   width: min(1120px, calc(100vw - 24px));
   margin: 0 auto;

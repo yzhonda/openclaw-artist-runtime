@@ -11,9 +11,10 @@ import { acknowledgeAlert } from "../services/alertAcks.js";
 import { collectAlerts } from "../services/alerts.js";
 import { listSongStates, readArtistMind, readSongState } from "../services/artistState.js";
 import { ArtistAutopilotService, pauseAutopilot, readAutopilotRunState, resumeAutopilot } from "../services/autopilotService.js";
+import { getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
 import { mergeResolvedConfig, patchResolvedConfig, readResolvedConfig } from "../services/runtimeConfig.js";
-import { readLatestSocialAction } from "../services/socialPublishing.js";
+import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
@@ -140,6 +141,14 @@ async function buildWorkspaceSummaries(workspaceRoot: string): Promise<Pick<Stat
     recentSong,
     lastSunoRun: await readLatestSunoRun(workspaceRoot, recentSong.songId),
     lastSocialAction: await readLatestSocialAction(workspaceRoot, recentSong.songId)
+  };
+}
+
+function buildTickerStatus(config: ArtistRuntimeConfig): StatusResponse["ticker"] {
+  return {
+    lastOutcome: getLastOutcome(),
+    lastTickAt: getLastTickAt(),
+    intervalMs: getAutopilotTickerIntervalMs(config)
   };
 }
 
@@ -457,6 +466,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     config: mergedConfig,
     dryRun: mergedConfig.autopilot.dryRun,
     autopilot,
+    ticker: buildTickerStatus(mergedConfig),
     sunoWorker,
     distributionWorker,
     platforms,
@@ -591,6 +601,45 @@ export function registerRoutes(api: unknown): void {
         status,
         testedAt: new Date().toISOString()
       };
+    }
+  });
+
+  safeRegisterRoute(api, {
+    method: "POST",
+    path: "/plugins/artist-runtime/api/platforms/x/simulate-reply",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const baseConfig = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = mergeResolvedConfig(baseConfig, {
+        autopilot: {
+          dryRun: true
+        } as ArtistRuntimeConfig["autopilot"]
+      } as Partial<ArtistRuntimeConfig>);
+      const songId = typeof payload.songId === "string"
+        ? payload.songId
+        : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
+      if (!songId) {
+        return {
+          result: {
+            accepted: false,
+            platform: "x" as const,
+            dryRun: true,
+            reason: "no_song_selected_for_reply_simulation"
+          },
+          entry: undefined
+        };
+      }
+      return publishSocialAction({
+        workspaceRoot: config.artist.workspaceRoot,
+        songId,
+        platform: "x",
+        action: "reply",
+        postType: "reply",
+        text: typeof payload.text === "string" ? payload.text : undefined,
+        targetId: typeof payload.targetId === "string" ? payload.targetId : undefined,
+        targetUrl: typeof payload.targetUrl === "string" ? payload.targetUrl : undefined,
+        config
+      });
     }
   });
 
@@ -854,6 +903,7 @@ export async function producerConsoleHtml(): Promise<string> {
     "<header><div><p class=\"muted\">Producer Console</p><h1>Artist Runtime</h1><p>Runtime-first control tower for status, songs, alerts, and cycle actions.</p></div><div class=\"actions\"><button id=\"pause\">Pause</button><button id=\"resume\">Resume</button><button class=\"primary\" id=\"run-cycle\">Run Cycle Now</button></div></header>",
     "<section class=\"grid\">",
     "<article class=\"panel\"><div class=\"muted\">Autopilot</div><div class=\"metric\" id=\"autopilot-stage\">-</div><div id=\"autopilot-meta\" class=\"muted\"></div></article>",
+    "<article class=\"panel\"><div class=\"muted\">Ticker</div><div class=\"metric\" id=\"ticker-outcome\">-</div><div id=\"ticker-meta\" class=\"muted\"></div></article>",
     "<article class=\"panel\"><div class=\"muted\">Suno</div><div class=\"metric\" id=\"suno-state\">-</div><div id=\"suno-meta\" class=\"muted\"></div></article>",
     "<article class=\"panel\"><div class=\"muted\">Music Budget</div><div class=\"metric\" id=\"music-budget\">-</div><div id=\"music-meta\" class=\"muted\"></div></article>",
     "<article class=\"panel\"><div class=\"muted\">Distribution</div><div class=\"metric\" id=\"distribution-meta\">-</div><div id=\"platform-meta\" class=\"muted\"></div></article>",
@@ -862,6 +912,10 @@ export async function producerConsoleHtml(): Promise<string> {
     "<article class=\"panel\"><div class=\"muted\">Songs</div><div id=\"songs\" class=\"list\"></div></article>",
     "<article class=\"panel\"><div class=\"muted\">Alerts</div><div id=\"alerts\" class=\"list\"></div></article>",
     "<article class=\"panel\"><div class=\"muted\">Current Song Detail</div><div id=\"song-detail\" class=\"list\"></div></article>",
+    "</section>",
+    "<section class=\"grid\" style=\"margin-top:16px\">",
+    "<article class=\"panel\"><div class=\"muted\">Recent X Result</div><div id=\"recent-x-result\" class=\"list\"></div></article>",
+    "<article class=\"panel\"><div class=\"muted\">Simulate Reply</div><form id=\"reply-form\" class=\"list\"><input id=\"reply-target\" placeholder=\"target tweet id or URL\" /><textarea id=\"reply-text\" placeholder=\"reply text\" rows=\"4\"></textarea><button class=\"primary\" type=\"submit\">Simulate Dry-Run Reply</button></form></article>",
     "</section>",
     "<section class=\"panel\" style=\"margin-top:16px\"><div class=\"muted\">API Debug</div><pre id=\"debug\">loading...</pre></section>",
     "<script type=\"module\">",
@@ -873,10 +927,13 @@ export async function producerConsoleHtml(): Promise<string> {
     "function renderSongs(songs){html('songs',songs.length?songs.map(song=>`<div class=\"item\"><span class=\"pill\">${song.status}</span><strong>${song.title}</strong><div class=\"muted\">${song.songId} · runs ${song.runCount}</div></div>`).join(''):'<div class=\"item muted\">No songs yet.</div>')}",
     "function renderAlerts(alerts){html('alerts',alerts.length?alerts.map(alert=>`<div class=\"item alert ${alert.severity}\"><strong>${alert.message}</strong><div class=\"muted\">${alert.source}${alert.ackedAt?' · acknowledged':''}</div></div>`).join(''):'<div class=\"item muted\">No active alerts.</div>')}",
     "function renderSongDetail(detail){if(!detail||!detail.song){html('song-detail','<div class=\"item muted\">No current song.</div>');return;} html('song-detail',`<div class=\"item\"><strong>${detail.song.title}</strong><div class=\"muted\">${detail.song.songId} · ${detail.song.status}</div></div><div class=\"item\"><div class=\"muted\">Prompt Ledger</div><strong>${detail.promptLedger.length} entries</strong></div><div class=\"item\"><div class=\"muted\">Suno Runs</div><strong>${detail.sunoRuns.length}</strong></div><div class=\"item\"><div class=\"muted\">Latest Prompt Pack</div><strong>${detail.latestPromptPack?`v${detail.latestPromptPack.version}`:'none'}</strong></div>`)}",
-    "async function refresh(){const [status,songs,alerts]=await Promise.all([get('/status'),get('/songs'),get('/alerts')]); text('autopilot-stage',status.autopilot.stage); text('autopilot-meta',`${status.autopilot.nextAction} · run ${status.autopilot.currentRunId??'none'}`); text('suno-state',status.sunoWorker.state); text('suno-meta',status.sunoWorker.hardStopReason??'worker ready'); text('music-budget',`${status.musicSummary.monthlyRuns}/${status.musicSummary.monthlyGenerationBudget}`); text('music-meta',`today ${status.musicSummary.dailyRuns} · prompt pack ${status.musicSummary.latestPromptPackVersion??'none'}`); text('distribution-meta',`posts ${status.distributionSummary.postsToday} · replies ${status.distributionSummary.repliesToday}`); text('platform-meta',Object.entries(status.platforms).map(([id,p])=>`${id}:${p.connected?'connected':'offline'}`).join(' · ')); renderSongs(songs); renderAlerts(alerts); if(status.recentSong){renderSongDetail(await get('/songs/'+status.recentSong.songId));} else {renderSongDetail(null);} text('debug',JSON.stringify(status,null,2)); }",
+    "function renderRecentX(status){const action=status.lastSocialAction; if(!action||action.platform!=='x'){html('recent-x-result','<div class=\"item muted\">No X result yet.</div>'); return;} html('recent-x-result',`<div class=\"item\"><strong>${action.action}</strong><div class=\"muted\">${action.accepted?'accepted':'blocked'} · ${action.reason??'no reason'}</div><div class=\"muted\">${action.url??'no url'}</div></div>`)}",
+    "async function refresh(){const [status,songs,alerts]=await Promise.all([get('/status'),get('/songs'),get('/alerts')]); text('autopilot-stage',status.autopilot.stage); text('autopilot-meta',`${status.autopilot.nextAction} · run ${status.autopilot.currentRunId??'none'}`); text('ticker-outcome',status.ticker.lastOutcome??'never'); text('ticker-meta',status.ticker.lastTickAt?`${status.ticker.lastTickAt} · ${status.ticker.intervalMs}ms`:`interval ${status.ticker.intervalMs}ms`); text('suno-state',status.sunoWorker.state); text('suno-meta',status.sunoWorker.hardStopReason??'worker ready'); text('music-budget',`${status.musicSummary.monthlyRuns}/${status.musicSummary.monthlyGenerationBudget}`); text('music-meta',`today ${status.musicSummary.dailyRuns} · prompt pack ${status.musicSummary.latestPromptPackVersion??'none'}`); text('distribution-meta',`posts ${status.distributionSummary.postsToday} · replies ${status.distributionSummary.repliesToday}`); text('platform-meta',Object.entries(status.platforms).map(([id,p])=>`${id}:${p.connected?'connected':'offline'}`).join(' · ')); renderSongs(songs); renderAlerts(alerts); renderRecentX(status); if(status.recentSong){document.getElementById('reply-form').dataset.songId=status.recentSong.songId; renderSongDetail(await get('/songs/'+status.recentSong.songId));} else {document.getElementById('reply-form').dataset.songId=''; renderSongDetail(null);} text('debug',JSON.stringify(status,null,2)); }",
     "document.getElementById('pause').addEventListener('click',async()=>{await post('/pause');await refresh();});",
     "document.getElementById('resume').addEventListener('click',async()=>{await post('/resume');await refresh();});",
     "document.getElementById('run-cycle').addEventListener('click',async()=>{await post('/run-cycle');await refresh();});",
+    "document.getElementById('reply-form').addEventListener('submit',async(event)=>{event.preventDefault(); const songId=event.currentTarget.dataset.songId; if(!songId) return; await post('/platforms/x/simulate-reply',{songId,targetId:document.getElementById('reply-target').value,text:document.getElementById('reply-text').value}); await refresh();});",
+    "setInterval(()=>{void refresh().catch(error=>{text('debug',String(error));});},3000);",
     "refresh().catch(error=>{text('debug',String(error));});",
     "</script>",
     "</main>"
