@@ -689,9 +689,9 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/config/update",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const current = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const patch = payload.patch;
-      return patchResolvedConfig(current.artist.workspaceRoot, payloadRecord(patch) as Partial<ArtistRuntimeConfig>);
+      const context = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const patchRaw = (payload.patch ?? payload.config) as Partial<ArtistRuntimeConfig> | undefined;
+      return patchResolvedConfig(context.artist.workspaceRoot, (patchRaw ?? {}) as Partial<ArtistRuntimeConfig>);
     }
   });
 
