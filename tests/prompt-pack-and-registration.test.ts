@@ -205,6 +205,9 @@ describe("registration shells", () => {
     expect(consoleHtml).toContain("Run Cycle");
     expect(consoleHtml).toContain("Config Editor");
     expect(consoleHtml).toContain("Songs Per Week");
+    expect(consoleHtml).toContain("X Authority");
+    expect(consoleHtml).toContain("Instagram Authority");
+    expect(consoleHtml).toContain("TikTok Authority");
     expect(consoleHtml).toContain("Suno Current Run");
     expect(consoleHtml).toContain("Last Imported");
     expect(consoleHtml).toContain("Last Create");

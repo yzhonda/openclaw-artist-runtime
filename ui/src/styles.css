@@ -51,6 +51,7 @@ input[type="checkbox"] {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -229,6 +230,11 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.platform-config {
+  display: grid;
+  gap: 8px;
 }
 
 .inline-actions {
