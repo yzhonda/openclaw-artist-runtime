@@ -17,6 +17,10 @@ common_args=(
   --port "${OPENCLAW_LOCAL_GATEWAY_PORT}"
 )
 
+ensure_runtime_dirs() {
+  mkdir -p "${OPENCLAW_LOCAL_ROOT}" "${OPENCLAW_HOME}" "${OPENCLAW_STATE_DIR}" "${OPENCLAW_LOCAL_WORKSPACE}" "${OPENCLAW_LOCAL_LOGS}" "$(dirname "${OPENCLAW_CONFIG_PATH}")"
+}
+
 ensure_gateway_config() {
   node <<'EOF'
 const crypto = require("node:crypto");
@@ -68,10 +72,85 @@ try {
 EOF
 }
 
+read_gateway_pid() {
+  if [[ -f "${OPENCLAW_LOCAL_GATEWAY_PID}" ]]; then
+    tr -d '[:space:]' < "${OPENCLAW_LOCAL_GATEWAY_PID}"
+  fi
+}
+
+gateway_pid_is_live() {
+  local pid="$1"
+  [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null
+}
+
+cleanup_stale_pid() {
+  local pid
+  pid="$(read_gateway_pid)"
+  if [[ -n "${pid}" ]] && ! gateway_pid_is_live "${pid}"; then
+    rm -f "${OPENCLAW_LOCAL_GATEWAY_PID}"
+  fi
+}
+
 case "${command}" in
   run)
+    ensure_runtime_dirs
     ensure_gateway_config
     exec "${script_dir}/openclaw-local" gateway run "${common_args[@]}" "$@"
+    ;;
+  start)
+    ensure_runtime_dirs
+    ensure_gateway_config
+    cleanup_stale_pid
+    existing_pid="$(read_gateway_pid)"
+    if gateway_pid_is_live "${existing_pid:-}"; then
+      echo "Gateway already running (pid ${existing_pid})." >&2
+      exit 0
+    fi
+    : > "${OPENCLAW_LOCAL_GATEWAY_LOG}"
+    nohup "${script_dir}/openclaw-local" gateway run "${common_args[@]}" "$@" \
+      >>"${OPENCLAW_LOCAL_GATEWAY_LOG}" 2>&1 < /dev/null &
+    gateway_pid=$!
+    echo "${gateway_pid}" > "${OPENCLAW_LOCAL_GATEWAY_PID}"
+    for _ in $(seq 1 20); do
+      if "${script_dir}/openclaw-local-http-smoke.sh" >/dev/null 2>&1; then
+        echo "Gateway started (pid ${gateway_pid})."
+        echo "Log: ${OPENCLAW_LOCAL_GATEWAY_LOG}"
+        exit 0
+      fi
+      sleep 1
+      if ! gateway_pid_is_live "${gateway_pid}"; then
+        echo "Gateway failed to stay up. Log: ${OPENCLAW_LOCAL_GATEWAY_LOG}" >&2
+        rm -f "${OPENCLAW_LOCAL_GATEWAY_PID}"
+        exit 1
+      fi
+    done
+    echo "Gateway did not become ready in time. Log: ${OPENCLAW_LOCAL_GATEWAY_LOG}" >&2
+    exit 1
+    ;;
+  stop)
+    cleanup_stale_pid
+    existing_pid="$(read_gateway_pid)"
+    if [[ -z "${existing_pid}" ]]; then
+      echo "Gateway is not running."
+      exit 0
+    fi
+    kill "${existing_pid}" 2>/dev/null || true
+    for _ in $(seq 1 10); do
+      if ! gateway_pid_is_live "${existing_pid}"; then
+        rm -f "${OPENCLAW_LOCAL_GATEWAY_PID}"
+        echo "Gateway stopped."
+        exit 0
+      fi
+      sleep 1
+    done
+    kill -9 "${existing_pid}" 2>/dev/null || true
+    rm -f "${OPENCLAW_LOCAL_GATEWAY_PID}"
+    echo "Gateway force-stopped."
+    ;;
+  tail)
+    ensure_runtime_dirs
+    touch "${OPENCLAW_LOCAL_GATEWAY_LOG}"
+    exec tail -n "${TAIL_LINES:-40}" -f "${OPENCLAW_LOCAL_GATEWAY_LOG}"
     ;;
   health)
     gateway_token="$(read_gateway_token)"
@@ -88,6 +167,15 @@ case "${command}" in
     exec "${script_dir}/openclaw-local" gateway probe --json --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" "$@"
     ;;
   status)
+    cleanup_stale_pid
+    existing_pid="$(read_gateway_pid)"
+    if [[ -n "${existing_pid}" ]]; then
+      echo "gateway_pid=${existing_pid}"
+      echo "gateway_log=${OPENCLAW_LOCAL_GATEWAY_LOG}"
+    else
+      echo "gateway_pid=stopped"
+      echo "gateway_log=${OPENCLAW_LOCAL_GATEWAY_LOG}"
+    fi
     gateway_token="$(read_gateway_token)"
     if [[ -n "${gateway_token}" ]]; then
       exec "${script_dir}/openclaw-local" gateway status --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" --token "${gateway_token}" "$@"
@@ -95,7 +183,7 @@ case "${command}" in
     exec "${script_dir}/openclaw-local" gateway status --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" "$@"
     ;;
   *)
-    echo "Usage: scripts/openclaw-local-gateway [run|health|probe|status] [args...]" >&2
+    echo "Usage: scripts/openclaw-local-gateway [run|start|stop|tail|health|probe|status] [args...]" >&2
     exit 1
     ;;
 esac
