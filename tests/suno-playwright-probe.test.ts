@@ -5,14 +5,24 @@ import {
   SUNO_CREATE_URL
 } from "../src/services/sunoPlaywrightDriver";
 
-const { launchPersistentContextMock } = vi.hoisted(() => ({
-  launchPersistentContextMock: vi.fn()
+const { chromiumMock, launchPersistentContextMock, stealthPluginMock, stealthResult } = vi.hoisted(() => ({
+  chromiumMock: {
+    use: vi.fn(),
+    launchPersistentContext: vi.fn()
+  },
+  launchPersistentContextMock: vi.fn(),
+  stealthPluginMock: vi.fn(),
+  stealthResult: { name: "stealth-plugin" }
 }));
 
-vi.mock("playwright", () => ({
-  chromium: {
-    launchPersistentContext: launchPersistentContextMock
-  }
+chromiumMock.launchPersistentContext = launchPersistentContextMock;
+
+vi.mock("playwright-extra", () => ({
+  chromium: chromiumMock
+}));
+
+vi.mock("puppeteer-extra-plugin-stealth", () => ({
+  default: stealthPluginMock
 }));
 
 function createPage({
@@ -42,7 +52,10 @@ function createContext(page = createPage()) {
 
 describe("PlaywrightSunoDriver probe", () => {
   beforeEach(() => {
+    chromiumMock.use.mockReset();
     launchPersistentContextMock.mockReset();
+    stealthPluginMock.mockReset();
+    stealthPluginMock.mockReturnValue(stealthResult);
   });
 
   it("returns connected when the create surface is already available", async () => {
@@ -59,6 +72,8 @@ describe("PlaywrightSunoDriver probe", () => {
     const result = await driver.probe();
 
     expect(result.state).toBe("connected");
+    expect(stealthPluginMock).toHaveBeenCalledTimes(1);
+    expect(chromiumMock.use).toHaveBeenCalledWith(stealthResult);
     expect(page.goto).toHaveBeenCalledWith(SUNO_CREATE_URL, {
       waitUntil: "domcontentloaded",
       timeout: 20_000
@@ -83,6 +98,7 @@ describe("PlaywrightSunoDriver probe", () => {
       state: "login_required",
       detail: PLAYWRIGHT_DRIVER_LOGIN_REQUIRED_DETAIL
     });
+    expect(chromiumMock.use).toHaveBeenCalledWith(stealthResult);
     expect(context.close).toHaveBeenCalledTimes(1);
   });
 
@@ -94,5 +110,6 @@ describe("PlaywrightSunoDriver probe", () => {
 
     expect(result.state).toBe("disconnected");
     expect(result.detail).toContain("browser launch failed");
+    expect(chromiumMock.use).toHaveBeenCalledWith(stealthResult);
   });
 });

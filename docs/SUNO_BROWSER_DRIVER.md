@@ -15,6 +15,9 @@ credit consumption stays at zero.
 - Use an existing Suno account that the operator controls.
 - Keep the browser session on the operator machine only.
 - Expect manual login first; automated probing/generation lands in later rounds.
+- The browser lane now uses `playwright-extra` plus
+  `puppeteer-extra-plugin-stealth` and launches with `channel: "chrome"` so
+  Google OAuth is less likely to flag the session as automation.
 
 ## Profile path
 
@@ -47,6 +50,21 @@ scripts/openclaw-suno-login.sh
 That script opens Chromium with the dedicated persistent profile, navigates to
 the Suno create surface, and waits for the operator to finish login manually.
 Close the browser window when login is complete.
+
+## Google OAuth bot detection workaround
+
+The current login lane uses the stealth plugin and Chrome channel launch options
+to suppress the default Playwright automation markers that Google OAuth was
+rejecting. In practice, if the operator can sign into Suno through ordinary
+Chrome on the same machine, the Playwright lane should now follow the same
+Google OAuth flow instead of failing at the "could not sign you in" screen.
+
+If login still fails:
+
+1. confirm ordinary Chrome can sign into the same Suno account;
+2. rerun `scripts/openclaw-suno-login.sh`;
+3. after login, verify the profile with `music.suno.driver = "playwright"` and
+   the existing Suno status/probe surface.
 
 ## Config toggle
 

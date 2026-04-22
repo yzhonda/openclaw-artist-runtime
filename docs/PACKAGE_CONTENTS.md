@@ -131,8 +131,9 @@ refresh guide, with direct links back into the platform test route anchors in
 `docs/API_ROUTES.md`.
 
 `docs/SUNO_BROWSER_DRIVER.md` now captures the separate local-browser lane for
-Suno, including the dedicated profile path and the operator-managed Playwright
-installation requirement.
+Suno, including the dedicated profile path, the operator-managed Playwright
+installation requirement, and the current Chrome-channel + stealth-plugin login
+workaround.
 
 ### Repo-local OpenClaw sandbox scripts
 
@@ -249,6 +250,13 @@ Console parity:
 - `ui/src/configEditor.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
+
+Also keep the Suno browser-lane runtime dependencies with the package, because
+the login/probe path now depends on them directly:
+
+- `playwright`
+- `playwright-extra`
+- `puppeteer-extra-plugin-stealth`
 
 Also keep the social connector source and tests together, because the package now
 ships one aligned dry-run contract across X, Instagram, and TikTok:

@@ -9,6 +9,7 @@ coverage/
 .env
 .DS_Store
 *.log
+package-lock.json
 .runtime/
 .openclaw-browser-profiles/
 /songs/
