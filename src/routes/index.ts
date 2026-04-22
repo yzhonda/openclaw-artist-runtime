@@ -2,7 +2,6 @@ import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyConfigDefaults } from "../config/schema.js";
-import { defaultArtistRuntimeConfig } from "../config/defaultConfig.js";
 import { InstagramConnector } from "../connectors/social/instagramConnector.js";
 import { TikTokConnector } from "../connectors/social/tiktokConnector.js";
 import { XBirdConnector } from "../connectors/social/xBirdConnector.js";
@@ -14,7 +13,7 @@ import { listSongStates, readArtistMind, readSongState } from "../services/artis
 import { ArtistAutopilotService, pauseAutopilot, readAutopilotRunState, resumeAutopilot } from "../services/autopilotService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
-import { mergeResolvedConfig, patchResolvedConfig, readResolvedConfig } from "../services/runtimeConfig.js";
+import { mergeResolvedConfig, patchResolvedConfig, resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
@@ -348,15 +347,6 @@ export async function buildConfigResponse(config?: Partial<ArtistRuntimeConfig>)
   return resolveRuntimeConfig(config);
 }
 
-async function resolveRuntimeConfig(config?: Partial<ArtistRuntimeConfig>): Promise<ArtistRuntimeConfig> {
-  if (config) {
-    const mergedConfig = applyConfigDefaults(config);
-    const persisted = await readResolvedConfig(mergedConfig.artist.workspaceRoot);
-    return mergeResolvedConfig(persisted, config);
-  }
-  return readResolvedConfig(defaultArtistRuntimeConfig.artist.workspaceRoot);
-}
-
 export async function buildArtistMindResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = await resolveRuntimeConfig(config);
   return readArtistMind(mergedConfig.artist.workspaceRoot);
@@ -572,7 +562,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/alerts/:id/ack",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return acknowledgeAlert(config.artist.workspaceRoot, typeof payload.id === "string" ? payload.id : "unknown");
     }
   });
@@ -599,7 +589,7 @@ export function registerRoutes(api: unknown): void {
     handler: async (input) => {
       const payload = payloadRecord(input);
       const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const status = await buildPlatformDetailResponse(platform, config);
       return {
         platform,
@@ -614,7 +604,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/platforms/x/simulate-reply",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const baseConfig = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const baseConfig = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const config = mergeResolvedConfig(baseConfig, {
         autopilot: {
           dryRun: true
@@ -654,7 +644,7 @@ export function registerRoutes(api: unknown): void {
     handler: async (input) => {
       const payload = payloadRecord(input);
       const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
         distribution: {
           platforms: {
@@ -672,7 +662,7 @@ export function registerRoutes(api: unknown): void {
     handler: async (input) => {
       const payload = payloadRecord(input);
       const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
         distribution: {
           platforms: {
@@ -695,7 +685,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/suno/runs",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const songId = typeof payload.songId === "string"
         ? payload.songId
         : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
@@ -708,7 +698,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/suno/connect",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return new SunoBrowserWorker(config.artist.workspaceRoot).connect();
     }
   });
@@ -718,7 +708,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/suno/reconnect",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return new SunoBrowserWorker(config.artist.workspaceRoot).reconnect();
     }
   });
@@ -728,7 +718,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/suno/generate/:songId",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const songId = typeof payload.songId === "string" ? payload.songId : "song-001";
       return generateSunoRun({
         workspaceRoot: config.artist.workspaceRoot,
@@ -754,7 +744,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/pause",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return pauseAutopilot(config.artist.workspaceRoot, typeof payload.reason === "string" ? payload.reason : undefined);
     }
   });
@@ -764,7 +754,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/resume",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return resumeAutopilot(config.artist.workspaceRoot);
     }
   });
@@ -789,7 +779,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/songs/ideate",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return createSongIdea({
         workspaceRoot: config.artist.workspaceRoot,
         title: typeof payload.title === "string" ? payload.title : undefined,
@@ -804,7 +794,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/songs/:songId/select-take",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return selectTake({
         workspaceRoot: config.artist.workspaceRoot,
         songId: typeof payload.songId === "string" ? payload.songId : "song-001",
@@ -820,7 +810,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/songs/:songId/social-assets",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       return prepareSocialAssets({
         workspaceRoot: config.artist.workspaceRoot,
         songId: typeof payload.songId === "string" ? payload.songId : "song-001",
