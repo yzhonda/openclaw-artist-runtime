@@ -1,3 +1,12 @@
+import {
+  instagramAuthorityModes,
+  tiktokAuthorityModes,
+  xAuthorityModes,
+  type InstagramAuthority,
+  type TikTokAuthority,
+  type XAuthority
+} from "../../src/types";
+
 export type ConfigEditorSource = {
   autopilot: {
     enabled: boolean;
@@ -7,9 +16,9 @@ export type ConfigEditorSource = {
   };
   distribution: {
     platforms: {
-      x: { enabled: boolean };
-      instagram: { enabled: boolean };
-      tiktok: { enabled: boolean };
+      x: { enabled: boolean; authority: XAuthority };
+      instagram: { enabled: boolean; authority: InstagramAuthority };
+      tiktok: { enabled: boolean; authority: TikTokAuthority };
     };
   };
 };
@@ -20,8 +29,11 @@ export type ConfigDraft = {
   songsPerWeek: string;
   cycleIntervalMinutes: string;
   xEnabled: boolean;
+  xAuthority: XAuthority;
   instagramEnabled: boolean;
+  instagramAuthority: InstagramAuthority;
   tiktokEnabled: boolean;
+  tiktokAuthority: TikTokAuthority;
 };
 
 export type ConfigUpdatePatch = {
@@ -33,9 +45,9 @@ export type ConfigUpdatePatch = {
   };
   distribution: {
     platforms: {
-      x: { enabled: boolean };
-      instagram: { enabled: boolean };
-      tiktok: { enabled: boolean };
+      x: { enabled: boolean; authority: XAuthority };
+      instagram: { enabled: boolean; authority: InstagramAuthority };
+      tiktok: { enabled: boolean; authority: TikTokAuthority };
     };
   };
 };
@@ -55,8 +67,11 @@ export function buildConfigDraft(source: ConfigEditorSource): ConfigDraft {
     songsPerWeek: String(source.autopilot.songsPerWeek),
     cycleIntervalMinutes: String(source.autopilot.cycleIntervalMinutes),
     xEnabled: source.distribution.platforms.x.enabled,
+    xAuthority: source.distribution.platforms.x.authority,
     instagramEnabled: source.distribution.platforms.instagram.enabled,
-    tiktokEnabled: source.distribution.platforms.tiktok.enabled
+    instagramAuthority: source.distribution.platforms.instagram.authority,
+    tiktokEnabled: source.distribution.platforms.tiktok.enabled,
+    tiktokAuthority: source.distribution.platforms.tiktok.authority
   };
 }
 
@@ -72,6 +87,18 @@ export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
     throw new Error("cycleIntervalMinutes must be between 15 and 1440");
   }
 
+  if (!xAuthorityModes.includes(draft.xAuthority)) {
+    throw new Error("xAuthority must be one of the supported X authority modes");
+  }
+
+  if (!instagramAuthorityModes.includes(draft.instagramAuthority)) {
+    throw new Error("instagramAuthority must be one of the supported Instagram authority modes");
+  }
+
+  if (!tiktokAuthorityModes.includes(draft.tiktokAuthority)) {
+    throw new Error("tiktokAuthority must be one of the supported TikTok authority modes");
+  }
+
   return {
     autopilot: {
       enabled: draft.autopilotEnabled,
@@ -81,9 +108,9 @@ export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
     },
     distribution: {
       platforms: {
-        x: { enabled: draft.xEnabled },
-        instagram: { enabled: draft.instagramEnabled },
-        tiktok: { enabled: draft.tiktokEnabled }
+        x: { enabled: draft.xEnabled, authority: draft.xAuthority },
+        instagram: { enabled: draft.instagramEnabled, authority: draft.instagramAuthority },
+        tiktok: { enabled: draft.tiktokEnabled, authority: draft.tiktokAuthority }
       }
     }
   };

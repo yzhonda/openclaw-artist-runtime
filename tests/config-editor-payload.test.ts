@@ -12,9 +12,9 @@ describe("config editor payload builder", () => {
       },
       distribution: {
         platforms: {
-          x: { enabled: true },
-          instagram: { enabled: false },
-          tiktok: { enabled: false }
+          x: { enabled: true, authority: "auto_publish" },
+          instagram: { enabled: false, authority: "draft_only" },
+          tiktok: { enabled: false, authority: "draft_only" }
         }
       }
     })).toEqual({
@@ -23,8 +23,11 @@ describe("config editor payload builder", () => {
       songsPerWeek: "5",
       cycleIntervalMinutes: "180",
       xEnabled: true,
+      xAuthority: "auto_publish",
       instagramEnabled: false,
-      tiktokEnabled: false
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokAuthority: "draft_only"
     });
   });
 
@@ -35,8 +38,11 @@ describe("config editor payload builder", () => {
       songsPerWeek: "7",
       cycleIntervalMinutes: "60",
       xEnabled: true,
+      xAuthority: "auto_publish_and_low_risk_replies",
       instagramEnabled: true,
-      tiktokEnabled: false
+      instagramAuthority: "auto_publish_visuals",
+      tiktokEnabled: false,
+      tiktokAuthority: "draft_only"
     })).toEqual({
       autopilot: {
         enabled: true,
@@ -46,9 +52,9 @@ describe("config editor payload builder", () => {
       },
       distribution: {
         platforms: {
-          x: { enabled: true },
-          instagram: { enabled: true },
-          tiktok: { enabled: false }
+          x: { enabled: true, authority: "auto_publish_and_low_risk_replies" },
+          instagram: { enabled: true, authority: "auto_publish_visuals" },
+          tiktok: { enabled: false, authority: "draft_only" }
         }
       }
     });
@@ -61,8 +67,11 @@ describe("config editor payload builder", () => {
       songsPerWeek: "24",
       cycleIntervalMinutes: "10",
       xEnabled: true,
+      xAuthority: "draft_only",
       instagramEnabled: false,
-      tiktokEnabled: false
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokAuthority: "draft_only"
     })).toBe("songsPerWeek must be between 0 and 21");
   });
 
@@ -73,8 +82,26 @@ describe("config editor payload builder", () => {
       songsPerWeek: "2.5",
       cycleIntervalMinutes: "180",
       xEnabled: true,
+      xAuthority: "draft_only",
       instagramEnabled: false,
-      tiktokEnabled: false
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokAuthority: "draft_only"
     })).toBe("songsPerWeek must be a whole number");
+  });
+
+  it("rejects unsupported authority values", () => {
+    expect(validateConfigDraft({
+      autopilotEnabled: true,
+      dryRun: true,
+      songsPerWeek: "5",
+      cycleIntervalMinutes: "180",
+      xEnabled: true,
+      xAuthority: "full_social_autonomy" as never,
+      instagramEnabled: false,
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokAuthority: "draft_only"
+    })).toBe("xAuthority must be one of the supported X authority modes");
   });
 });

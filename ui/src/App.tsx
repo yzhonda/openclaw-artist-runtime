@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import "./styles.css";
 import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
+import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes } from "../../src/types";
 
 type StatusResponse = {
   dryRun: boolean;
@@ -95,9 +96,9 @@ type ConfigResponse = {
   };
   distribution: {
     platforms: {
-      x: { enabled: boolean };
-      instagram: { enabled: boolean };
-      tiktok: { enabled: boolean };
+      x: { enabled: boolean; authority: string };
+      instagram: { enabled: boolean; authority: string };
+      tiktok: { enabled: boolean; authority: string };
     };
   };
 };
@@ -697,9 +698,29 @@ export function App() {
               <input type="number" min={15} max={1440} value={configDraft.cycleIntervalMinutes} onChange={(event) => updateConfigDraft({ cycleIntervalMinutes: event.target.value })} />
             </label>
           </div>
-          <label className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => updateConfigDraft({ xEnabled: event.target.checked })} />X enabled</label>
-          <label className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => updateConfigDraft({ instagramEnabled: event.target.checked })} />Instagram enabled</label>
-          <label className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => updateConfigDraft({ tiktokEnabled: event.target.checked })} />TikTok enabled</label>
+          <div className="field-grid">
+            <label className="platform-config">
+              <div className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => updateConfigDraft({ xEnabled: event.target.checked })} />X enabled</div>
+              <div className="eyebrow">X Authority</div>
+              <select value={configDraft.xAuthority} onChange={(event) => updateConfigDraft({ xAuthority: event.target.value as ConfigDraft["xAuthority"] })}>
+                {xAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+              </select>
+            </label>
+            <label className="platform-config">
+              <div className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => updateConfigDraft({ instagramEnabled: event.target.checked })} />Instagram enabled</div>
+              <div className="eyebrow">Instagram Authority</div>
+              <select value={configDraft.instagramAuthority} onChange={(event) => updateConfigDraft({ instagramAuthority: event.target.value as ConfigDraft["instagramAuthority"] })}>
+                {instagramAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+              </select>
+            </label>
+            <label className="platform-config">
+              <div className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => updateConfigDraft({ tiktokEnabled: event.target.checked })} />TikTok enabled</div>
+              <div className="eyebrow">TikTok Authority</div>
+              <select value={configDraft.tiktokAuthority} onChange={(event) => updateConfigDraft({ tiktokAuthority: event.target.value as ConfigDraft["tiktokAuthority"] })}>
+                {tiktokAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+              </select>
+            </label>
+          </div>
           <div className="muted">artist {config.artist.artistId} · workspace {config.artist.workspaceRoot}</div>
           {configValidationError ? <div className="field-error">{configValidationError}</div> : null}
           <div className="inline-actions">
