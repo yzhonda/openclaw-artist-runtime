@@ -36,10 +36,22 @@ openclaw plugins install npm:@your-org/openclaw-artist-runtime
 
 ## Current status
 
-This package is a detailed implementation scaffold. Codex or another coding agent
-should start with `AGENTS.md`, then `CODEX_START_HERE.md`, and then the docs in order.
-The TypeScript files are intentionally thin and must be adapted to the current
-OpenClaw SDK signatures before release.
+This package includes a working dry-run pipeline: autopilot state machine, Suno worker
+lifecycle skeleton, Bird (X) text publish / reply code paths, a periodic `runCycle`
+ticker, and a bundled React Producer Console served from `ui/dist/`.
+
+- Full-cycle smoke test covers `planning → prompt_pack → suno_generation → take_selection
+  → asset_generation → publishing (dry-run) → completed` with zero external calls
+  (`spawn` and `fetch` are mocked and asserted unused in the test).
+- Real Bird / Instagram / TikTok posting, real Suno browser automation, and real
+  platform writes are **not** enabled by default and require explicit operator action.
+- `autopilot.dryRun` defaults to `true`; the plugin ships safe-by-default.
+- Producer Console exposes `Ticker`, `Recent X Result`, and `Simulate Reply` (dry-run-only)
+  for live inspection and a 3-second polling loop against `/api/status`.
+
+See `CHANGELOG.md` for the active feature set. For implementation details and
+contributor onboarding, start with `AGENTS.md`, then `CODEX_START_HERE.md`, then the
+docs in order.
 
 ## Key package files
 
