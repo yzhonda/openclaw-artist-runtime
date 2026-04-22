@@ -165,6 +165,7 @@ workaround.
 - `tests/config-editor-payload.test.ts`
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
+- `tests/suno-playwright-create.test.ts`
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`

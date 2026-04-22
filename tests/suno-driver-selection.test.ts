@@ -101,7 +101,8 @@ describe("Suno driver selection", () => {
           ...defaultArtistRuntimeConfig.music,
           suno: {
             ...defaultArtistRuntimeConfig.music.suno,
-            driver: "playwright"
+            driver: "playwright",
+            submitMode: "skip"
           }
         }
       }
@@ -130,7 +131,8 @@ describe("Suno driver selection", () => {
           ...defaultArtistRuntimeConfig.music,
           suno: {
             ...defaultArtistRuntimeConfig.music.suno,
-            driver: "playwright"
+            driver: "playwright",
+            submitMode: "skip"
           }
         }
       }
