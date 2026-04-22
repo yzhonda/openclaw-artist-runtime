@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
 type UnknownHandler = (payload?: unknown) => unknown | Promise<unknown>;
+type HttpMethod = "GET" | "POST" | "PATCH";
 
 export interface ToolRegistration {
   name: string;
@@ -19,7 +20,7 @@ export interface ServiceRegistration {
 }
 
 export interface RouteRegistration {
-  method: "GET" | "POST" | "PATCH";
+  method: HttpMethod | HttpMethod[];
   path: string;
   handler: UnknownHandler;
   auth?: "plugin" | "gateway";
@@ -142,9 +143,10 @@ function writeRouteResponse(res: ServerResponse, route: RouteRegistration, resul
 function createHttpRouteHandler(route: RouteRegistration) {
   return async (req: IncomingMessage, res: ServerResponse): Promise<boolean> => {
     const method = (req.method ?? "GET").toUpperCase();
-    if (method !== route.method) {
+    const allowedMethods = Array.isArray(route.method) ? route.method : [route.method];
+    if (!allowedMethods.includes(method as HttpMethod)) {
       res.statusCode = 405;
-      res.setHeader("Allow", route.method);
+      res.setHeader("Allow", allowedMethods.join(", "));
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
       res.end(`Method ${method} Not Allowed`);
       return true;
@@ -152,6 +154,8 @@ function createHttpRouteHandler(route: RouteRegistration) {
 
     const url = new URL(req.url ?? route.path, "http://127.0.0.1");
     const payloadBase: Record<string, unknown> = {
+      requestMethod: method,
+      requestPath: url.pathname,
       ...readQueryParams(url),
       ...extractPathParams(route.path, url.pathname)
     };

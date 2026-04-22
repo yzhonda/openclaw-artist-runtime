@@ -149,7 +149,7 @@ describe("status ticker and reply simulation routes", () => {
       }
     });
 
-    const handler = registered.get("/plugins/artist-runtime/api/platforms/x/simulate-reply");
+    const handler = registered.get("/plugins/artist-runtime/api/platforms");
     expect(handler).toBeTruthy();
 
     const response = createMockResponse();
