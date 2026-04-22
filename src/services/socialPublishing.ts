@@ -41,6 +41,12 @@ function getPlatformAuthority(config: ArtistRuntimeConfig, platform: SocialPlatf
   return config.distribution.platforms[platform].authority;
 }
 
+function resolveSocialDryRun(config: ArtistRuntimeConfig, platform: SocialPlatform): boolean {
+  return config.autopilot.dryRun
+    || !config.distribution.enabled
+    || !config.distribution.platforms[platform].enabled;
+}
+
 function getSocialLedgerPath(root: string, songId: string): string {
   return join(root, "songs", songId, "social", "social-publish.jsonl");
 }
@@ -98,11 +104,12 @@ export async function readLatestSocialAction(root: string, songId: string): Prom
 export async function publishSocialAction(input: SocialActionInput): Promise<{ result: SocialPublishResult; entry: SocialPublishLedgerEntry }> {
   const action = input.action ?? "publish";
   const config = applyConfigDefaults(input.config);
+  const effectiveDryRun = resolveSocialDryRun(config, input.platform);
   const connector = getConnector(input.platform);
   const capabilitySummary = await connector.checkCapabilities();
   const capabilityAvailable = capabilityForPostType(capabilitySummary, input.postType, action);
   const authorityDecision = decideSocialAuthority({
-    dryRun: config.autopilot.dryRun,
+    dryRun: effectiveDryRun,
     authority: getPlatformAuthority(config, input.platform),
     platform: input.platform,
     risk: input.risk ?? "low",
@@ -114,7 +121,7 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
   const result: SocialPublishResult = authorityDecision.allowed
     ? action === "reply"
       ? await (connector.reply?.({
-          dryRun: config.autopilot.dryRun,
+          dryRun: effectiveDryRun,
           authority: getPlatformAuthority(config, input.platform),
           postType: input.postType,
           text: input.text,
@@ -124,12 +131,12 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
         }) ?? Promise.resolve({
           accepted: false,
           platform: input.platform,
-          dryRun: config.autopilot.dryRun,
+          dryRun: effectiveDryRun,
           reason: `${input.platform} reply is unavailable`,
           url: undefined
         }))
       : await connector.publish({
-          dryRun: config.autopilot.dryRun,
+          dryRun: effectiveDryRun,
           authority: getPlatformAuthority(config, input.platform),
           postType: input.postType,
           text: input.text,
@@ -138,7 +145,7 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
     : {
         accepted: false,
         platform: input.platform,
-        dryRun: config.autopilot.dryRun,
+        dryRun: effectiveDryRun,
         reason: authorityDecision.reason,
         url: undefined
       };
@@ -151,7 +158,7 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
     postType: input.postType,
     action,
     accepted: result.accepted,
-    dryRun: config.autopilot.dryRun,
+    dryRun: effectiveDryRun,
     textHash: hashText(input.text),
     mediaRefs: input.mediaPaths ?? [],
     policyDecision: authorityDecision,
