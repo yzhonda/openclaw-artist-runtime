@@ -35,6 +35,17 @@ See `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh flow.
   the plugin invokes the CLI but does not export, rewrite, or persist those
   cookies itself.
 
+## Suno profile boundary
+
+- The Suno browser profile lives under `.openclaw-browser-profiles/suno/` on the
+  operator filesystem only.
+- It is not bundled into package artifacts and is not intended for network
+  upload or workspace syncing.
+- The plugin's browser-driver lane should operate against that local profile
+  without copying raw cookie contents into Prompt Ledgers, audit logs, or other
+  human-readable artifacts.
+- See `docs/SUNO_BROWSER_DRIVER.md` for the operator setup path.
+
 ## Data not intentionally stored
 
 - Passwords.

@@ -19,6 +19,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     suno: {
       enabled: true,
       connectionMode: "background_browser_worker",
+      driver: "mock",
       authority: "auto_create_and_select_take",
       monthlyGenerationBudget: 50,
       maxGenerationsPerDay: 4,

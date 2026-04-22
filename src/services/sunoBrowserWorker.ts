@@ -1,14 +1,17 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
+  ArtistRuntimeConfig,
   SunoCreateRequest,
   SunoCreateResult,
   SunoImportRequest,
   SunoImportResult,
   SunoLoginHandoff,
+  SunoDriverMode,
   SunoWorkerState,
   SunoWorkerStatus
 } from "../types.js";
+import { PlaywrightSunoDriver } from "./sunoPlaywrightDriver.js";
 
 type SunoWorkerProbeState = Extract<
   SunoWorkerState,
@@ -36,6 +39,14 @@ interface WorkerAutomationOptions {
   driver?: SunoBrowserDriver;
   dryRun?: boolean;
 }
+
+interface SunoBrowserWorkerOptions {
+  config?: Partial<ArtistRuntimeConfig>;
+  driverMode?: SunoDriverMode;
+  profilePath?: string;
+}
+
+const DEFAULT_SUNO_PROFILE_PATH = ".openclaw-browser-profiles/suno";
 
 function now(): string {
   return new Date().toISOString();
@@ -81,7 +92,10 @@ function buildHandoffMessage(state: SunoWorkerProbeState, detail?: string): stri
 }
 
 export class SunoBrowserWorker {
-  constructor(private readonly workspaceRoot = ".") {}
+  constructor(
+    private readonly workspaceRoot = ".",
+    private readonly options: SunoBrowserWorkerOptions = {}
+  ) {}
 
   private statePath(): string {
     return join(this.workspaceRoot, "runtime", "suno-worker.json");
@@ -151,6 +165,19 @@ export class SunoBrowserWorker {
     });
   }
 
+  private resolveDriver(explicitDriver?: SunoBrowserDriver): SunoBrowserDriver | undefined {
+    if (explicitDriver) {
+      return explicitDriver;
+    }
+
+    const driverMode = this.options.driverMode ?? this.options.config?.music?.suno?.driver ?? "mock";
+    if (driverMode === "playwright") {
+      return new PlaywrightSunoDriver(this.options.profilePath ?? DEFAULT_SUNO_PROFILE_PATH);
+    }
+
+    return undefined;
+  }
+
   async start(options: StartOptions = {}): Promise<SunoWorkerStatus> {
     await this.transition({
       state: "connecting",
@@ -159,8 +186,9 @@ export class SunoBrowserWorker {
       hardStopReason: undefined
     });
 
-    const probe = options.driver
-      ? await options.driver.probe()
+    const driver = this.resolveDriver(options.driver);
+    const probe = driver
+      ? await driver.probe()
       : { state: "login_required", detail: undefined } satisfies SunoBrowserDriverProbe;
 
     if (probe.state === "connected") {
@@ -244,7 +272,8 @@ export class SunoBrowserWorker {
     if (current.state === "stopped") {
       return current;
     }
-    await driver?.stop?.().catch(() => undefined);
+    const resolvedDriver = this.resolveDriver(driver);
+    await resolvedDriver?.stop?.().catch(() => undefined);
     return this.writeState({
       ...current,
       state: "stopped",
@@ -262,6 +291,7 @@ export class SunoBrowserWorker {
     const current = await this.readState();
     const dryRun = options.dryRun ?? request.dryRun;
     const runId = request.runId ?? `worker_${Date.now().toString(36)}`;
+    const driver = this.resolveDriver(options.driver);
 
     if (!dryRun && current.state !== "connected") {
       const blockedResult = {
@@ -313,7 +343,7 @@ export class SunoBrowserWorker {
       };
     }
 
-    if (!options.driver?.create) {
+    if (!driver?.create) {
       await this.transition({
         state: "connected",
         connected: true,
@@ -336,7 +366,7 @@ export class SunoBrowserWorker {
       };
     }
 
-    const result = await options.driver.create({ ...request, dryRun, runId });
+    const result = await driver.create({ ...request, dryRun, runId });
     await this.transition({
       state: result.accepted ? "generating" : "connected",
       connected: true,
@@ -357,6 +387,7 @@ export class SunoBrowserWorker {
   async importRun(runId: string, options: WorkerAutomationOptions = {}): Promise<SunoImportResult> {
     const current = await this.readState();
     const dryRun = options.dryRun ?? false;
+    const driver = this.resolveDriver(options.driver);
 
     if (!dryRun && current.state !== "connected" && current.state !== "generating") {
       const blockedResult = {
@@ -408,7 +439,7 @@ export class SunoBrowserWorker {
       };
     }
 
-    if (!options.driver?.importResults) {
+    if (!driver?.importResults) {
       await this.transition({
         state: "connected",
         connected: true,
@@ -430,7 +461,7 @@ export class SunoBrowserWorker {
       };
     }
 
-    const result = await options.driver.importResults({ runId });
+    const result = await driver.importResults({ runId });
     await this.transition({
       state: "connected",
       connected: true,

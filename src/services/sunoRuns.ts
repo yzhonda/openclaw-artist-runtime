@@ -104,7 +104,7 @@ export async function readAllSunoRuns(root: string, songId: string): Promise<Sun
 
 export async function generateSunoRun(input: GenerateSunoRunInput): Promise<SunoRunRecord> {
   const config = applyConfigDefaults(input.config);
-  const connector = new BrowserWorkerSunoConnector(input.workspaceRoot);
+  const connector = new BrowserWorkerSunoConnector(input.workspaceRoot, { config });
   const workerStatus = input.workerState ? { state: input.workerState } : await connector.status();
   const { payload, payloadHash, payloadPath } = await loadPayload(input.workspaceRoot, input.songId);
   const authorityDecision = decideMusicAuthority({

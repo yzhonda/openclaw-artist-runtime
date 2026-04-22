@@ -1,5 +1,6 @@
 export const producerDigestModes = ["off", "daily", "important_events", "high_touch"] as const;
 export const sunoConnectionModes = ["manual_copy", "background_browser_worker", "api_provider"] as const;
+export const sunoDriverModes = ["mock", "playwright"] as const;
 export const sunoAuthorityModes = ["prepare_only", "autofill_only", "auto_create_with_budget", "auto_create_and_select_take"] as const;
 export const dailySharingModes = ["off", "draft_only", "auto"] as const;
 export const officialReleaseModes = ["manual_approval", "auto_with_release_policy"] as const;
@@ -28,6 +29,7 @@ export const sunoLoginHandoffStates = ["waiting_for_operator", "completed"] as c
 
 export type ProducerDigestMode = (typeof producerDigestModes)[number];
 export type SunoConnectionMode = (typeof sunoConnectionModes)[number];
+export type SunoDriverMode = (typeof sunoDriverModes)[number];
 export type SunoAuthority = (typeof sunoAuthorityModes)[number];
 export type DailySharingMode = (typeof dailySharingModes)[number];
 export type OfficialReleaseMode = (typeof officialReleaseModes)[number];
@@ -64,6 +66,7 @@ export interface AutopilotConfig {
 export interface SunoMusicConfig {
   enabled: boolean;
   connectionMode: SunoConnectionMode;
+  driver: SunoDriverMode;
   authority: SunoAuthority;
   monthlyGenerationBudget: number;
   maxGenerationsPerDay: number;

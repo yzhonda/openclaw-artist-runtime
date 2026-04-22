@@ -11,6 +11,7 @@ Use it together with:
 - `PUBLISHING.md` for release/package checklist items
 - `docs/GATEWAY_AUTH.md` for the HTTP/gateway boundary around these connector checks
 - `docs/API_ROUTES.md` for the plugin HTTP surface
+- `docs/SUNO_BROWSER_DRIVER.md` for the separate Suno browser-profile lane
 
 ## Shared rules
 

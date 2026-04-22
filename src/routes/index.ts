@@ -756,10 +756,10 @@ export function registerRoutes(api: unknown): void {
 
       if (method === "POST") {
         if (segments.length === 1 && segments[0] === "connect") {
-          return new SunoBrowserWorker(config.artist.workspaceRoot).connect();
+          return new SunoBrowserWorker(config.artist.workspaceRoot, { config }).connect();
         }
         if (segments.length === 1 && segments[0] === "reconnect") {
-          return new SunoBrowserWorker(config.artist.workspaceRoot).reconnect();
+          return new SunoBrowserWorker(config.artist.workspaceRoot, { config }).reconnect();
         }
         if (segments.length === 2 && segments[0] === "generate") {
           return generateSunoRun({
