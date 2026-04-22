@@ -21,6 +21,8 @@ export interface SocialActionInput {
   risk?: SocialRiskLevel;
   config?: Partial<ArtistRuntimeConfig>;
   action?: "publish" | "reply";
+  targetId?: string;
+  targetUrl?: string;
 }
 
 function getConnector(platform: SocialPlatform): SocialConnector {
@@ -116,7 +118,9 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
           authority: getPlatformAuthority(config, input.platform),
           postType: input.postType,
           text: input.text,
-          mediaPaths: input.mediaPaths
+          mediaPaths: input.mediaPaths,
+          targetId: input.targetId,
+          targetUrl: input.targetUrl
         }) ?? Promise.resolve({
           accepted: false,
           platform: input.platform,
