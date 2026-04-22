@@ -41,6 +41,9 @@ See `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh flow.
   operator filesystem only.
 - It is not bundled into package artifacts and is not intended for network
   upload or workspace syncing.
+- During the initial login flow, credentials are entered by the operator into
+  Suno's own web UI through Chromium; the plugin does not capture or persist the
+  credential body.
 - The plugin's browser-driver lane should operate against that local profile
   without copying raw cookie contents into Prompt Ledgers, audit logs, or other
   human-readable artifacts.

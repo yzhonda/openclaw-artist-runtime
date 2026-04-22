@@ -60,6 +60,9 @@ It must stop on login challenge, CAPTCHA, payment prompt, or unexpected UI.
 - The plugin may automate a browser against that profile in later rounds, but
   it must not dump cookie bodies or session-token contents into readable
   artifacts.
+- Initial Suno login is an operator-only manual action through
+  `scripts/openclaw-suno-login.sh`. CC/Cdx, CI, and unattended autopilot must
+  not execute that flow automatically.
 - For operator setup flow, see `docs/SUNO_BROWSER_DRIVER.md`.
 
 ## Public side effects

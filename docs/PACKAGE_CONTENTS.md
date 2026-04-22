@@ -73,8 +73,8 @@ Producer Console status surfaces. In practice that means:
   read routes, mutating routes, and `/api/config/update`.
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
-- `src/services/sunoPlaywrightDriver.ts` is the dependency-free stub reserved for
-  the later operator-managed browser lane.
+- `src/services/sunoPlaywrightDriver.ts` now owns the real Playwright-backed
+  login probe while keeping create/import stubbed.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -142,6 +142,8 @@ installation requirement.
 - `scripts/openclaw-local-write-smoke.sh`
 - `scripts/openclaw-local-ticker-observe.sh`
 - `scripts/openclaw-local-install.sh`
+- `scripts/openclaw-suno-login.sh`
+- `scripts/openclaw-suno-login.mjs`
 
 ### CI / regression gate
 
@@ -162,6 +164,7 @@ installation requirement.
 - `tests/config-editor-payload.test.ts`
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
+- `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/status-ticker.test.ts`
@@ -227,6 +230,8 @@ Also keep the repo-local verification scripts because they are the documented sa
 - `scripts/openclaw-local-http-smoke.sh`
 - `scripts/openclaw-local-write-smoke.sh`
 - `scripts/openclaw-local-ticker-observe.sh`
+- `scripts/openclaw-suno-login.sh`
+- `scripts/openclaw-suno-login.mjs`
 
 Also keep the CI workflow and tracked workspace template files because they now form part of the package's regression discipline and bootstrap contract:
 
