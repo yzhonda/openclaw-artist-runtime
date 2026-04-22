@@ -24,6 +24,23 @@ Use it together with:
 - Keep connector credentials local to the operator machine. CI, packaging, and
   tarball verification should run without bundling these values.
 
+### Operator-only credential notes (`.local/social-credentials.env`)
+
+- An optional reminder file may live at `.local/social-credentials.env`. It is
+  ignored by the top-level `.gitignore` and should be created with mode `0600`.
+- The file is **not** auto-loaded by the runtime. Connectors read their settings
+  from process environment variables only. To apply locally-stored values:
+
+  ```sh
+  set -a; . ./.local/social-credentials.env; set +a
+  scripts/openclaw-local-gateway start
+  ```
+
+- Never paste file contents into logs, PR descriptions, screenshots, or chat
+  transcripts.
+- A raw password alone does **not** satisfy any connector. Each platform below
+  still requires its own session or token.
+
 ## X (Bird)
 
 ### Contract
@@ -34,9 +51,14 @@ Use it together with:
 
 ### Refresh
 
-1. Re-authenticate Bird so its local session store is current.
-2. Re-run [`POST /plugins/artist-runtime/api/platforms/x/test`](./API_ROUTES.md#post-apiplatformsxtest).
-3. If the route still returns `bird_cli_not_installed`, `bird_auth_expired`, or
+1. Re-authenticate Bird so its local session store is current. Bird drives the
+   account from its configured browser profile (e.g. a dedicated Firefox
+   profile); the operator must sign in there directly — runtime cannot script
+   that login.
+2. Confirm `bird whoami --plain` returns the expected `@handle` outside the
+   plugin.
+3. Re-run [`POST /plugins/artist-runtime/api/platforms/x/test`](./API_ROUTES.md#post-apiplatformsxtest).
+4. If the route still returns `bird_cli_not_installed`, `bird_auth_expired`, or
    `bird_probe_failed`, inspect the local Bird install/session outside the plugin
    before retrying distribution.
 
@@ -57,10 +79,13 @@ Use it together with:
 
 ### Refresh
 
-1. Update `OPENCLAW_INSTAGRAM_AUTH` or `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` in the
+1. Obtain an Instagram Graph API access token via Meta for Developers
+   (requires an Instagram Business/Creator account linked to a Facebook Page
+   and a Meta app). A raw login password is **not** accepted.
+2. Update `OPENCLAW_INSTAGRAM_AUTH` or `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` in the
    active shell environment or launch profile.
-2. Reload the shell/session that launches OpenClaw so the environment is current.
-3. Re-run [`POST /plugins/artist-runtime/api/platforms/instagram/test`](./API_ROUTES.md#post-apiplatformsinstagramtest).
+3. Reload the shell/session that launches OpenClaw so the environment is current.
+4. Re-run [`POST /plugins/artist-runtime/api/platforms/instagram/test`](./API_ROUTES.md#post-apiplatformsinstagramtest).
 
 ### Dry-run behavior
 
