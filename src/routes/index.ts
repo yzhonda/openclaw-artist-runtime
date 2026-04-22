@@ -1,7 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyConfigDefaults } from "../config/schema.js";
 import { InstagramConnector } from "../connectors/social/instagramConnector.js";
 import { TikTokConnector } from "../connectors/social/tiktokConnector.js";
 import { XBirdConnector } from "../connectors/social/xBirdConnector.js";
@@ -733,7 +732,7 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/config/update",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const context = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const context = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
       const patchRaw = (payload.patch ?? payload.config) as Partial<ArtistRuntimeConfig> | undefined;
       return patchResolvedConfig(context.artist.workspaceRoot, (patchRaw ?? {}) as Partial<ArtistRuntimeConfig>);
     }
