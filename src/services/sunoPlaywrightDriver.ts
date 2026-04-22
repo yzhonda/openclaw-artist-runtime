@@ -23,6 +23,9 @@ export const PLAYWRIGHT_LIVE_TIMEOUT_REASON = "playwright_live_timeout";
 export const PLAYWRIGHT_IMPORT_NO_URLS_REASON = "playwright_import_no_urls";
 export const PLAYWRIGHT_POLL_INTERVAL_MS = 3_000;
 export const PLAYWRIGHT_POLL_TIMEOUT_MS = 10 * 60 * 1_000;
+export const PLAYWRIGHT_CREATE_CARD_TIMEOUT_MS = 3 * 60 * 1_000;
+export const PLAYWRIGHT_CREATE_CARD_REASON = "submitted_via_create_card";
+export const PLAYWRIGHT_LIBRARY_DIFF_REASON = "submitted_via_library_diff";
 
 /**
  * Round 38 adds probe automation.
@@ -36,7 +39,8 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
     private readonly workspaceRoot = ".",
     private readonly polling = {
       intervalMs: PLAYWRIGHT_POLL_INTERVAL_MS,
-      timeoutMs: PLAYWRIGHT_POLL_TIMEOUT_MS
+      timeoutMs: PLAYWRIGHT_POLL_TIMEOUT_MS,
+      createCardTimeoutMs: PLAYWRIGHT_CREATE_CARD_TIMEOUT_MS
     }
   ) {}
 
@@ -142,13 +146,13 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
 
       await page.locator("button[aria-label=\"Create song\"]").click();
       await page.waitForLoadState("domcontentloaded").catch(() => undefined);
-      const urls = await this.pollForGeneratedSongs(page, baselineUrls);
-      if (urls.length > 0) {
+      const generated = await this.pollForGeneratedSongs(page, baselineUrls);
+      if (generated.urls.length > 0) {
         return {
           accepted: true,
           runId,
-          reason: "submitted",
-          urls,
+          reason: generated.reason ?? PLAYWRIGHT_LIBRARY_DIFF_REASON,
+          urls: generated.urls,
           dryRun: request.dryRun
         };
       }
@@ -389,8 +393,56 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
       .filter((href) => href.startsWith("https://suno.com/song/")));
   }
 
-  private async pollForGeneratedSongs(page: Page, baselineUrls: Set<string>): Promise<string[]> {
-    const maxAttempts = Math.max(1, Math.ceil(this.polling.timeoutMs / this.polling.intervalMs));
+  private async pollForGeneratedSongs(
+    page: Page,
+    baselineUrls: Set<string>
+  ): Promise<{ urls: string[]; reason?: string }> {
+    const totalAttempts = Math.max(1, Math.ceil(this.polling.timeoutMs / this.polling.intervalMs));
+    const createCardAttempts = Math.min(
+      totalAttempts,
+      Math.max(1, Math.ceil((this.polling.createCardTimeoutMs ?? PLAYWRIGHT_CREATE_CARD_TIMEOUT_MS) / this.polling.intervalMs))
+    );
+
+    const createCardUrls = await this.pollCreateCards(page, createCardAttempts);
+    if (createCardUrls.length > 0) {
+      return { urls: createCardUrls, reason: PLAYWRIGHT_CREATE_CARD_REASON };
+    }
+
+    const remainingAttempts = totalAttempts - createCardAttempts;
+    if (remainingAttempts <= 0) {
+      return { urls: [] };
+    }
+
+    const libraryUrls = await this.pollLibraryDiff(page, baselineUrls, remainingAttempts);
+    if (libraryUrls.length > 0) {
+      return { urls: libraryUrls, reason: PLAYWRIGHT_LIBRARY_DIFF_REASON };
+    }
+
+    return { urls: [] };
+  }
+
+  private async readCreateCardSongUrls(page: Page): Promise<string[]> {
+    return page.locator(
+      "[data-testid*=\"generation-card\"] a[href*='/song/'], [data-testid*=\"generation-card-link\"][href*='/song/'], [data-testid*=\"song-card\"] a[href*='/song/'], [data-testid*=\"track-card\"] a[href*='/song/'], [role='listitem'] a[href*='/song/'], li a[href*='/song/'], a[href*='/song/']"
+    ).evaluateAll((elements) => elements
+      .map((element) => (element as HTMLAnchorElement).href)
+      .filter((href) => href.startsWith("https://suno.com/song/")));
+  }
+
+  private async pollCreateCards(page: Page, maxAttempts: number): Promise<string[]> {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const createCardUrls = await this.readCreateCardSongUrls(page);
+      if (createCardUrls.length > 0) {
+        return createCardUrls;
+      }
+      if (attempt < maxAttempts - 1) {
+        await page.waitForTimeout(this.polling.intervalMs);
+      }
+    }
+    return [];
+  }
+
+  private async pollLibraryDiff(page: Page, baselineUrls: Set<string>, maxAttempts: number): Promise<string[]> {
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const currentUrls = await this.readSongUrls(page);
       const newUrls = currentUrls.filter((url) => !baselineUrls.has(url));
