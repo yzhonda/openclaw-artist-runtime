@@ -112,6 +112,7 @@ export interface TikTokPlatformConfig {
 
 export interface DistributionConfig {
   enabled: boolean;
+  liveGoArmed: boolean;
   dailySharing: DailySharingMode;
   officialRelease: OfficialReleaseMode;
   platforms: {
@@ -336,6 +337,8 @@ export interface SetupReadiness {
 export interface SocialDistributionWorkerStatus {
   enabled: boolean;
   dryRun: boolean;
+  liveGoArmed: boolean;
+  effectiveDryRun: Record<SocialPlatform, boolean>;
   lastSongId?: string;
   lastAction?: SocialPublishLedgerEntry;
   enabledPlatforms: SocialPlatform[];

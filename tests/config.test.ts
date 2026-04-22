@@ -47,6 +47,7 @@ describe("config schema", () => {
     const merged = applyConfigDefaults({ autopilot: { enabled: true } });
     expect(merged.autopilot.enabled).toBe(true);
     expect(merged.autopilot.dryRun).toBe(true);
+    expect(merged.distribution.liveGoArmed).toBe(false);
     expect(merged.music.suno.authority).toBe("auto_create_and_select_take");
   });
 

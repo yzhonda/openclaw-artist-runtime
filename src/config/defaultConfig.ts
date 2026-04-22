@@ -33,6 +33,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
   },
   distribution: {
     enabled: false,
+    liveGoArmed: false,
     dailySharing: "auto",
     officialRelease: "manual_approval",
     platforms: {

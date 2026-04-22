@@ -44,6 +44,7 @@ function getPlatformAuthority(config: ArtistRuntimeConfig, platform: SocialPlatf
 function resolveSocialDryRun(config: ArtistRuntimeConfig, platform: SocialPlatform): boolean {
   return config.autopilot.dryRun
     || !config.distribution.enabled
+    || !config.distribution.liveGoArmed
     || !config.distribution.platforms[platform].enabled;
 }
 

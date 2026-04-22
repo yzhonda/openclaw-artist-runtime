@@ -19,6 +19,12 @@ Use it together with:
   artifacts, screenshots, or repository docs.
 - Check connector state from Producer Console `Platforms` and `Status` before
   retrying any live distribution action.
+- `distribution.liveGoArmed` stays `false` by default. Until the producer arms
+  it, every X / Instagram / TikTok publish path is forced back into dry-run
+  before any connector publish call is attempted.
+- Arming `distribution.liveGoArmed` alone does **not** enable real publishing.
+  Each connector still fails closed at its own edge until that platform's live
+  lane is explicitly opened.
 - Use `POST /plugins/artist-runtime/api/platforms/{id}/test` for connector health
   checks (`x`, `instagram`, `tiktok`).
 - Keep connector credentials local to the operator machine. CI, packaging, and
@@ -105,9 +111,9 @@ Use it together with:
   wired for the Graph account lookup, media container, and publish-stage fetch
   sequence, but this round still returns `dry-run blocks publish`.
 - The upper social distribution pipeline now adds a second hold: if
-  `distribution.enabled` is off or the target platform toggle is off, the
-  publish request is forced back into dry-run before the connector publish path
-  is reached.
+  `distribution.enabled` is off, `distribution.liveGoArmed` is off, or the
+  target platform toggle is off, the publish request is forced back into
+  dry-run before the connector publish path is reached.
 - Non-dry-run publish attempts are rejected with `requires_explicit_live_go`
   even when auth is configured. Live posting remains outside the current lane.
 
