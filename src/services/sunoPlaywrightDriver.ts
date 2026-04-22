@@ -22,10 +22,15 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
     let context: BrowserContext | undefined;
 
     try {
-      const { chromium } = await import("playwright");
+      const { chromium } = await import("playwright-extra");
+      const stealth = (await import("puppeteer-extra-plugin-stealth")).default;
+      chromium.use(stealth());
       await mkdir(this.profilePath, { recursive: true });
       context = await chromium.launchPersistentContext(this.profilePath, {
-        headless: false
+        headless: false,
+        channel: "chrome",
+        args: ["--disable-blink-features=AutomationControlled"],
+        ignoreDefaultArgs: ["--enable-automation"]
       });
 
       const page = context.pages()[0] ?? await context.newPage();
