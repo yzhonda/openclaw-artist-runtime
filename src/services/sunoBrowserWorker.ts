@@ -11,7 +11,7 @@ import type {
   SunoWorkerState,
   SunoWorkerStatus
 } from "../types.js";
-import { PlaywrightSunoDriver } from "./sunoPlaywrightDriver.js";
+import { DEFAULT_SUNO_PROFILE_PATH, PlaywrightSunoDriver } from "./sunoPlaywrightDriver.js";
 
 type SunoWorkerProbeState = Extract<
   SunoWorkerState,
@@ -45,8 +45,6 @@ interface SunoBrowserWorkerOptions {
   driverMode?: SunoDriverMode;
   profilePath?: string;
 }
-
-const DEFAULT_SUNO_PROFILE_PATH = ".openclaw-browser-profiles/suno";
 
 function now(): string {
   return new Date().toISOString();

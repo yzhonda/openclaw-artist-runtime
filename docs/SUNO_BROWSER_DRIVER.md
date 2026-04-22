@@ -5,8 +5,10 @@ lane.
 
 ## Status
 
-Round 37 is skeleton-only. The `PlaywrightSunoDriver` class exists, but it does
-not import Playwright, launch a browser, or contact Suno yet.
+Round 38 adds real Playwright probe support plus a manual first-login helper.
+The driver can now open Chromium against the dedicated Suno profile and detect
+whether the session is already logged in. Create/import remain stubbed, so
+credit consumption stays at zero.
 
 ## Prerequisites
 
@@ -22,20 +24,33 @@ not import Playwright, launch a browser, or contact Suno yet.
 
 ## Dependency install (operator)
 
-The plugin package does not add Playwright to `package.json`. When the operator
-is ready for the real browser lane in a later round, install it locally in the
-operator environment:
+Playwright is now a package dependency, but browser binaries are still an
+operator-side install step. Run these on the operator machine:
 
 ```bash
 npm install playwright
 npx playwright install chromium
 ```
 
-Until then, keep `music.suno.driver` on `mock`.
+The project keeps `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` for CI/package installs,
+so Chromium is not fetched automatically.
+
+## First login
+
+Use the manual wrapper once per operator machine or whenever the Suno session
+expires:
+
+```bash
+scripts/openclaw-suno-login.sh
+```
+
+That script opens Chromium with the dedicated persistent profile, navigates to
+the Suno create surface, and waits for the operator to finish login manually.
+Close the browser window when login is complete.
 
 ## Config toggle
 
-Enable the future browser lane through runtime config override:
+Enable the browser lane through runtime config override:
 
 ```json
 {
@@ -64,7 +79,7 @@ Default remains:
 `autopilot.dryRun` and `music.suno.driver` are separate controls:
 
 - `driver: "mock"` + `dryRun: true` keeps the current fully stubbed lane
-- `driver: "playwright"` + `dryRun: true` is the future probe-only / no-credit
+- `driver: "playwright"` + `dryRun: true` is the current probe-only / no-credit
   lane
 - `driver: "playwright"` + `dryRun: false` remains out of scope until later
   rounds add explicit GO and budget guards
