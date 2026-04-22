@@ -118,11 +118,11 @@ describe("registration shells", () => {
       registerTool(definition: { name: string }) {
         registered.tools.push(definition.name);
       },
-      registerHook(definition: { event: string }) {
-        registered.hooks.push(definition.event);
+      registerHook(event: string, _handler?: unknown) {
+        registered.hooks.push(event);
       },
-      registerService(definition: { name: string }) {
-        registered.services.push(definition.name);
+      registerService(definition: { id?: string; name?: string }) {
+        registered.services.push(definition.id ?? definition.name ?? "unknown");
       },
       registerHttpRoute(definition: { path: string }) {
         registered.routes.push(definition.path);

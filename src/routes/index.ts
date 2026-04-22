@@ -508,16 +508,6 @@ export function registerRoutes(api: unknown): void {
   });
 
   safeRegisterRoute(api, {
-    method: "PATCH",
-    path: "/plugins/artist-runtime/api/config",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const current = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return patchResolvedConfig(current.artist.workspaceRoot, payloadRecord(payload.patch) as Partial<ArtistRuntimeConfig>);
-    }
-  });
-
-  safeRegisterRoute(api, {
     method: "GET",
     path: "/plugins/artist-runtime/api/songs",
     handler: async (input) => buildSongsResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
@@ -695,7 +685,7 @@ export function registerRoutes(api: unknown): void {
 
   safeRegisterRoute(api, {
     method: "POST",
-    path: "/plugins/artist-runtime/api/config",
+    path: "/plugins/artist-runtime/api/config/update",
     handler: async (input) => {
       const payload = payloadRecord(input);
       const current = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
