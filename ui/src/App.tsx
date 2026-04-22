@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useState } from "react";
 import "./styles.css";
+import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
 
 type StatusResponse = {
   dryRun: boolean;
@@ -89,6 +90,8 @@ type ConfigResponse = {
   autopilot: {
     enabled: boolean;
     dryRun: boolean;
+    songsPerWeek: number;
+    cycleIntervalMinutes: number;
   };
   distribution: {
     platforms: {
@@ -128,14 +131,6 @@ type PlatformDetail = {
   accountLabel?: string;
   reason?: string;
   capabilitySummary?: Record<string, boolean | "unknown">;
-};
-
-type ConfigDraft = {
-  autopilotEnabled: boolean;
-  dryRun: boolean;
-  xEnabled: boolean;
-  instagramEnabled: boolean;
-  tiktokEnabled: boolean;
 };
 
 type SunoStatusResponse = {
@@ -289,13 +284,14 @@ export function App() {
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ConsoleView>("dashboard");
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
+  const [configDirty, setConfigDirty] = useState(false);
   const [platformTests, setPlatformTests] = useState<Record<string, { testedAt: string; status: PlatformDetail }>>({});
   const [replyTargetId, setReplyTargetId] = useState("");
   const [replyText, setReplyText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const refresh = async (preferredSongId?: string | null) => {
+  const refresh = async (preferredSongId?: string | null, forceConfigDraftSync = false) => {
     try {
       setError(null);
       const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery] = await Promise.all([
@@ -331,13 +327,9 @@ export function App() {
         setSongs(nextSongs);
         setDetail(nextDetail);
         setSelectedSongId(nextSelectedSongId);
-        setConfigDraft({
-          autopilotEnabled: nextConfig.autopilot.enabled,
-          dryRun: nextConfig.autopilot.dryRun,
-          xEnabled: nextConfig.distribution.platforms.x.enabled,
-          instagramEnabled: nextConfig.distribution.platforms.instagram.enabled,
-          tiktokEnabled: nextConfig.distribution.platforms.tiktok.enabled
-        });
+        if (forceConfigDraftSync || !configDirty) {
+          setConfigDraft(buildConfigDraft(nextConfig));
+        }
       });
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
@@ -356,7 +348,7 @@ export function App() {
       void refresh(selectedSongId);
     }, 3000);
     return () => clearInterval(intervalId);
-  }, [busy, selectedSongId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [busy, configDirty, selectedSongId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const runAction = async (action: "pause" | "resume" | "run-cycle" | "ideate") => {
     setBusy(action);
@@ -396,30 +388,41 @@ export function App() {
     if (!configDraft) {
       return;
     }
+    const validationError = validateConfigDraft(configDraft);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
     setBusy("config");
     try {
+      const patch = buildConfigUpdatePatch(configDraft);
       await apiPost("/config/update", {
-        patch: {
-          autopilot: {
-            enabled: configDraft.autopilotEnabled,
-            dryRun: configDraft.dryRun
-          },
-          distribution: {
-            platforms: {
-              x: { enabled: configDraft.xEnabled },
-              instagram: { enabled: configDraft.instagramEnabled },
-              tiktok: { enabled: configDraft.tiktokEnabled }
-            }
-          }
-        }
+        patch
       });
-      await refresh(selectedSongId);
+      setConfigDirty(false);
+      await refresh(selectedSongId, true);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
     } finally {
       setBusy(null);
     }
   };
+
+  const updateConfigDraft = (update: Partial<ConfigDraft>) => {
+    setConfigDirty(true);
+    setConfigDraft((current) => (current ? { ...current, ...update } : current));
+  };
+
+  const resetConfigDraft = () => {
+    if (!config) {
+      return;
+    }
+    setConfigDirty(false);
+    setConfigDraft(buildConfigDraft(config));
+    setError(null);
+  };
+
+  const configValidationError = configDraft ? validateConfigDraft(configDraft) : null;
 
   const testPlatform = async (platform: "x" | "instagram" | "tiktok") => {
     setBusy(`platform:${platform}`);
@@ -599,18 +602,31 @@ export function App() {
 
   const configPanel = (
     <article className="panel">
-      <div className="section-title">Settings</div>
+      <div className="section-title">Config Editor</div>
       {config && configDraft ? (
         <div className="config-form">
-          <label className="toggle"><input type="checkbox" checked={configDraft.autopilotEnabled} onChange={(event) => setConfigDraft({ ...configDraft, autopilotEnabled: event.target.checked })} />Autopilot enabled</label>
-          <label className="toggle"><input type="checkbox" checked={configDraft.dryRun} onChange={(event) => setConfigDraft({ ...configDraft, dryRun: event.target.checked })} />Dry-run safety</label>
-          <label className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => setConfigDraft({ ...configDraft, xEnabled: event.target.checked })} />X enabled</label>
-          <label className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => setConfigDraft({ ...configDraft, instagramEnabled: event.target.checked })} />Instagram enabled</label>
-          <label className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => setConfigDraft({ ...configDraft, tiktokEnabled: event.target.checked })} />TikTok enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.autopilotEnabled} onChange={(event) => updateConfigDraft({ autopilotEnabled: event.target.checked })} />Autopilot enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.dryRun} onChange={(event) => updateConfigDraft({ dryRun: event.target.checked })} />Dry-run safety</label>
+          {!configDraft.dryRun ? <div className="warning-banner">Dry-run is OFF. The runtime stays fail-closed, but this arm can permit live side effects if the connectors are ready.</div> : null}
+          <div className="field-grid">
+            <label>
+              <div className="eyebrow">Songs Per Week</div>
+              <input type="number" min={0} max={21} value={configDraft.songsPerWeek} onChange={(event) => updateConfigDraft({ songsPerWeek: event.target.value })} />
+            </label>
+            <label>
+              <div className="eyebrow">Cycle Interval Minutes</div>
+              <input type="number" min={15} max={1440} value={configDraft.cycleIntervalMinutes} onChange={(event) => updateConfigDraft({ cycleIntervalMinutes: event.target.value })} />
+            </label>
+          </div>
+          <label className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => updateConfigDraft({ xEnabled: event.target.checked })} />X enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => updateConfigDraft({ instagramEnabled: event.target.checked })} />Instagram enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => updateConfigDraft({ tiktokEnabled: event.target.checked })} />TikTok enabled</label>
           <div className="muted">artist {config.artist.artistId} · workspace {config.artist.workspaceRoot}</div>
+          {configValidationError ? <div className="field-error">{configValidationError}</div> : null}
           <div className="inline-actions">
-            <button className="primary" disabled={busy !== null} onClick={() => void saveConfig()}>Save Settings</button>
-            <button disabled={busy !== null} onClick={() => void refresh(selectedSongId)}>Refresh</button>
+            <button className="primary" disabled={busy !== null || Boolean(configValidationError)} onClick={() => void saveConfig()}>Save Settings</button>
+            <button disabled={busy !== null || !configDirty} onClick={resetConfigDraft}>Reset Draft</button>
+            <button disabled={busy !== null} onClick={() => void refresh(selectedSongId, true)}>Refresh</button>
           </div>
         </div>
       ) : <div className="item muted">Loading config.</div>}
