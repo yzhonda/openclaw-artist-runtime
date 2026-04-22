@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   AutopilotTicker,
+  getLastOutcome,
+  getLastTickAt,
   getAutopilotTicker,
   resetAutopilotTickerForTest,
   type AutopilotTickOutcome
@@ -61,6 +63,19 @@ describe("AutopilotTicker", () => {
       autopilot: { enabled: true, dryRun: true }
     });
     expect(result).toBe("ran");
+  });
+
+  it("tracks the last outcome and tick time for status surfaces", async () => {
+    const root = makeWorkspace({ paused: false, stage: "idle" });
+    const ticker = new AutopilotTicker();
+
+    await ticker.tick({
+      artist: { workspaceRoot: root },
+      autopilot: { enabled: true, dryRun: true }
+    });
+
+    expect(getLastOutcome()).toBe("ran");
+    expect(getLastTickAt()).toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
   it("start/stop cleanly manages the interval handle", () => {

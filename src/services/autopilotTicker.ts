@@ -25,6 +25,8 @@ const FALLBACK_INTERVAL_MS = 5 * 60 * 1000;
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let running = false;
 let singleton: AutopilotTicker | null = null;
+let lastOutcome: AutopilotTickOutcome | undefined;
+let lastTickAt: string | undefined;
 
 export class AutopilotTicker {
   constructor(private readonly options: AutopilotTickerOptions = {}) {}
@@ -93,6 +95,8 @@ export class AutopilotTicker {
   }
 
   private emit(outcome: AutopilotTickOutcome): AutopilotTickOutcome {
+    lastOutcome = outcome;
+    lastTickAt = new Date().toISOString();
     this.options.onOutcome?.(outcome);
     return outcome;
   }
@@ -112,4 +116,21 @@ export function resetAutopilotTickerForTest(): void {
   }
   singleton = null;
   running = false;
+  lastOutcome = undefined;
+  lastTickAt = undefined;
+}
+
+export function getLastOutcome(): AutopilotTickOutcome | undefined {
+  return lastOutcome;
+}
+
+export function getLastTickAt(): string | undefined {
+  return lastTickAt;
+}
+
+export function getAutopilotTickerIntervalMs(config?: PartialDeep<ArtistRuntimeConfig>): number {
+  if (config?.autopilot?.cycleIntervalMinutes && config.autopilot.cycleIntervalMinutes > 0) {
+    return config.autopilot.cycleIntervalMinutes * 60 * 1000;
+  }
+  return FALLBACK_INTERVAL_MS;
 }
