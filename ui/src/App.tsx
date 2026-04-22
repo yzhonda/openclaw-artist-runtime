@@ -138,11 +138,43 @@ type SunoStatusResponse = {
     state: string;
     hardStopReason?: string;
     pendingAction?: string;
+    currentRunId?: string;
+    lastImportedRunId?: string;
+    lastCreateOutcome?: {
+      runId: string;
+      accepted: boolean;
+      reason: string;
+      at: string;
+      dryRun?: boolean;
+    };
+    lastImportOutcome?: {
+      runId: string;
+      urlCount: number;
+      reason?: string;
+      at: string;
+      dryRun?: boolean;
+    };
   };
   currentSongId?: string;
   latestRun?: { runId: string; status: string };
   recentRuns: Array<{ runId: string; status: string; urls: string[] }>;
   latestPromptPackVersion?: number;
+  currentRunId?: string;
+  lastImportedRunId?: string;
+  lastCreateOutcome?: {
+    runId: string;
+    accepted: boolean;
+    reason: string;
+    at: string;
+    dryRun?: boolean;
+  };
+  lastImportOutcome?: {
+    runId: string;
+    urlCount: number;
+    reason?: string;
+    at: string;
+    dryRun?: boolean;
+  };
 };
 
 type ArtistMindResponse = {
@@ -269,6 +301,30 @@ function platformEnabled(draft: ConfigDraft | null, platform: "x" | "instagram" 
     default:
       return draft.xEnabled;
   }
+}
+
+function formatSunoOutcome(
+  label: string,
+  outcome?:
+    | SunoStatusResponse["lastCreateOutcome"]
+    | SunoStatusResponse["lastImportOutcome"]
+): { title: string; detail: string; tone: "ok" | "blocked" | "idle" } {
+  if (!outcome) {
+    return {
+      title: `${label}: -`,
+      detail: "No outcome recorded yet.",
+      tone: "idle"
+    };
+  }
+
+  const accepted = "accepted" in outcome ? outcome.accepted : outcome.urlCount > 0;
+  const title = `${label}: ${accepted ? "ok" : "blocked"}`;
+  const detailParts = [`run ${outcome.runId}`, outcome.reason ?? null, outcome.at];
+  return {
+    title,
+    detail: detailParts.filter(Boolean).join(" · "),
+    tone: accepted ? "ok" : "blocked"
+  };
 }
 
 export function App() {
@@ -575,6 +631,9 @@ export function App() {
     </article>
   );
 
+  const createOutcome = formatSunoOutcome("Last Create", sunoStatus?.lastCreateOutcome ?? sunoStatus?.worker.lastCreateOutcome);
+  const importOutcome = formatSunoOutcome("Last Import", sunoStatus?.lastImportOutcome ?? sunoStatus?.worker.lastImportOutcome);
+
   const sunoPanel = (
     <article className="panel">
       <div className="section-title">Suno</div>
@@ -582,6 +641,26 @@ export function App() {
         <div className="item">
           <strong>{sunoStatus?.worker.state ?? "-"}</strong>
           <div className="muted">{sunoStatus?.worker.pendingAction ?? sunoStatus?.worker.hardStopReason ?? "No pending operator step."}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Suno Current Run</div>
+          <strong>{sunoStatus?.currentRunId ?? sunoStatus?.worker.currentRunId ?? "-"}</strong>
+          <div className="muted">song {sunoStatus?.currentSongId ?? "-"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Last Imported</div>
+          <strong>{sunoStatus?.lastImportedRunId ?? sunoStatus?.worker.lastImportedRunId ?? "-"}</strong>
+          <div className="muted">{sunoStatus?.lastImportOutcome?.at ?? "No import recorded yet."}</div>
+        </div>
+        <div className={`item outcome-item outcome-${createOutcome.tone}`}>
+          <div className="eyebrow">Last Create</div>
+          <strong>{createOutcome.title}</strong>
+          <div className="muted">{createOutcome.detail}</div>
+        </div>
+        <div className={`item outcome-item outcome-${importOutcome.tone}`}>
+          <div className="eyebrow">Last Import</div>
+          <strong>{importOutcome.title}</strong>
+          <div className="muted">{importOutcome.detail}</div>
         </div>
         <div className="inline-actions">
           <button disabled={busy !== null} onClick={() => void runSunoAction("connect")}>Connect</button>
