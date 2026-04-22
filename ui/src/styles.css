@@ -178,6 +178,18 @@ textarea {
   padding: 12px;
 }
 
+.outcome-item.outcome-ok {
+  border-left: 4px solid #1d6a45;
+}
+
+.outcome-item.outcome-blocked {
+  border-left: 4px solid var(--warning);
+}
+
+.outcome-item.outcome-idle {
+  border-left: 4px solid var(--line);
+}
+
 .item-button {
   text-align: left;
   width: 100%;

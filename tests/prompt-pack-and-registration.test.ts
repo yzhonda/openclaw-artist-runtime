@@ -205,6 +205,10 @@ describe("registration shells", () => {
     expect(consoleHtml).toContain("Run Cycle");
     expect(consoleHtml).toContain("Config Editor");
     expect(consoleHtml).toContain("Songs Per Week");
+    expect(consoleHtml).toContain("Suno Current Run");
+    expect(consoleHtml).toContain("Last Imported");
+    expect(consoleHtml).toContain("Last Create");
+    expect(consoleHtml).toContain("Last Import");
     expect((await buildConfigResponse()).artist.artistId).toBe("artist");
 
     const rootHandler = registered.routeHandlers.get("/plugins/artist-runtime");
