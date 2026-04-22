@@ -55,7 +55,7 @@ current OpenClaw Gateway.
 | `POST` | `/api/resume` | `plugin` | Resume autopilot. | optional `config` | resumed autopilot state | Clears pause state in runtime storage. |
 | `POST` | `/api/run-cycle` | `plugin` | Manually trigger one autopilot cycle. | optional `config` | autopilot state plus `tickerOutcome` and `tickerLastTickAt` | Also updates ticker getters through `AutopilotTicker.runNow()`. |
 | `POST` | `/api/alerts/:id/ack` | `plugin` | Acknowledge an alert. | optional `config` | ack result object | Family-dispatched under `/api/alerts`. |
-| `POST` | `/api/platforms/:id/test` | `plugin` | Probe one platform status. | optional `config` | `{ platform, status, testedAt }` | Live paths are supported for `x`, `instagram`, and `tiktok`. |
+| `POST` | `/api/platforms/:id/test` | `plugin` | Probe one platform status. | optional `config` | `{ platform, status, testedAt }` | Live paths are supported for `x`, `instagram`, and `tiktok`; see the platform-specific anchors below. |
 | `POST` | `/api/platforms/:id/connect` | `plugin` | Mark a platform enabled in config overrides. | optional `config` | updated `PlatformStatus` | Writes `distribution.platforms.<id>.enabled = true`. |
 | `POST` | `/api/platforms/:id/disconnect` | `plugin` | Mark a platform disabled in config overrides. | optional `config` | updated `PlatformStatus` | Writes `distribution.platforms.<id>.enabled = false`. |
 | `POST` | `/api/platforms/x/simulate-reply` | `plugin` | Dry-run an X reply from the Console. | optional `config`, `songId?`, `text?`, `targetId?`, `targetUrl?` | `{ result, entry }` from social publishing | Forces `autopilot.dryRun = true` before dispatch. |
@@ -65,6 +65,26 @@ current OpenClaw Gateway.
 | `POST` | `/api/suno/connect` | `plugin` | Move the Suno worker toward a connected state. | optional `config` | `SunoWorkerStatus` | Uses the persisted worker file, not a real browser in tests. |
 | `POST` | `/api/suno/reconnect` | `plugin` | Request a reconnect/login handoff cycle. | optional `config` | `SunoWorkerStatus` | Used after login handoff or worker loss. |
 | `POST` | `/api/suno/generate/:songId` | `plugin` | Kick one Suno generation run for a song. | optional `config` | Suno run result / run record | Family-dispatched under `/api/suno`. |
+
+## Platform test route anchors
+
+### POST /api/platforms/x/test
+
+- Auth: `plugin`
+- Purpose: run the X/Bird connector probe and return `{ platform, status, testedAt }`
+- Notes: uses the same persisted config resolution path as the rest of the platform family
+
+### POST /api/platforms/instagram/test
+
+- Auth: `plugin`
+- Purpose: run the Instagram connector probe and return `{ platform, status, testedAt }`
+- Notes: reports env-configured / fail-closed state without performing real external posting
+
+### POST /api/platforms/tiktok/test
+
+- Auth: `plugin`
+- Purpose: run the TikTok connector probe and return `{ platform, status, testedAt }`
+- Notes: reports env-configured / fail-closed state without performing real external posting
 
 ## Notes for implementers
 
