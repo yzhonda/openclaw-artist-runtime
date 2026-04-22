@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Producer Console live config editor for `autopilot` and `distribution.platforms.*` via `/api/config/update` (`a3f5a93`).
+- `ui/src/configEditor.ts` pure payload builder / validator and dirty-state guard for in-flight edits (`a3f5a93`).
+- `scripts/openclaw-local-ticker-observe.sh` for repo-local ticker observation via manual `run-cycle` proxy (`e72e8b5`).
 - Bird (X) auth probe via `bird whoami --plain` in `XBirdConnector.checkConnection` (3 unit cases).
 - Bird (X) text-only publish path via `bird tweet` with text-hash dedupe and min-interval guards (5 unit cases).
 - Bird (X) reply code path via `bird reply <targetIdOrUrl>` with `targetId` / `targetUrl` threading (5 unit cases).
@@ -14,15 +17,24 @@
 - Producer Console UI: bundled React app served from `ui/dist/` with Ticker card, Recent X Result, Simulate Reply form, and 3-second polling.
 - `socialPublishing.ts` `SocialActionInput` carries `targetId` / `targetUrl` through to `XBirdConnector.reply()`.
 - Autopilot full-cycle dry-run smoke test: `planning → prompt_pack → suno_generation → take_selection → asset_generation → publishing (dry-run) → completed` with external-call-zero assertion.
+- Two-cycle autopilot dry-run smoke test that rotates from `song-001` to `song-002` after dry-run publish completion (`d614813`).
 - `scripts/openclaw-local-gateway` lifecycle helpers (`start` / `stop` / `status` / `tail`) for repo-local OpenClaw sandbox.
+- GitHub Actions CI workflow for `push` / `pull_request` to `main` running `typecheck`, `test`, and `build` (`bd2156f`).
+- `workspace-template/artist/{CURRENT_STATE,OBSERVATIONS,PRODUCER_NOTES,RELEASE_POLICY,SOCIAL_VOICE,SONGBOOK}.md` and `workspace-template/songs/.gitkeep` are tracked to keep CI/workspace bootstrap aligned (`68f885f`).
 
 ### Fixed
 - `/api/config/update` accepts `payload.config` as patch fallback.
+- `/api/status` now reflects persisted runtime config overrides and `/api/run-cycle` updates ticker getters (`717219d`).
+- Eleven helper-backed read routes now resolve persisted runtime config overrides instead of using defaults only (`e3b02f0`).
+- `resolveRuntimeConfig()` is promoted to `src/services/runtimeConfig.ts` and reused across 14 mutating routes (`087acdf`).
+- `/api/config/update` now resolves its context through the shared runtime-config resolver as well (`aaf75f4`).
 - UI bundle resolution uses plugin-root path via `import.meta.url` rather than `process.cwd()`, so the bundled Console renders even when the gateway's cwd is `.local/openclaw/home`.
 - `stripUiBasePath` helper normalizes `/plugins/artist-runtime/ui/` asset references to `ui/dist/` relative paths during inlining.
+- GitHub Actions CI no longer requires a lock file; the workflow uses `npm install --no-audit --no-fund` without `cache: npm` (`5cad215`).
 
 ### Changed
-- `.gitignore` excludes repo-root workspace artifacts (`ARTIST.md` / `HEARTBEAT.md` / `SOUL.md` / `runtime/`) that appear when autopilot runs against the default `workspaceRoot: "."`.
+- `.gitignore` excludes repo-root workspace artifacts with root-only patterns so `workspace-template/artist/*` and `workspace-template/songs/.gitkeep` remain tracked (`68f885f`).
+- `docs/PACKAGE_CONTENTS.md` was refreshed for the repo-local ticker observer and expanded runtime/test surface (`e72e8b5`).
 
 ### Security
 - Real Bird / Instagram / TikTok posting, real Suno browser automation, and real
