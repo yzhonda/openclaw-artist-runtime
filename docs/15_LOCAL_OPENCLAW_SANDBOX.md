@@ -35,6 +35,7 @@ This layout is ignored by git through `.gitignore`.
   - Fetches the official `install-cli.sh` installer and installs into `.local/openclaw/`.
 - `scripts/openclaw-local-gateway`
   - Runs the repo-local Gateway on loopback only with `auth none` and a fixed repo-local port.
+  - Supports `run`, `start`, `stop`, `status`, `health`, `probe`, and `tail`.
 - `scripts/openclaw-local-http-smoke.sh`
   - Curls the main Artist Runtime Console/API routes against the repo-local Gateway.
 - `scripts/openclaw-local-write-smoke.sh`
@@ -67,10 +68,12 @@ This layout is ignored by git through `.gitignore`.
    scripts/openclaw-local plugins list
    ```
 
-5. Run the Gateway in the foreground on loopback only:
+5. Run the Gateway on loopback only:
 
    ```bash
-   scripts/openclaw-local-gateway run
+   scripts/openclaw-local-gateway start
+   scripts/openclaw-local-gateway status
+   scripts/openclaw-local-gateway tail
    ```
 
 6. In another terminal, verify Gateway reachability and the plugin HTTP surface:
@@ -79,6 +82,12 @@ This layout is ignored by git through `.gitignore`.
    scripts/openclaw-local-gateway health
    scripts/openclaw-local-http-smoke.sh
    scripts/openclaw-local-write-smoke.sh
+   ```
+
+7. Stop the repo-local Gateway when done:
+
+   ```bash
+   scripts/openclaw-local-gateway stop
    ```
 
 ## Safety notes

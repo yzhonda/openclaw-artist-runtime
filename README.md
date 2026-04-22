@@ -118,8 +118,10 @@ For a repo-local OpenClaw sandbox install that avoids `~/.openclaw`, see
 For a repo-local Gateway smoke run after install, use:
 
 ```bash
-scripts/openclaw-local-gateway run
+scripts/openclaw-local-gateway start
 scripts/openclaw-local-http-smoke.sh
+scripts/openclaw-local-write-smoke.sh
+scripts/openclaw-local-gateway stop
 ```
 
 Before public distribution, update:
