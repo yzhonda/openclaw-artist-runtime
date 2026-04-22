@@ -166,6 +166,11 @@ workaround.
 - `tests/instagram-connector.test.ts`
   This suite now fixes the Round 42 Graph skeleton contract: auth missing,
   dry-run stage traversal, and non-dry-run `requires_explicit_live_go`.
+- `tests/distribution-authority-wiring.test.ts`
+  This suite fixes the Round 43 upstream boundary: disabled distribution or a
+  disabled Instagram platform toggle must force social publish back into
+  dry-run before connector execution, while an armed Instagram path still dies
+  at `requires_explicit_live_go`.
 - `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
@@ -226,8 +231,8 @@ for distribution operators:
 
 `docs/CONNECTOR_AUTH.md` now also documents the Instagram Graph API skeleton
 route (`/me/accounts -> /media -> /media_publish`) plus the required scopes and
-the fact that Round 42 still blocks live posting with
-`requires_explicit_live_go`.
+the fact that Round 42/43 still block live posting with an upstream dry-run
+hold plus `requires_explicit_live_go` at the connector edge.
 
 Also keep the built UI bundle and its source provenance together:
 
