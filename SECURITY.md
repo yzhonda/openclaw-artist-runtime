@@ -52,6 +52,16 @@ For platform-by-platform setup and refresh flow, see `docs/CONNECTOR_AUTH.md`.
 The Suno Browser Worker uses a dedicated browser profile. It must not read the operator's ordinary browser profile.
 It must stop on login challenge, CAPTCHA, payment prompt, or unexpected UI.
 
+## Suno browser profile
+
+- `.openclaw-browser-profiles/suno/` is operator-machine-local state only.
+- The path is excluded from git and must never be copied into package tarballs,
+  ledgers, audit logs, screenshots, or repository docs.
+- The plugin may automate a browser against that profile in later rounds, but
+  it must not dump cookie bodies or session-token contents into readable
+  artifacts.
+- For operator setup flow, see `docs/SUNO_BROWSER_DRIVER.md`.
+
 ## Public side effects
 
 Public actions include Suno generation, X posts, Instagram posts, TikTok posts, replies, quote posts, and release announcements.

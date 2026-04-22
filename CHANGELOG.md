@@ -6,9 +6,11 @@
 - Marketplace listing docs now summarize connector credential requirements and include a first-pass credential refresh troubleshooting section for X/Bird, Instagram, and TikTok.
 - Added `docs/CONNECTOR_AUTH.md` as the dedicated connector setup / refresh guide and linked operator-facing docs back to it.
 - Added `docs/GATEWAY_AUTH.md` to document the current plugin-level gateway auth boundary for the HTTP route surface.
+- Added a dependency-free `PlaywrightSunoDriver` skeleton and `docs/SUNO_BROWSER_DRIVER.md` for the future operator-managed Suno browser lane.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
+- Suno worker selection now accepts `music.suno.driver`, defaulting to `mock` while reserving `playwright` for later operator-installed browser automation.
 
 ## 0.3.0 - 2026-04-22
 

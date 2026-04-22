@@ -162,6 +162,15 @@
                 ],
                 "default": "background_browser_worker"
               },
+              "driver": {
+                "type": "string",
+                "enum": [
+                  "mock",
+                  "playwright"
+                ],
+                "default": "mock",
+                "description": "Suno browser driver selection. 'mock' keeps dry-run-safe skeleton behavior. 'playwright' is reserved for operator machines that install playwright separately."
+              },
               "authority": {
                 "type": "string",
                 "enum": [
@@ -443,6 +452,10 @@
     "music.suno.connectionMode": {
       "label": "Suno connection",
       "help": "Use a background logged-in browser profile, manual copy fallback, or a future API provider."
+    },
+    "music.suno.driver": {
+      "label": "Suno browser driver",
+      "help": "Select 'mock' for the built-in dry-run skeleton or 'playwright' after the operator installs playwright locally."
     },
     "music.suno.authority": {
       "label": "Suno authority",

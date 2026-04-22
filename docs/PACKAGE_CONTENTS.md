@@ -43,6 +43,7 @@ The package still needs curation: built UI assets belong in the tarball, while l
 ├── docs/*.md                          # distribution-focused docs
 ├── docs/API_ROUTES.md                 # plugin HTTP route catalog for Console consumers
 ├── docs/CONNECTOR_AUTH.md             # operator-facing connector setup / refresh guide
+├── docs/SUNO_BROWSER_DRIVER.md        # operator-facing Suno browser-profile lane guide
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -60,6 +61,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/socialDistributionWorker.ts`
 - `src/services/socialPublishing.ts`
 - `src/services/sunoBrowserWorker.ts`
+- `src/services/sunoPlaywrightDriver.ts`
 - `src/services/sunoRuns.ts`
 - `src/services/sunoPromptPackFiles.ts`
 - `src/services/artistState.ts`
@@ -71,6 +73,8 @@ Producer Console status surfaces. In practice that means:
   read routes, mutating routes, and `/api/config/update`.
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
+- `src/services/sunoPlaywrightDriver.ts` is the dependency-free stub reserved for
+  the later operator-managed browser lane.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -109,11 +113,13 @@ The config editor source now owns both:
 
 - enable/disable toggles for each social platform
 - authority-mode payload shaping for `distribution.platforms.{x,instagram,tiktok}.authority`
+- the Suno browser-driver selector payload path under `music.suno.driver`
 
 ### API route catalog
 
 - `docs/API_ROUTES.md`
 - `docs/CONNECTOR_AUTH.md`
+- `docs/SUNO_BROWSER_DRIVER.md`
 
 This document exists so plugin consumers do not have to reverse-read
 `src/routes/index.ts` just to understand the HTTP surface. It catalogs the
@@ -123,6 +129,10 @@ family-dispatch note required by the current OpenClaw Gateway matcher behavior.
 `docs/CONNECTOR_AUTH.md` sits beside it as the operator-focused credential and
 refresh guide, with direct links back into the platform test route anchors in
 `docs/API_ROUTES.md`.
+
+`docs/SUNO_BROWSER_DRIVER.md` now captures the separate local-browser lane for
+Suno, including the dedicated profile path and the operator-managed Playwright
+installation requirement.
 
 ### Repo-local OpenClaw sandbox scripts
 
@@ -151,6 +161,7 @@ refresh guide, with direct links back into the platform test route anchors in
 - `tests/config-update-route.test.ts`
 - `tests/config-editor-payload.test.ts`
 - `tests/repository-and-ledger.test.ts`
+- `tests/suno-driver-selection.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/status-ticker.test.ts`
