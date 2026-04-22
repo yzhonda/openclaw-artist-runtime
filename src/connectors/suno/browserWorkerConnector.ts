@@ -40,7 +40,7 @@ export class BrowserWorkerSunoConnector implements SunoConnector {
     return this.worker.startCreate(input, { dryRun: input.dryRun });
   }
 
-  async importResults(input: { runId: string }): Promise<SunoImportResult> {
-    return this.worker.importRun(input.runId);
+  async importResults(input: { runId: string; urls: string[] }): Promise<SunoImportResult> {
+    return this.worker.importRun(input.runId, input.urls);
   }
 }

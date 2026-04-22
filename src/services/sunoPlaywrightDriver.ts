@@ -1,4 +1,5 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import type { SunoCreateRequest, SunoCreateResult, SunoImportRequest, SunoImportResult, SunoSubmitMode } from "../types.js";
 import type { SunoBrowserDriver, SunoBrowserDriverProbe } from "./sunoBrowserWorker.js";
 import type { BrowserContext, Page } from "playwright";
@@ -12,6 +13,7 @@ export const PLAYWRIGHT_DRIVER_LOGIN_REQUIRED_DETAIL =
   "Suno login required in persistent profile — run `scripts/openclaw-suno-login.sh` and complete operator login";
 export const PLAYWRIGHT_CREATE_SKIPPED_REASON = "submit_skipped";
 export const PLAYWRIGHT_LIVE_TIMEOUT_REASON = "playwright_live_timeout";
+export const PLAYWRIGHT_IMPORT_NO_URLS_REASON = "playwright_import_no_urls";
 export const PLAYWRIGHT_POLL_INTERVAL_MS = 3_000;
 export const PLAYWRIGHT_POLL_TIMEOUT_MS = 10 * 60 * 1_000;
 
@@ -24,6 +26,7 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
   constructor(
     readonly profilePath: string,
     readonly submitMode: SunoSubmitMode = "skip",
+    private readonly workspaceRoot = ".",
     private readonly polling = {
       intervalMs: PLAYWRIGHT_POLL_INTERVAL_MS,
       timeoutMs: PLAYWRIGHT_POLL_TIMEOUT_MS
@@ -174,12 +177,100 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
   }
 
   async importResults(request: SunoImportRequest): Promise<SunoImportResult> {
-    return {
-      runId: request.runId,
-      urls: [],
-      reason: "playwright_driver_skeleton_only",
-      dryRun: false
-    };
+    if (request.urls.length === 0) {
+      return {
+        accepted: false,
+        runId: request.runId,
+        urls: [],
+        paths: [],
+        reason: PLAYWRIGHT_IMPORT_NO_URLS_REASON,
+        dryRun: false
+      };
+    }
+
+    let context: BrowserContext | undefined;
+
+    try {
+      const { chromium } = await import("playwright-extra");
+      const stealth = (await import("puppeteer-extra-plugin-stealth")).default;
+      chromium.use(stealth());
+      await mkdir(this.profilePath, { recursive: true });
+      context = await chromium.launchPersistentContext(this.profilePath, {
+        headless: false,
+        channel: "chrome",
+        args: ["--disable-blink-features=AutomationControlled"],
+        ignoreDefaultArgs: ["--enable-automation"]
+      });
+
+      const page = context.pages()[0] ?? await context.newPage();
+      const outputDir = join(this.workspaceRoot, "runtime", "suno", request.runId);
+      await mkdir(outputDir, { recursive: true });
+
+      const successfulUrls: string[] = [];
+      const savedPaths: string[] = [];
+      const failures: string[] = [];
+
+      for (const songUrl of request.urls) {
+        try {
+          await page.goto(songUrl, {
+            waitUntil: "domcontentloaded",
+            timeout: 20_000
+          });
+          await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+
+          const asset = await this.extractSongAudio(page, songUrl);
+          if (!asset) {
+            failures.push(`${songUrl}: audio asset not found`);
+            continue;
+          }
+
+          const response = await fetch(asset.audioUrl);
+          if (!response.ok) {
+            failures.push(`${songUrl}: download failed with HTTP ${response.status}`);
+            continue;
+          }
+
+          const buffer = Buffer.from(await response.arrayBuffer());
+          const outputPath = join(outputDir, `${asset.trackId}.mp3`);
+          await writeFile(outputPath, buffer);
+          successfulUrls.push(songUrl);
+          savedPaths.push(outputPath);
+        } catch (error) {
+          failures.push(`${songUrl}: ${this.errorMessage(error)}`);
+        }
+      }
+
+      return {
+        accepted: savedPaths.length > 0,
+        runId: request.runId,
+        urls: successfulUrls,
+        paths: savedPaths,
+        reason: failures.length > 0 ? failures.join("; ") : "imported",
+        dryRun: false
+      };
+    } catch (error) {
+      if (this.isModuleNotInstalled(error)) {
+        return {
+          accepted: false,
+          runId: request.runId,
+          urls: [],
+          paths: [],
+          reason: PLAYWRIGHT_DRIVER_NOT_INSTALLED_DETAIL,
+          dryRun: false
+        };
+      }
+
+      return {
+        accepted: false,
+        runId: request.runId,
+        urls: [],
+        paths: [],
+        reason: `playwright_import_failed: ${this.errorMessage(error)}`,
+        dryRun: false
+      };
+    } finally {
+      await context?.close().catch(() => undefined);
+    }
   }
 
   private async isLoginRequired(page: Page, currentUrl: string): Promise<boolean> {
@@ -295,6 +386,33 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
       }
     }
     return [];
+  }
+
+  private async extractSongAudio(
+    page: Page,
+    sourceUrl: string
+  ): Promise<{ trackId: string; audioUrl: string } | undefined> {
+    return page.evaluate((currentSongUrl) => {
+      const scriptTexts = Array.from(document.scripts)
+        .map((script) => script.textContent ?? "")
+        .filter(Boolean);
+      const matches = scriptTexts.flatMap((text) => Array.from(text.matchAll(/https:\/\/cdn1\.suno\.ai\/[^"'\\\s]+\.mp3(?:\?[^"'\\\s]*)?/g)).map((match) => match[0]))
+        .filter((url) => !url.includes("sil-100.mp3"));
+
+      const audioUrl = matches[0];
+      if (!audioUrl) {
+        return undefined;
+      }
+
+      const songMatch = currentSongUrl.match(/\/song\/([^/?#]+)/);
+      const audioMatch = audioUrl.match(/\/([^/?#]+)\.mp3(?:\?|$)/);
+      const trackId = songMatch?.[1] ?? audioMatch?.[1];
+      if (!trackId) {
+        return undefined;
+      }
+
+      return { trackId, audioUrl };
+    }, sourceUrl);
   }
 
   private isModuleNotInstalled(error: unknown): boolean {

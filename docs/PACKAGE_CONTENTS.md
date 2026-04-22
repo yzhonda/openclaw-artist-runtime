@@ -74,8 +74,8 @@ Producer Console status surfaces. In practice that means:
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
 - `src/services/sunoPlaywrightDriver.ts` now owns the real Playwright-backed
-  login probe plus the live create submit/polling lane while keeping import
-  stubbed.
+  login probe, live create submit/polling lane, and the local mp3 import
+  downloader under `runtime/suno/<runId>/`.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -167,6 +167,7 @@ workaround.
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
 - `tests/suno-playwright-create.test.ts`
+- `tests/suno-playwright-import.test.ts`
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`

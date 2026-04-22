@@ -5,9 +5,10 @@ lane.
 
 ## Status
 
-Round 40 keeps the real Playwright probe plus manual first-login helper, and
-now allows `submitMode: "live"` to click `Create` and poll the Suno library for
-new song URLs. `submitMode: "skip"` still fills the form without submission for
+Round 41 keeps the real Playwright probe plus manual first-login helper, allows
+`submitMode: "live"` to click `Create`, polls the Suno library for new song
+URLs, and can now import finished runs by downloading mp3 assets into the local
+workspace. `submitMode: "skip"` still fills the form without submission for
 credit-safe rehearsals.
 
 ## Prerequisites
@@ -134,13 +135,32 @@ The live create lane now performs the following:
    `/song/<uuid>` URLs once they appear.
 
 If no new song URLs appear before timeout, the driver returns
-`playwright_live_timeout` and leaves result import/download to later rounds.
+`playwright_live_timeout`.
+
+## Round 41 import and audio download
+
+After a successful Round 40 live create, the driver can now revisit the returned
+`/song/<uuid>` URLs, extract the mp3 asset URL from the page payload, and save
+the downloaded files under:
+
+```txt
+runtime/suno/<runId>/<trackId>.mp3
+```
+
+Import stays fail-closed:
+
+- `urls=[]` returns `playwright_import_no_urls`
+- per-song failures are accumulated into `reason`
+- at least one saved mp3 is required for `accepted: true`
+- partial success keeps the successful paths and reports the failed URLs in
+  `reason`
 
 ## Credit budget
 
 `submitMode: "skip"` still consumes zero credits. `submitMode: "live"` now
 consumes real Suno credits and should only be enabled after explicit operator
-approval. Result import and audio download remain separate later-round work.
+approval. Round 41 audio import/download does not create new generations on its
+own; it only pulls finished outputs from the returned song URLs.
 
 ## Rollback
 

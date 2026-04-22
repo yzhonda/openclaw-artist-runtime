@@ -191,6 +191,7 @@ describe("PlaywrightSunoDriver create", () => {
     const driver = new PlaywrightSunoDriver(
       ".openclaw-browser-profiles/suno",
       "live",
+      ".",
       { intervalMs: 1, timeoutMs: 2 }
     );
 
