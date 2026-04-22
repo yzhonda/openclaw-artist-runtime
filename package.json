@@ -1,6 +1,6 @@
 {
   "name": "@your-org/openclaw-artist-runtime",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "OpenClaw native plugin that runs a public autonomous AI musician with Suno generation and social distribution.",
   "type": "module",
   "main": "dist/index.js",
