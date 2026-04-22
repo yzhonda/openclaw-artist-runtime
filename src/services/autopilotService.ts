@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import type { AutopilotRunState, AutopilotStage, AutopilotStatus, ArtistRuntimeConfig, SongState } from "../types.js";
-import { listSongStates, readSongState } from "./artistState.js";
+import { listSongStates, readSongState, updateSongState } from "./artistState.js";
 import { createSongIdea } from "./songIdeation.js";
 import { draftLyrics } from "./lyricsDrafting.js";
 import { prepareSocialAssets } from "./socialAssets.js";
@@ -132,7 +132,7 @@ function stageFromSong(song?: SongState): AutopilotStage {
 
 async function currentSong(root: string): Promise<SongState | undefined> {
   const songs = await listSongStates(root);
-  return songs[0];
+  return songs.find((song) => song.status !== "published" && song.status !== "archived" && song.status !== "failed");
 }
 
 async function ensureLyrics(root: string, song: SongState): Promise<SongState> {
@@ -229,7 +229,9 @@ export class ArtistAutopilotService {
 
     const song = await currentSong(input.workspaceRoot);
     const stage = stageFromSong(song);
-    const runId = existing.runId ?? `auto_${Date.now().toString(36)}`;
+    const runId = !song && existing.lastSuccessfulStage === "completed"
+      ? `auto_${Date.now().toString(36)}`
+      : existing.runId ?? `auto_${Date.now().toString(36)}`;
     const baseState: AutopilotRunState = {
       ...existing,
       runId,
@@ -237,6 +239,23 @@ export class ArtistAutopilotService {
       stage,
       lastRunAt: nowIso()
     };
+
+    if (
+      !song
+      && existing.lastSuccessfulStage === "publishing"
+      && config.autopilot.dryRun
+      && existing.blockedReason?.includes("dry-run")
+    ) {
+      return writeAutopilotState(input.workspaceRoot, {
+        ...baseState,
+        currentSongId: existing.currentSongId,
+        stage: "completed",
+        blockedReason: existing.blockedReason,
+        lastError: undefined,
+        lastSuccessfulStage: "completed",
+        cycleCount: existing.cycleCount + 1
+      });
+    }
 
     if (
       song
@@ -342,6 +361,12 @@ export class ArtistAutopilotService {
             config,
             action: "publish"
           });
+          if (config.autopilot.dryRun && published.result.reason.includes("dry-run")) {
+            await updateSongState(input.workspaceRoot, song.songId, {
+              status: "published",
+              reason: `dry-run publish simulated: ${published.result.reason}`
+            });
+          }
           return writeAutopilotState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
