@@ -70,6 +70,9 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
     if (config.distribution.enabled !== undefined) {
       merged.distribution.enabled = config.distribution.enabled;
     }
+    if (config.distribution.liveGoArmed !== undefined) {
+      merged.distribution.liveGoArmed = config.distribution.liveGoArmed;
+    }
     if (config.distribution.dailySharing !== undefined) {
       merged.distribution.dailySharing = config.distribution.dailySharing;
     }
@@ -224,9 +227,12 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     if (!isRecord(config.distribution)) {
       errors.push("config.distribution must be an object");
     } else {
-      validateKnownKeys("config.distribution", config.distribution, ["enabled", "dailySharing", "officialRelease", "platforms"], errors);
+      validateKnownKeys("config.distribution", config.distribution, ["enabled", "liveGoArmed", "dailySharing", "officialRelease", "platforms"], errors);
       if ("enabled" in config.distribution && typeof config.distribution.enabled !== "boolean") {
         errors.push("config.distribution.enabled must be a boolean");
+      }
+      if ("liveGoArmed" in config.distribution && typeof config.distribution.liveGoArmed !== "boolean") {
+        errors.push("config.distribution.liveGoArmed must be a boolean");
       }
       if ("dailySharing" in config.distribution) {
         validateEnum("config.distribution.dailySharing", config.distribution.dailySharing, dailySharingModes, errors);

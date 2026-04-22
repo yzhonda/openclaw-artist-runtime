@@ -169,6 +169,10 @@
           "type": "boolean",
           "default": false
         },
+        "liveGoArmed": {
+          "type": "boolean",
+          "default": false
+        },
         "dailySharing": {
           "type": "string",
           "enum": [

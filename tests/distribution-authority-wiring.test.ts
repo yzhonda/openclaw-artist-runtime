@@ -3,6 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InstagramConnector } from "../src/connectors/social/instagramConnector.js";
+import { TikTokConnector } from "../src/connectors/social/tiktokConnector.js";
+import { XBirdConnector } from "../src/connectors/social/xBirdConnector.js";
 import { publishSocialAction } from "../src/services/socialPublishing.js";
 
 function makeWorkspace(): string {
@@ -19,6 +21,21 @@ function allowInstagramVisualPublishing() {
     videoPost: true,
     carouselPost: true,
     reelPost: true,
+    reply: false,
+    quote: false,
+    dm: false,
+    scheduledPost: false,
+    metrics: "unknown"
+  });
+}
+
+function allowTikTokClipPublishing() {
+  return vi.spyOn(TikTokConnector.prototype, "checkCapabilities").mockResolvedValue({
+    textPost: false,
+    imagePost: false,
+    videoPost: true,
+    carouselPost: false,
+    reelPost: false,
     reply: false,
     quote: false,
     dm: false,
@@ -50,6 +67,7 @@ describe("distribution authority wiring", () => {
         autopilot: { dryRun: false },
         distribution: {
           enabled: false,
+          liveGoArmed: true,
           platforms: {
             instagram: { enabled: true, authority: "auto_publish_visuals" }
           }
@@ -84,6 +102,7 @@ describe("distribution authority wiring", () => {
         autopilot: { dryRun: false },
         distribution: {
           enabled: true,
+          liveGoArmed: true,
           platforms: {
             instagram: { enabled: false, authority: "auto_publish_visuals" }
           }
@@ -121,6 +140,7 @@ describe("distribution authority wiring", () => {
         autopilot: { dryRun: false },
         distribution: {
           enabled: true,
+          liveGoArmed: true,
           platforms: {
             instagram: { enabled: true, authority: "auto_publish_visuals" }
           }
@@ -143,5 +163,84 @@ describe("distribution authority wiring", () => {
       postType: "lyric_card"
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forces dry-run hold for every platform while liveGoArmed is false", async () => {
+    const root = makeWorkspace();
+    vi.stubEnv("OPENCLAW_INSTAGRAM_ACCESS_TOKEN", "ig-token");
+    vi.stubEnv("OPENCLAW_TIKTOK_ACCESS_TOKEN", "tt-token");
+    allowInstagramVisualPublishing();
+    allowTikTokClipPublishing();
+    const instagramPublishSpy = vi.spyOn(InstagramConnector.prototype, "publish");
+    const xPublishSpy = vi.spyOn(XBirdConnector.prototype, "publish");
+    const tiktokPublishSpy = vi.spyOn(TikTokConnector.prototype, "publish");
+
+    const [xAction, instagramAction, tiktokAction] = await Promise.all([
+      publishSocialAction({
+        workspaceRoot: root,
+        songId: "song-001",
+        platform: "x",
+        postType: "observation",
+        text: "ash on the rail line",
+        config: {
+          autopilot: { dryRun: false },
+          distribution: {
+            enabled: true,
+            liveGoArmed: false,
+            platforms: {
+              x: { enabled: true, authority: "auto_publish" }
+            }
+          }
+        }
+      }),
+      publishSocialAction({
+        workspaceRoot: root,
+        songId: "song-001",
+        platform: "instagram",
+        postType: "lyric_card",
+        text: "ash on the rail line",
+        mediaPaths: ["https://example.com/card.png"],
+        config: {
+          autopilot: { dryRun: false },
+          distribution: {
+            enabled: true,
+            liveGoArmed: false,
+            platforms: {
+              instagram: { enabled: true, authority: "auto_publish_visuals" }
+            }
+          }
+        }
+      }),
+      publishSocialAction({
+        workspaceRoot: root,
+        songId: "song-001",
+        platform: "tiktok",
+        postType: "hook_clip",
+        text: "ash on the rail line",
+        mediaPaths: ["https://example.com/clip.mp4"],
+        config: {
+          autopilot: { dryRun: false },
+          distribution: {
+            enabled: true,
+            liveGoArmed: false,
+            platforms: {
+              tiktok: { enabled: true, authority: "auto_publish_clips" }
+            }
+          }
+        }
+      })
+    ]);
+
+    for (const action of [xAction, instagramAction, tiktokAction]) {
+      expect(action.result.accepted).toBe(false);
+      expect(action.result.dryRun).toBe(true);
+      expect(action.result.reason).toBe("dry-run blocks social publish");
+      expect(action.entry.dryRun).toBe(true);
+      expect(action.entry.policyDecision?.policyDecision).toBe("deny_dry_run");
+    }
+
+    expect(xPublishSpy).not.toHaveBeenCalled();
+    expect(instagramPublishSpy).not.toHaveBeenCalled();
+    expect(tiktokPublishSpy).not.toHaveBeenCalled();
   });
 });

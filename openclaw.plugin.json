@@ -235,12 +235,16 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "enabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "dailySharing": {
-            "type": "string",
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "liveGoArmed": {
+          "type": "boolean",
+          "default": false
+        },
+        "dailySharing": {
+          "type": "string",
             "enum": [
               "off",
               "draft_only",
@@ -481,6 +485,10 @@
     "distribution.enabled": {
       "label": "Social distribution",
       "help": "Allow the artist to share finished work or daily progress publicly."
+    },
+    "distribution.liveGoArmed": {
+      "label": "Live social publishing arm",
+      "help": "Keep OFF by default. When false, every social publish path is forced back into dry-run before any connector publish call."
     },
     "distribution.platforms.x.enabled": {
       "label": "Enable X",

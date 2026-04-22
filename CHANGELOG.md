@@ -16,6 +16,7 @@
 - Added Round 41.2 two-stage live submit polling so `/create` generation cards are checked before the older library-diff fallback.
 - Added Round 42 Instagram Graph API skeleton wiring so the connector can model `accounts -> media -> media_publish` while staying dry-run fixed.
 - Added Round 43 distribution-authority wiring tests so disabled distribution/platform states are proven to force social publishes back into dry-run before connector execution.
+- Added Round 44 `distribution.liveGoArmed` plus `/api/status` dry-run surfacing so the producer can see the global social live arm and each platform's effective dry-run state.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
@@ -28,6 +29,7 @@
 - The Playwright live create lane now reports whether success came from `/create` card polling or the `/me` library-diff fallback, while keeping the library path as the final safety net.
 - The Instagram connector now resolves dry-run Graph API stages but still rejects all non-dry-run publish attempts with `requires_explicit_live_go`.
 - `publishSocialAction()` now forces an upstream dry-run hold whenever distribution is disabled or the target platform toggle is off, leaving Instagram live requests to fail closed with `requires_explicit_live_go` only when the upper pipeline is actually armed.
+- `publishSocialAction()` now also forces social publish back into dry-run whenever `distribution.liveGoArmed` is false, and `distributionWorker` mirrors `liveGoArmed` plus per-platform `effectiveDryRun` into `/api/status`.
 
 ### Fixed
 - Suno Google OAuth login now uses the stealth-plugin + Chrome-channel probe/login lane instead of the default automation markers that were getting blocked.

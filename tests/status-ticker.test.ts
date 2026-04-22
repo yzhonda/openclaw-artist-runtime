@@ -76,8 +76,10 @@ describe("status ticker and reply simulation routes", () => {
     await ensureArtistWorkspace(root);
     await patchResolvedConfig(root, {
       artist: { workspaceRoot: root },
-      autopilot: { enabled: true, dryRun: true, songsPerWeek: 6, cycleIntervalMinutes: 15 },
+      autopilot: { enabled: true, dryRun: false, songsPerWeek: 6, cycleIntervalMinutes: 15 },
       distribution: {
+        enabled: true,
+        liveGoArmed: false,
         platforms: {
           x: { enabled: true }
         }
@@ -91,8 +93,17 @@ describe("status ticker and reply simulation routes", () => {
     expect(status.autopilot.enabled).toBe(true);
     expect(status.config.autopilot.songsPerWeek).toBe(6);
     expect(status.config.autopilot.cycleIntervalMinutes).toBe(15);
+    expect(status.config.autopilot.dryRun).toBe(false);
+    expect(status.config.distribution.liveGoArmed).toBe(false);
     expect(status.config.distribution.platforms.x.enabled).toBe(true);
     expect(status.ticker.intervalMs).toBe(900000);
+    expect(status.distributionWorker.liveGoArmed).toBe(false);
+    expect(status.distributionWorker.effectiveDryRun).toMatchObject({
+      x: true,
+      instagram: true,
+      tiktok: true
+    });
+    expect(status.distributionWorker.blockedReason).toContain("live-go arm");
   });
 
   it("updates ticker getters when /api/run-cycle is triggered", async () => {

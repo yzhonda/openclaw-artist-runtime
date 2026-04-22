@@ -171,6 +171,8 @@ workaround.
   disabled Instagram platform toggle must force social publish back into
   dry-run before connector execution, while an armed Instagram path still dies
   at `requires_explicit_live_go`.
+  Round 44 extends the same seam with `distribution.liveGoArmed=false`, fixing
+  the global social live arm across X / Instagram / TikTok.
 - `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
@@ -230,9 +232,10 @@ for distribution operators:
 - TikTok probes `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN`
 
 `docs/CONNECTOR_AUTH.md` now also documents the Instagram Graph API skeleton
-route (`/me/accounts -> /media -> /media_publish`) plus the required scopes and
-the fact that Round 42/43 still block live posting with an upstream dry-run
-hold plus `requires_explicit_live_go` at the connector edge.
+route (`/me/accounts -> /media -> /media_publish`), the required scopes, the
+global `distribution.liveGoArmed` guard, and the fact that Round 42-44 still
+block live posting with an upstream dry-run hold plus
+`requires_explicit_live_go` at the connector edge.
 
 Also keep the built UI bundle and its source provenance together:
 
