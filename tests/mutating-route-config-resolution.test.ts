@@ -69,7 +69,7 @@ describe("mutating route config resolution", () => {
       }
     });
 
-    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/platforms/:id/test");
+    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/platforms/x/test");
     expect(handler).toBeTruthy();
 
     const response = createMockResponse();

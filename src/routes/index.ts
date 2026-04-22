@@ -582,21 +582,22 @@ export function registerRoutes(api: unknown): void {
     }
   });
 
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/platforms/:id/test",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const status = await buildPlatformDetailResponse(platform, config);
-      return {
-        platform,
-        status,
-        testedAt: new Date().toISOString()
-      };
-    }
-  });
+  for (const platform of ["x", "instagram", "tiktok"] as const) {
+    safeRegisterRoute(api, {
+      method: "POST",
+      path: `/plugins/artist-runtime/api/platforms/${platform}/test`,
+      handler: async (input) => {
+        const payload = payloadRecord(input);
+        const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+        const status = await buildPlatformDetailResponse(platform, config);
+        return {
+          platform,
+          status,
+          testedAt: new Date().toISOString()
+        };
+      }
+    });
+  }
 
   safeRegisterRoute(api, {
     method: "POST",

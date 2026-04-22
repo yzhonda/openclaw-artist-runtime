@@ -224,18 +224,20 @@ describe("registration shells", () => {
     expect(statusResponse.readHeader("content-type")).toContain("application/json");
     expect(JSON.parse(statusResponse.readBody()).dryRun).toBe(true);
 
-    const platformTestHandler = registered.routeHandlers.get("/plugins/artist-runtime/api/platforms/:id/test");
-    expect(platformTestHandler).toBeTruthy();
-    const platformResponse = createMockResponse();
-    await platformTestHandler?.(
-      createMockRequest(
-        "POST",
-        "/plugins/artist-runtime/api/platforms/x/test",
-        JSON.stringify({ config: { artist: { workspaceRoot: mkdtempSync(join(tmpdir(), "artist-runtime-route-")) } } }),
-        { "content-type": "application/json" }
-      ),
-      platformResponse.res
-    );
-    expect(JSON.parse(platformResponse.readBody()).platform).toBe("x");
+    for (const platform of ["x", "instagram", "tiktok"] as const) {
+      const platformTestHandler = registered.routeHandlers.get(`/plugins/artist-runtime/api/platforms/${platform}/test`);
+      expect(platformTestHandler).toBeTruthy();
+      const platformResponse = createMockResponse();
+      await platformTestHandler?.(
+        createMockRequest(
+          "POST",
+          `/plugins/artist-runtime/api/platforms/${platform}/test`,
+          JSON.stringify({ config: { artist: { workspaceRoot: mkdtempSync(join(tmpdir(), "artist-runtime-route-")) } } }),
+          { "content-type": "application/json" }
+        ),
+        platformResponse.res
+      );
+      expect(JSON.parse(platformResponse.readBody()).platform).toBe(platform);
+    }
   });
 });
