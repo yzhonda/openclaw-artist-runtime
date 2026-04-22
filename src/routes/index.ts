@@ -54,6 +54,43 @@ function payloadRecord(input: unknown): Record<string, unknown> {
   return typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {};
 }
 
+function normalizeRequestPath(path: string): string {
+  if (path === "/") {
+    return path;
+  }
+  const trimmed = path.replace(/\/+$/, "");
+  return trimmed.length > 0 ? trimmed : "/";
+}
+
+function payloadRequestPath(payload: Record<string, unknown>, fallback: string): string {
+  return typeof payload.requestPath === "string" ? normalizeRequestPath(payload.requestPath) : fallback;
+}
+
+function payloadRequestMethod(payload: Record<string, unknown>, fallback: "GET" | "POST" | "PATCH" = "GET"): "GET" | "POST" | "PATCH" {
+  const method = typeof payload.requestMethod === "string" ? payload.requestMethod.toUpperCase() : fallback;
+  return method === "POST" || method === "PATCH" ? method : "GET";
+}
+
+function payloadPathSegments(payload: Record<string, unknown>, prefix: string): string[] {
+  const normalizedPrefix = normalizeRequestPath(prefix);
+  const requestPath = payloadRequestPath(payload, normalizedPrefix);
+  if (requestPath === normalizedPrefix) {
+    return [];
+  }
+  if (!requestPath.startsWith(`${normalizedPrefix}/`)) {
+    return [];
+  }
+  return requestPath
+    .slice(normalizedPrefix.length + 1)
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => decodeURIComponent(segment));
+}
+
+function platformFromSegment(value: unknown): SocialPlatform | undefined {
+  return value === "instagram" || value === "tiktok" || value === "x" ? value : undefined;
+}
+
 async function readAllSocialActions(workspaceRoot: string): Promise<SocialPublishLedgerEntry[]> {
   const songs = await listSongStates(workspaceRoot);
   const all = await Promise.all(
@@ -513,28 +550,59 @@ export function registerRoutes(api: unknown): void {
   });
 
   safeRegisterRoute(api, {
-    method: "GET",
+    method: ["GET", "POST"],
+    match: "prefix",
     path: "/plugins/artist-runtime/api/songs",
-    handler: async (input) => buildSongsResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
-  });
-
-  safeRegisterRoute(api, {
-    method: "GET",
-    path: "/plugins/artist-runtime/api/songs/:songId",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const songId = typeof payload.songId === "string" ? payload.songId : "song-001";
-      return buildSongDetailResponse(songId, payload.config as Partial<ArtistRuntimeConfig> | undefined);
-    }
-  });
+      const method = payloadRequestMethod(payload);
+      const segments = payloadPathSegments(payload, "/plugins/artist-runtime/api/songs");
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
 
-  safeRegisterRoute(api, {
-    method: "GET",
-    path: "/plugins/artist-runtime/api/songs/:songId/ledger",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const songId = typeof payload.songId === "string" ? payload.songId : "song-001";
-      return buildSongLedgerResponse(songId, payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      if (method === "GET") {
+        if (segments.length === 0) {
+          return buildSongsResponse(config);
+        }
+        if (segments.length === 1) {
+          return buildSongDetailResponse(segments[0] ?? "song-001", config);
+        }
+        if (segments.length === 2 && segments[1] === "ledger") {
+          return buildSongLedgerResponse(segments[0] ?? "song-001", config);
+        }
+      }
+
+      if (method === "POST") {
+        if (segments.length === 1 && segments[0] === "ideate") {
+          return createSongIdea({
+            workspaceRoot: config.artist.workspaceRoot,
+            title: typeof payload.title === "string" ? payload.title : undefined,
+            artistReason: typeof payload.artistReason === "string" ? payload.artistReason : undefined,
+            config
+          });
+        }
+        if (segments.length === 2 && segments[1] === "select-take") {
+          return selectTake({
+            workspaceRoot: config.artist.workspaceRoot,
+            songId: segments[0] ?? (typeof payload.songId === "string" ? payload.songId : "song-001"),
+            runId: typeof payload.runId === "string" ? payload.runId : undefined,
+            selectedTakeId: typeof payload.selectedTakeId === "string" ? payload.selectedTakeId : undefined,
+            reason: typeof payload.reason === "string" ? payload.reason : undefined
+          });
+        }
+        if (segments.length === 2 && segments[1] === "social-assets") {
+          return prepareSocialAssets({
+            workspaceRoot: config.artist.workspaceRoot,
+            songId: segments[0] ?? (typeof payload.songId === "string" ? payload.songId : "song-001"),
+            config
+          });
+        }
+      }
+
+      return {
+        error: "unknown_songs_route",
+        method,
+        requestPath: payloadRequestPath(payload, "/plugins/artist-runtime/api/songs")
+      };
     }
   });
 
@@ -551,180 +619,156 @@ export function registerRoutes(api: unknown): void {
   });
 
   safeRegisterRoute(api, {
-    method: "GET",
+    method: ["GET", "POST"],
+    match: "prefix",
     path: "/plugins/artist-runtime/api/alerts",
-    handler: async (input) => buildAlertsResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
-  });
-
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/alerts/:id/ack",
     handler: async (input) => {
       const payload = payloadRecord(input);
+      const method = payloadRequestMethod(payload);
+      const segments = payloadPathSegments(payload, "/plugins/artist-runtime/api/alerts");
       const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return acknowledgeAlert(config.artist.workspaceRoot, typeof payload.id === "string" ? payload.id : "unknown");
+
+      if (method === "GET" && segments.length === 0) {
+        return buildAlertsResponse(config);
+      }
+      if (method === "POST" && segments.length === 2 && segments[1] === "ack") {
+        return acknowledgeAlert(config.artist.workspaceRoot, segments[0] ?? "unknown");
+      }
+
+      return {
+        error: "unknown_alerts_route",
+        method,
+        requestPath: payloadRequestPath(payload, "/plugins/artist-runtime/api/alerts")
+      };
     }
   });
 
   safeRegisterRoute(api, {
-    method: "GET",
+    method: ["GET", "POST"],
+    match: "prefix",
     path: "/plugins/artist-runtime/api/platforms",
-    handler: async (input) => buildPlatformsResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
-  });
-
-  safeRegisterRoute(api, {
-    method: "GET",
-    path: "/plugins/artist-runtime/api/platforms/:id",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
-      return buildPlatformDetailResponse(platform, payload.config as Partial<ArtistRuntimeConfig> | undefined);
-    }
-  });
+      const method = payloadRequestMethod(payload);
+      const segments = payloadPathSegments(payload, "/plugins/artist-runtime/api/platforms");
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
 
-  for (const platform of ["x", "instagram", "tiktok"] as const) {
-    safeRegisterRoute(api, {
-      method: "POST",
-      path: `/plugins/artist-runtime/api/platforms/${platform}/test`,
-      handler: async (input) => {
-        const payload = payloadRecord(input);
-        const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-        const status = await buildPlatformDetailResponse(platform, config);
-        return {
-          platform,
-          status,
-          testedAt: new Date().toISOString()
-        };
+      if (method === "GET") {
+        if (segments.length === 0) {
+          return buildPlatformsResponse(config);
+        }
+        const platform = platformFromSegment(segments[0]);
+        if (segments.length === 1 && platform) {
+          return buildPlatformDetailResponse(platform, config);
+        }
       }
-    });
-  }
 
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/platforms/x/simulate-reply",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const baseConfig = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const config = mergeResolvedConfig(baseConfig, {
-        autopilot: {
-          dryRun: true
-        } as ArtistRuntimeConfig["autopilot"]
-      } as Partial<ArtistRuntimeConfig>);
-      const songId = typeof payload.songId === "string"
-        ? payload.songId
-        : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
-      if (!songId) {
-        return {
-          result: {
-            accepted: false,
-            platform: "x" as const,
-            dryRun: true,
-            reason: "no_song_selected_for_reply_simulation"
-          },
-          entry: undefined
-        };
+      if (method === "POST") {
+        if (segments.length === 2 && segments[0] === "x" && segments[1] === "simulate-reply") {
+          const dryRunConfig = mergeResolvedConfig(config, {
+            autopilot: {
+              dryRun: true
+            } as ArtistRuntimeConfig["autopilot"]
+          } as Partial<ArtistRuntimeConfig>);
+          const songId = typeof payload.songId === "string"
+            ? payload.songId
+            : (await listSongStates(dryRunConfig.artist.workspaceRoot))[0]?.songId;
+          if (!songId) {
+            return {
+              result: {
+                accepted: false,
+                platform: "x" as const,
+                dryRun: true,
+                reason: "no_song_selected_for_reply_simulation"
+              },
+              entry: undefined
+            };
+          }
+          return publishSocialAction({
+            workspaceRoot: dryRunConfig.artist.workspaceRoot,
+            songId,
+            platform: "x",
+            action: "reply",
+            postType: "reply",
+            text: typeof payload.text === "string" ? payload.text : undefined,
+            targetId: typeof payload.targetId === "string" ? payload.targetId : undefined,
+            targetUrl: typeof payload.targetUrl === "string" ? payload.targetUrl : undefined,
+            config: dryRunConfig
+          });
+        }
+
+        const platform = platformFromSegment(segments[0]);
+        if (segments.length === 2 && platform && segments[1] === "test") {
+          const status = await buildPlatformDetailResponse(platform, config);
+          return {
+            platform,
+            status,
+            testedAt: new Date().toISOString()
+          };
+        }
+        if (segments.length === 2 && platform && (segments[1] === "connect" || segments[1] === "disconnect")) {
+          const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
+            distribution: {
+              platforms: {
+                [platform]: { enabled: segments[1] === "connect" }
+              }
+            } as unknown as ArtistRuntimeConfig["distribution"]
+          } as Partial<ArtistRuntimeConfig>);
+          return buildPlatformDetailResponse(platform, nextConfig);
+        }
       }
-      return publishSocialAction({
-        workspaceRoot: config.artist.workspaceRoot,
-        songId,
-        platform: "x",
-        action: "reply",
-        postType: "reply",
-        text: typeof payload.text === "string" ? payload.text : undefined,
-        targetId: typeof payload.targetId === "string" ? payload.targetId : undefined,
-        targetUrl: typeof payload.targetUrl === "string" ? payload.targetUrl : undefined,
-        config
-      });
+
+      return {
+        error: "unknown_platforms_route",
+        method,
+        requestPath: payloadRequestPath(payload, "/plugins/artist-runtime/api/platforms")
+      };
     }
   });
 
   safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/platforms/:id/connect",
+    method: ["GET", "POST"],
+    match: "prefix",
+    path: "/plugins/artist-runtime/api/suno",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
+      const method = payloadRequestMethod(payload);
+      const segments = payloadPathSegments(payload, "/plugins/artist-runtime/api/suno");
       const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
-        distribution: {
-          platforms: {
-            [platform]: { enabled: true }
-          }
-        } as unknown as ArtistRuntimeConfig["distribution"]
-      } as Partial<ArtistRuntimeConfig>);
-      return buildPlatformDetailResponse(platform, nextConfig);
-    }
-  });
 
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/platforms/:id/disconnect",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const platform = payload.id === "instagram" || payload.id === "tiktok" ? payload.id : "x";
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const nextConfig = await patchResolvedConfig(config.artist.workspaceRoot, {
-        distribution: {
-          platforms: {
-            [platform]: { enabled: false }
-          }
-        } as unknown as ArtistRuntimeConfig["distribution"]
-      } as Partial<ArtistRuntimeConfig>);
-      return buildPlatformDetailResponse(platform, nextConfig);
-    }
-  });
+      if (method === "GET") {
+        if (segments.length === 1 && segments[0] === "status") {
+          return buildSunoStatusResponse(config);
+        }
+        if (segments.length === 1 && segments[0] === "runs") {
+          const songId = typeof payload.songId === "string"
+            ? payload.songId
+            : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
+          return songId ? readAllSunoRuns(config.artist.workspaceRoot, songId) : [];
+        }
+      }
 
-  safeRegisterRoute(api, {
-    method: "GET",
-    path: "/plugins/artist-runtime/api/suno/status",
-    handler: async (input) => buildSunoStatusResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
-  });
+      if (method === "POST") {
+        if (segments.length === 1 && segments[0] === "connect") {
+          return new SunoBrowserWorker(config.artist.workspaceRoot).connect();
+        }
+        if (segments.length === 1 && segments[0] === "reconnect") {
+          return new SunoBrowserWorker(config.artist.workspaceRoot).reconnect();
+        }
+        if (segments.length === 2 && segments[0] === "generate") {
+          return generateSunoRun({
+            workspaceRoot: config.artist.workspaceRoot,
+            songId: segments[1] ?? (typeof payload.songId === "string" ? payload.songId : "song-001"),
+            config
+          });
+        }
+      }
 
-  safeRegisterRoute(api, {
-    method: "GET",
-    path: "/plugins/artist-runtime/api/suno/runs",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const songId = typeof payload.songId === "string"
-        ? payload.songId
-        : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
-      return songId ? readAllSunoRuns(config.artist.workspaceRoot, songId) : [];
-    }
-  });
-
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/suno/connect",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return new SunoBrowserWorker(config.artist.workspaceRoot).connect();
-    }
-  });
-
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/suno/reconnect",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return new SunoBrowserWorker(config.artist.workspaceRoot).reconnect();
-    }
-  });
-
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/suno/generate/:songId",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const songId = typeof payload.songId === "string" ? payload.songId : "song-001";
-      return generateSunoRun({
-        workspaceRoot: config.artist.workspaceRoot,
-        songId,
-        config
-      });
+      return {
+        error: "unknown_suno_route",
+        method,
+        requestPath: payloadRequestPath(payload, "/plugins/artist-runtime/api/suno")
+      };
     }
   });
 
@@ -774,50 +818,6 @@ export function registerRoutes(api: unknown): void {
     }
   });
 
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/songs/ideate",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return createSongIdea({
-        workspaceRoot: config.artist.workspaceRoot,
-        title: typeof payload.title === "string" ? payload.title : undefined,
-        artistReason: typeof payload.artistReason === "string" ? payload.artistReason : undefined,
-        config
-      });
-    }
-  });
-
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/songs/:songId/select-take",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return selectTake({
-        workspaceRoot: config.artist.workspaceRoot,
-        songId: typeof payload.songId === "string" ? payload.songId : "song-001",
-        runId: typeof payload.runId === "string" ? payload.runId : undefined,
-        selectedTakeId: typeof payload.selectedTakeId === "string" ? payload.selectedTakeId : undefined,
-        reason: typeof payload.reason === "string" ? payload.reason : undefined
-      });
-    }
-  });
-
-  safeRegisterRoute(api, {
-    method: "POST",
-    path: "/plugins/artist-runtime/api/songs/:songId/social-assets",
-    handler: async (input) => {
-      const payload = payloadRecord(input);
-      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return prepareSocialAssets({
-        workspaceRoot: config.artist.workspaceRoot,
-        songId: typeof payload.songId === "string" ? payload.songId : "song-001",
-        config
-      });
-    }
-  });
 }
 
 const PLUGIN_ROOT = (() => {

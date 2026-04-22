@@ -69,7 +69,7 @@ describe("mutating route config resolution", () => {
       }
     });
 
-    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/platforms/x/test");
+    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/platforms");
     expect(handler).toBeTruthy();
 
     const response = createMockResponse();
@@ -114,7 +114,7 @@ describe("mutating route config resolution", () => {
       }
     });
 
-    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/songs/:songId/social-assets");
+    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/songs");
     expect(handler).toBeTruthy();
 
     const response = createMockResponse();
@@ -162,7 +162,7 @@ describe("mutating route config resolution", () => {
       }
     });
 
-    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/suno/generate/:songId");
+    const handler = registeredRouteHandlers().get("/plugins/artist-runtime/api/suno");
     expect(handler).toBeTruthy();
 
     const response = createMockResponse();

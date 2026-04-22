@@ -184,12 +184,10 @@ describe("registration shells", () => {
     expect(registered.routes).toContain("/plugins/artist-runtime/api/audit");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/recovery");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/prompt-ledger");
-    expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/connect");
-    expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/disconnect");
-    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/connect");
-    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/reconnect");
-    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/runs");
-    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/generate/:songId");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/alerts");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/songs");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/suno");
 
     const status = await buildStatusResponse();
     const artistMind = await buildArtistMindResponse();
@@ -224,11 +222,21 @@ describe("registration shells", () => {
     expect(statusResponse.readHeader("content-type")).toContain("application/json");
     expect(JSON.parse(statusResponse.readBody()).dryRun).toBe(true);
 
+    const songsHandler = registered.routeHandlers.get("/plugins/artist-runtime/api/songs");
+    expect(songsHandler).toBeTruthy();
+    const songsResponse = createMockResponse();
+    await songsHandler?.(
+      createMockRequest("GET", "/plugins/artist-runtime/api/songs/song-001"),
+      songsResponse.res
+    );
+    expect(songsResponse.readStatus()).toBe(200);
+    expect(songsResponse.readHeader("content-type")).toContain("application/json");
+
+    const platformHandler = registered.routeHandlers.get("/plugins/artist-runtime/api/platforms");
+    expect(platformHandler).toBeTruthy();
     for (const platform of ["x", "instagram", "tiktok"] as const) {
-      const platformTestHandler = registered.routeHandlers.get(`/plugins/artist-runtime/api/platforms/${platform}/test`);
-      expect(platformTestHandler).toBeTruthy();
       const platformResponse = createMockResponse();
-      await platformTestHandler?.(
+      await platformHandler?.(
         createMockRequest(
           "POST",
           `/plugins/artist-runtime/api/platforms/${platform}/test`,
