@@ -138,6 +138,36 @@ type SunoStatusResponse = {
   latestPromptPackVersion?: number;
 };
 
+type ArtistMindResponse = {
+  artist: string;
+  currentState: string;
+  socialVoice: string;
+  songbook: string;
+};
+
+type AuditEntry = {
+  timestamp: string;
+  eventType?: string;
+  actor?: string;
+  songId?: string;
+  details?: Record<string, unknown>;
+};
+
+type ConsoleView = "dashboard" | "setup" | "music" | "platforms" | "songs" | "prompt-ledger" | "alerts" | "artist-mind" | "settings" | "recovery";
+
+const consoleViews: Array<{ id: ConsoleView; label: string }> = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "setup", label: "Setup" },
+  { id: "music", label: "Music / Suno" },
+  { id: "platforms", label: "Platforms" },
+  { id: "songs", label: "Songs" },
+  { id: "prompt-ledger", label: "Prompt Ledger" },
+  { id: "alerts", label: "Alerts" },
+  { id: "artist-mind", label: "Artist Mind" },
+  { id: "settings", label: "Settings" },
+  { id: "recovery", label: "Recovery" }
+];
+
 const apiBase = "/plugins/artist-runtime/api";
 
 async function apiGet<T>(path: string): Promise<T> {
@@ -199,7 +229,10 @@ export function App() {
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [detail, setDetail] = useState<SongDetail | null>(null);
   const [sunoStatus, setSunoStatus] = useState<SunoStatusResponse | null>(null);
+  const [artistMind, setArtistMind] = useState<ArtistMindResponse | null>(null);
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<ConsoleView>("dashboard");
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
   const [platformTests, setPlatformTests] = useState<Record<string, { testedAt: string; status: PlatformDetail }>>({});
   const [error, setError] = useState<string | null>(null);
@@ -208,11 +241,13 @@ export function App() {
   const refresh = async (preferredSongId?: string | null) => {
     try {
       setError(null);
-      const [nextStatus, nextSongs, nextConfig, nextSunoStatus] = await Promise.all([
+      const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries] = await Promise.all([
         apiGet<StatusResponse>("/status"),
         apiGet<SongSummary[]>("/songs"),
         apiGet<ConfigResponse>("/config"),
-        apiGet<SunoStatusResponse>("/suno/status")
+        apiGet<SunoStatusResponse>("/suno/status"),
+        apiGet<ArtistMindResponse>("/artist-mind"),
+        apiGet<AuditEntry[]>("/audit")
       ]);
       const nextSelectedSongId = preferredSongId
         ?? selectedSongId
@@ -226,6 +261,8 @@ export function App() {
         setStatus(nextStatus);
         setConfig(nextConfig);
         setSunoStatus(nextSunoStatus);
+        setArtistMind(nextArtistMind);
+        setAuditEntries(nextAuditEntries);
         setSongs(nextSongs);
         setDetail(nextDetail);
         setSelectedSongId(nextSelectedSongId);
@@ -355,6 +392,275 @@ export function App() {
     }
   };
 
+  const setupPanel = (
+    <article className="panel">
+      <div className="section-title">Setup Readiness</div>
+      <div className="list">
+        <div className="item">
+          <strong>{status?.setupReadiness.readyForAutopilot ? "ready for live autopilot" : "setup in progress"}</strong>
+          <div className="muted">{status ? `next: ${status.setupReadiness.nextRecommendedAction}` : "loading"}</div>
+        </div>
+        {status?.setupReadiness.checklist.map((item) => (
+          <div className={`item setup-${item.state}`} key={item.id}>
+            <div className="inline-actions">
+              <strong>{item.label}</strong>
+              <span className={`pill pill-${item.state}`}>{item.state}</span>
+            </div>
+            <div className="muted">{item.detail}</div>
+          </div>
+        )) ?? <div className="item muted">Loading setup state.</div>}
+      </div>
+    </article>
+  );
+
+  const distributionWorkerPanel = (
+    <article className="panel">
+      <div className="section-title">Distribution Worker</div>
+      <div className="list">
+        <div className="item">
+          <strong>{status?.distributionWorker.enabled ? "enabled" : "disabled"}</strong>
+          <div className="muted">{status?.distributionWorker.blockedReason ?? "distribution ready"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Enabled Platforms</div>
+          <div className="muted">{status?.distributionWorker.enabledPlatforms.join(" · ") || "none"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Daily Counters</div>
+          <div className="muted">posts {status?.distributionWorker.postsToday ?? 0} · replies {status?.distributionWorker.repliesToday ?? 0}</div>
+        </div>
+      </div>
+    </article>
+  );
+
+  const sunoPanel = (
+    <article className="panel">
+      <div className="section-title">Suno</div>
+      <div className="list">
+        <div className="item">
+          <strong>{sunoStatus?.worker.state ?? "-"}</strong>
+          <div className="muted">{sunoStatus?.worker.pendingAction ?? sunoStatus?.worker.hardStopReason ?? "No pending operator step."}</div>
+        </div>
+        <div className="inline-actions">
+          <button disabled={busy !== null} onClick={() => void runSunoAction("connect")}>Connect</button>
+          <button disabled={busy !== null} onClick={() => void runSunoAction("reconnect")}>Reconnect</button>
+          <button className="primary" disabled={busy !== null || !selectedSongId} onClick={() => void runSunoAction("generate")}>Generate Current Song</button>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Recent Runs</div>
+          <div className="muted">
+            {sunoStatus?.recentRuns.length
+              ? sunoStatus.recentRuns.slice(0, 5).map((run) => `${run.runId}:${run.status}`).join(" · ")
+              : "No Suno runs yet."}
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+
+  const configPanel = (
+    <article className="panel">
+      <div className="section-title">Settings</div>
+      {config && configDraft ? (
+        <div className="config-form">
+          <label className="toggle"><input type="checkbox" checked={configDraft.autopilotEnabled} onChange={(event) => setConfigDraft({ ...configDraft, autopilotEnabled: event.target.checked })} />Autopilot enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.dryRun} onChange={(event) => setConfigDraft({ ...configDraft, dryRun: event.target.checked })} />Dry-run safety</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => setConfigDraft({ ...configDraft, xEnabled: event.target.checked })} />X enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => setConfigDraft({ ...configDraft, instagramEnabled: event.target.checked })} />Instagram enabled</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => setConfigDraft({ ...configDraft, tiktokEnabled: event.target.checked })} />TikTok enabled</label>
+          <div className="muted">artist {config.artist.artistId} · workspace {config.artist.workspaceRoot}</div>
+          <div className="inline-actions">
+            <button className="primary" disabled={busy !== null} onClick={() => void saveConfig()}>Save Settings</button>
+            <button disabled={busy !== null} onClick={() => void refresh(selectedSongId)}>Refresh</button>
+          </div>
+        </div>
+      ) : <div className="item muted">Loading config.</div>}
+    </article>
+  );
+
+  const songsPanel = (
+    <article className="panel">
+      <div className="section-title">Songs</div>
+      <div className="list">
+        {songs.length > 0 ? songs.map((song) => (
+          <button className={`item item-button${selectedSongId === song.songId ? " is-selected" : ""}`} key={song.songId} disabled={busy !== null} onClick={() => void refresh(song.songId)}>
+            <span className="pill">{song.status}</span>
+            <strong>{song.title}</strong>
+            <div className="muted">{song.songId} · runs {song.runCount}{song.selectedTakeId ? ` · take ${song.selectedTakeId}` : ""}</div>
+          </button>
+        )) : <div className="item muted">No songs yet.</div>}
+      </div>
+    </article>
+  );
+
+  const platformsPanel = (
+    <article className="panel">
+      <div className="section-title">Platforms</div>
+      <div className="list">
+        {status ? Object.entries(status.platforms).map(([platform, value]) => (
+          <div className="item" key={platform}>
+            <div className="inline-actions">
+              <strong>{platform}</strong>
+              <div className="inline-actions">
+                <button disabled={busy !== null} onClick={() => void testPlatform(platform as "x" | "instagram" | "tiktok")}>Test</button>
+                <button disabled={busy !== null} onClick={() => void togglePlatform(platform as "x" | "instagram" | "tiktok", !platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok"))}>
+                  {platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok") ? "Disable" : "Enable"}
+                </button>
+              </div>
+            </div>
+            <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
+            <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
+            {platformTests[platform] ? (
+              <div className="muted">tested {platformTests[platform].testedAt} · {platformTests[platform].status.reason ?? "ok"}</div>
+            ) : null}
+          </div>
+        )) : <div className="item muted">Loading platforms.</div>}
+      </div>
+    </article>
+  );
+
+  const alertsPanel = (
+    <article className="panel">
+      <div className="section-title">Alerts</div>
+      <div className="list">
+        {status?.alerts.length ? status.alerts.map((alert) => (
+          <div className={`item alert-${alert.severity}`} key={alert.id}>
+            <strong>{alert.message}</strong>
+            <div className="muted">{alert.source}{alert.ackedAt ? " · acknowledged" : ""}</div>
+            {!alert.ackedAt ? <div className="inline-actions"><button disabled={busy !== null} onClick={() => void acknowledge(alert.id)}>Acknowledge</button></div> : null}
+          </div>
+        )) : <div className="item muted">No active alerts.</div>}
+      </div>
+    </article>
+  );
+
+  const currentSongPanel = (
+    <article className="panel">
+      <div className="section-title">Current Song</div>
+      {detail ? (
+        <div className="list">
+          <div className="item">
+            <strong>{detail.song.title}</strong>
+            <div className="muted">{detail.song.songId} · {detail.song.status}</div>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Brief</div>
+            <div className="muted">{excerpt(detail.brief)}</div>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Prompt Ledger</div>
+            <strong>{detail.promptLedger.length} entries</strong>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Suno Runs</div>
+            <strong>{detail.sunoRuns.length}</strong>
+            <div className="muted">{detail.sunoRuns.slice(0, 3).map((run) => `${run.runId}:${run.status}`).join(" · ") || "none"}</div>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Latest Prompt Pack</div>
+            <strong>{detail.latestPromptPack ? `v${detail.latestPromptPack.version}` : "none"}</strong>
+            <div className="muted">take selections {detail.takeSelections.length}</div>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Selected Take</div>
+            <strong>{detail.selectedTake?.selectedTakeId ?? "none"}</strong>
+            <div className="muted">{detail.takeHistory?.slice(0, 3).map((take) => `${take.selectedTakeId} · ${take.reason}`).join(" · ") || "no take history"}</div>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Social Assets</div>
+            <strong>{detail.socialAssets?.length ?? 0}</strong>
+            <div className="muted">{detail.socialAssets?.map((asset) => `${asset.platform}:${asset.postType}`).join(" · ") || "none yet"}</div>
+          </div>
+          <div className="item">
+            <div className="eyebrow">Last Social Action</div>
+            <strong>{detail.lastSocialAction ? `${detail.lastSocialAction.platform}:${detail.lastSocialAction.action}` : "none"}</strong>
+            <div className="muted">{detail.lastSocialAction?.url ?? (detail.lastSocialAction?.accepted ? "accepted without URL" : "no publish yet")}</div>
+          </div>
+        </div>
+      ) : <div className="item muted">No current song.</div>}
+    </article>
+  );
+
+  const promptLedgerPanel = (
+    <article className="panel">
+      <div className="section-title">Prompt Ledger</div>
+      <div className="list">
+        {detail?.promptLedger.length ? detail.promptLedger.slice().reverse().slice(0, 12).map((entry, index) => {
+          const record = entry as { stage?: string; timestamp?: string; outputSummary?: string; runId?: string; artistReason?: string };
+          return (
+            <div className="item" key={`${record.timestamp ?? "entry"}-${index}`}>
+              <strong>{record.stage ?? "unknown_stage"}</strong>
+              <div className="muted">{record.timestamp ?? "no timestamp"}{record.runId ? ` · ${record.runId}` : ""}</div>
+              <div className="muted">{record.outputSummary ?? record.artistReason ?? "No summary."}</div>
+            </div>
+          );
+        }) : <div className="item muted">No prompt ledger entries for the selected song.</div>}
+      </div>
+    </article>
+  );
+
+  const auditPanel = (
+    <article className="panel">
+      <div className="section-title">Audit Log</div>
+      <div className="list">
+        {auditEntries.length ? auditEntries.slice(0, 12).map((entry, index) => (
+          <div className="item" key={`${entry.timestamp}-${index}`}>
+            <strong>{entry.eventType ?? "audit_event"}</strong>
+            <div className="muted">{entry.timestamp} · {entry.songId ?? "global"} · {entry.actor ?? "system"}</div>
+            <div className="muted">{entry.details ? JSON.stringify(entry.details) : "No extra details."}</div>
+          </div>
+        )) : <div className="item muted">No audit entries yet.</div>}
+      </div>
+    </article>
+  );
+
+  const artistMindPanel = (
+    <article className="panel">
+      <div className="section-title">Artist Mind</div>
+      <div className="list">
+        <div className="item">
+          <div className="eyebrow">ARTIST.md</div>
+          <pre className="mind-block">{artistMind?.artist.trim() || "No artist constitution loaded."}</pre>
+        </div>
+        <div className="item">
+          <div className="eyebrow">CURRENT_STATE.md</div>
+          <pre className="mind-block">{artistMind?.currentState.trim() || "No current state yet."}</pre>
+        </div>
+        <div className="item">
+          <div className="eyebrow">SOCIAL_VOICE.md</div>
+          <pre className="mind-block">{artistMind?.socialVoice.trim() || "No social voice file yet."}</pre>
+        </div>
+        <div className="item">
+          <div className="eyebrow">SONGBOOK.md</div>
+          <pre className="mind-block">{artistMind?.songbook.trim() || "No songbook yet."}</pre>
+        </div>
+      </div>
+    </article>
+  );
+
+  const recoveryPanel = (
+    <article className="panel">
+      <div className="section-title">Recovery</div>
+      <div className="list">
+        <div className="item">
+          <strong>{status?.autopilot.blockedReason ?? status?.autopilot.lastError ?? "No active block."}</strong>
+          <div className="muted">autopilot stage {status?.autopilot.stage ?? "-"}</div>
+        </div>
+        <div className="inline-actions">
+          <button disabled={busy !== null} onClick={() => void runAction("pause")}>Pause</button>
+          <button disabled={busy !== null} onClick={() => void runAction("resume")}>Resume</button>
+          <button disabled={busy !== null} onClick={() => void runSunoAction("connect")}>Suno Connect</button>
+          <button disabled={busy !== null} onClick={() => void runSunoAction("reconnect")}>Suno Reconnect</button>
+          <button className="primary" disabled={busy !== null} onClick={() => void runAction("run-cycle")}>Run Recovery Cycle</button>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Distribution Block</div>
+          <div className="muted">{status?.distributionWorker.blockedReason ?? "distribution ready"}</div>
+        </div>
+      </div>
+    </article>
+  );
+
   return (
     <main className="console-shell">
       <header className="hero">
@@ -401,184 +707,29 @@ export function App() {
         />
       </section>
 
-      <section className="two-column">
-        <article className="panel">
-          <div className="section-title">Setup Readiness</div>
-          <div className="list">
-            <div className="item">
-              <strong>{status?.setupReadiness.readyForAutopilot ? "ready for live autopilot" : "setup in progress"}</strong>
-              <div className="muted">{status ? `next: ${status.setupReadiness.nextRecommendedAction}` : "loading"}</div>
-            </div>
-            {status?.setupReadiness.checklist.map((item) => (
-              <div className={`item setup-${item.state}`} key={item.id}>
-                <div className="inline-actions">
-                  <strong>{item.label}</strong>
-                  <span className={`pill pill-${item.state}`}>{item.state}</span>
-                </div>
-                <div className="muted">{item.detail}</div>
-              </div>
-            )) ?? <div className="item muted">Loading setup state.</div>}
-          </div>
-        </article>
+      <nav className="view-tabs" aria-label="Producer Console pages">
+        {consoleViews.map((view) => (
+          <button
+            key={view.id}
+            className={`tab-button${activeView === view.id ? " is-active" : ""}`}
+            disabled={busy !== null && activeView !== view.id}
+            onClick={() => setActiveView(view.id)}
+          >
+            {view.label}
+          </button>
+        ))}
+      </nav>
 
-        <article className="panel">
-          <div className="section-title">Distribution Worker</div>
-          <div className="list">
-            <div className="item">
-              <strong>{status?.distributionWorker.enabled ? "enabled" : "disabled"}</strong>
-              <div className="muted">{status?.distributionWorker.blockedReason ?? "distribution ready"}</div>
-            </div>
-            <div className="item">
-              <div className="eyebrow">Enabled Platforms</div>
-              <div className="muted">{status?.distributionWorker.enabledPlatforms.join(" · ") || "none"}</div>
-            </div>
-            <div className="item">
-              <div className="eyebrow">Daily Counters</div>
-              <div className="muted">posts {status?.distributionWorker.postsToday ?? 0} · replies {status?.distributionWorker.repliesToday ?? 0}</div>
-            </div>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="section-title">Suno</div>
-          <div className="list">
-            <div className="item">
-              <strong>{sunoStatus?.worker.state ?? "-"}</strong>
-              <div className="muted">{sunoStatus?.worker.pendingAction ?? sunoStatus?.worker.hardStopReason ?? "No pending operator step."}</div>
-            </div>
-            <div className="inline-actions">
-              <button disabled={busy !== null} onClick={() => void runSunoAction("connect")}>Connect</button>
-              <button disabled={busy !== null} onClick={() => void runSunoAction("reconnect")}>Reconnect</button>
-              <button className="primary" disabled={busy !== null || !selectedSongId} onClick={() => void runSunoAction("generate")}>Generate Current Song</button>
-            </div>
-            <div className="item">
-              <div className="eyebrow">Recent Runs</div>
-              <div className="muted">
-                {sunoStatus?.recentRuns.length
-                  ? sunoStatus.recentRuns.slice(0, 3).map((run) => `${run.runId}:${run.status}`).join(" · ")
-                  : "No Suno runs yet."}
-              </div>
-            </div>
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="section-title">Config</div>
-          {config && configDraft ? (
-            <div className="config-form">
-              <label className="toggle"><input type="checkbox" checked={configDraft.autopilotEnabled} onChange={(event) => setConfigDraft({ ...configDraft, autopilotEnabled: event.target.checked })} />Autopilot enabled</label>
-              <label className="toggle"><input type="checkbox" checked={configDraft.dryRun} onChange={(event) => setConfigDraft({ ...configDraft, dryRun: event.target.checked })} />Dry-run safety</label>
-              <label className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => setConfigDraft({ ...configDraft, xEnabled: event.target.checked })} />X enabled</label>
-              <label className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => setConfigDraft({ ...configDraft, instagramEnabled: event.target.checked })} />Instagram enabled</label>
-              <label className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => setConfigDraft({ ...configDraft, tiktokEnabled: event.target.checked })} />TikTok enabled</label>
-              <div className="muted">artist {config.artist.artistId} · workspace {config.artist.workspaceRoot}</div>
-              <div className="inline-actions">
-                <button className="primary" disabled={busy !== null} onClick={() => void saveConfig()}>Save Config</button>
-                <button disabled={busy !== null} onClick={() => void refresh(selectedSongId)}>Refresh</button>
-              </div>
-            </div>
-          ) : <div className="item muted">Loading config.</div>}
-        </article>
-      </section>
-
-      <section className="two-column">
-        <article className="panel">
-          <div className="section-title">Songs</div>
-          <div className="list">
-            {songs.length > 0 ? songs.map((song) => (
-              <button className={`item item-button${selectedSongId === song.songId ? " is-selected" : ""}`} key={song.songId} disabled={busy !== null} onClick={() => void refresh(song.songId)}>
-                <span className="pill">{song.status}</span>
-                <strong>{song.title}</strong>
-                <div className="muted">{song.songId} · runs {song.runCount}{song.selectedTakeId ? ` · take ${song.selectedTakeId}` : ""}</div>
-              </button>
-            )) : <div className="item muted">No songs yet.</div>}
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="section-title">Platforms</div>
-          <div className="list">
-            {status ? Object.entries(status.platforms).map(([platform, value]) => (
-              <div className="item" key={platform}>
-                <div className="inline-actions">
-                  <strong>{platform}</strong>
-                  <div className="inline-actions">
-                    <button disabled={busy !== null} onClick={() => void testPlatform(platform as "x" | "instagram" | "tiktok")}>Test</button>
-                    <button disabled={busy !== null} onClick={() => void togglePlatform(platform as "x" | "instagram" | "tiktok", !platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok"))}>
-                      {platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok") ? "Disable" : "Enable"}
-                    </button>
-                  </div>
-                </div>
-                <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
-                <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
-                {platformTests[platform] ? (
-                  <div className="muted">tested {platformTests[platform].testedAt} · {platformTests[platform].status.reason ?? "ok"}</div>
-                ) : null}
-              </div>
-            )) : <div className="item muted">Loading platforms.</div>}
-          </div>
-        </article>
-      </section>
-
-      <section className="two-column">
-        <article className="panel">
-          <div className="section-title">Alerts</div>
-          <div className="list">
-            {status?.alerts.length ? status.alerts.map((alert) => (
-              <div className={`item alert-${alert.severity}`} key={alert.id}>
-                <strong>{alert.message}</strong>
-                <div className="muted">{alert.source}{alert.ackedAt ? " · acknowledged" : ""}</div>
-                {!alert.ackedAt ? <div className="inline-actions"><button disabled={busy !== null} onClick={() => void acknowledge(alert.id)}>Acknowledge</button></div> : null}
-              </div>
-            )) : <div className="item muted">No active alerts.</div>}
-          </div>
-        </article>
-
-        <article className="panel">
-          <div className="section-title">Current Song</div>
-          {detail ? (
-            <div className="list">
-              <div className="item">
-                <strong>{detail.song.title}</strong>
-                <div className="muted">{detail.song.songId} · {detail.song.status}</div>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Brief</div>
-                <div className="muted">{excerpt(detail.brief)}</div>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Prompt Ledger</div>
-                <strong>{detail.promptLedger.length} entries</strong>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Suno Runs</div>
-                <strong>{detail.sunoRuns.length}</strong>
-                <div className="muted">{detail.sunoRuns.slice(0, 3).map((run) => `${run.runId}:${run.status}`).join(" · ") || "none"}</div>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Latest Prompt Pack</div>
-                <strong>{detail.latestPromptPack ? `v${detail.latestPromptPack.version}` : "none"}</strong>
-                <div className="muted">take selections {detail.takeSelections.length}</div>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Selected Take</div>
-                <strong>{detail.selectedTake?.selectedTakeId ?? "none"}</strong>
-                <div className="muted">{detail.takeHistory?.slice(0, 3).map((take) => `${take.selectedTakeId} · ${take.reason}`).join(" · ") || "no take history"}</div>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Social Assets</div>
-                <strong>{detail.socialAssets?.length ?? 0}</strong>
-                <div className="muted">{detail.socialAssets?.map((asset) => `${asset.platform}:${asset.postType}`).join(" · ") || "none yet"}</div>
-              </div>
-              <div className="item">
-                <div className="eyebrow">Last Social Action</div>
-                <strong>{detail.lastSocialAction ? `${detail.lastSocialAction.platform}:${detail.lastSocialAction.action}` : "none"}</strong>
-                <div className="muted">{detail.lastSocialAction?.url ?? (detail.lastSocialAction?.accepted ? "accepted without URL" : "no publish yet")}</div>
-              </div>
-            </div>
-          ) : <div className="item muted">No current song.</div>}
-        </article>
-      </section>
+      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}</section> : null}
+      {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
+      {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}</section> : null}
+      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}</section> : null}
+      {activeView === "songs" ? <section className="two-column">{songsPanel}{currentSongPanel}</section> : null}
+      {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
+      {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}
+      {activeView === "artist-mind" ? <section className="single-column">{artistMindPanel}</section> : null}
+      {activeView === "settings" ? <section className="two-column">{configPanel}{setupPanel}</section> : null}
+      {activeView === "recovery" ? <section className="two-column">{recoveryPanel}{sunoPanel}{alertsPanel}</section> : null}
 
       <section className="panel debug-panel">
         <div className="section-title">Status Debug</div>

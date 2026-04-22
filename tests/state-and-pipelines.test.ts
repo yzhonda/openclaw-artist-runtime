@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildAlertsResponse, buildConfigResponse, buildPlatformDetailResponse, buildSongDetailResponse, buildSongLedgerResponse, buildSongsResponse, buildStatusResponse, buildSunoStatusResponse } from "../src/routes";
+import { buildAlertsResponse, buildArtistMindResponse, buildAuditLogResponse, buildConfigResponse, buildPlatformDetailResponse, buildSongDetailResponse, buildSongLedgerResponse, buildSongsResponse, buildStatusResponse, buildSunoStatusResponse } from "../src/routes";
 import { acknowledgeAlert } from "../src/services/alertAcks";
 import { createSongSkeleton } from "../src/repositories/songRepository";
 import { readSongState, updateSongState, writeSongBrief } from "../src/services/artistState";
@@ -198,6 +198,8 @@ describe("suno and social pipelines", () => {
 
     const socialLedger = await readFile(join(root, "songs", "song-001", "social", "social-publish.jsonl"), "utf8");
     const auditLog = await readFile(join(root, "songs", "song-001", "audit", "actions.jsonl"), "utf8");
+    const artistMind = await buildArtistMindResponse({ artist: { workspaceRoot: root } });
+    const audit = await buildAuditLogResponse({ artist: { workspaceRoot: root } });
 
     expect(social.result.accepted).toBe(false);
     expect(social.entry.policyDecision?.policyDecision).toBe("deny_dry_run");
@@ -211,6 +213,8 @@ describe("suno and social pipelines", () => {
     expect(status.distributionSummary.postsToday).toBeGreaterThanOrEqual(0);
     expect(status.distributionWorker.blockedReason).toContain("dry-run");
     expect(status.setupReadiness.checklist.find((item) => item.id === "run_dry_run_cycle")?.state).toBe("complete");
+    expect(artistMind.artist).toContain("ARTIST");
+    expect(audit[0]).toMatchObject({ eventType: "social_publish", songId: "song-001" });
   });
 
   it("runs autopilot one stage at a time and exposes route helpers", async () => {

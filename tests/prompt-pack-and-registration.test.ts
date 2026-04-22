@@ -6,7 +6,7 @@ import { createSunoPromptPack } from "../src/suno-production/generatePromptPack"
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
 import { validateSunoPromptPack } from "../src/validators/promptPackValidator";
 import { registerHooks } from "../src/hooks";
-import { buildConfigResponse, buildStatusResponse, producerConsoleHtml, registerRoutes, uiBuildIsFresh } from "../src/routes";
+import { buildArtistMindResponse, buildAuditLogResponse, buildConfigResponse, buildStatusResponse, producerConsoleHtml, registerRoutes, uiBuildIsFresh } from "../src/routes";
 import { registerServices } from "../src/services";
 import { registerTools } from "../src/tools";
 
@@ -141,6 +141,8 @@ describe("registration shells", () => {
     expect(registered.routes).toContain("/plugins/artist-runtime/api/status");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/run-cycle");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/config");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/artist-mind");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/audit");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/connect");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/disconnect");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/connect");
@@ -149,8 +151,12 @@ describe("registration shells", () => {
     expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/generate/:songId");
 
     const status = await buildStatusResponse();
+    const artistMind = await buildArtistMindResponse();
+    const audit = await buildAuditLogResponse();
     expect(status.dryRun).toBe(true);
     expect(status.platforms.x.authority).toBe("auto_publish");
+    expect(typeof artistMind.artist).toBe("string");
+    expect(Array.isArray(audit)).toBe(true);
     const consoleHtml = await producerConsoleHtml();
     expect(consoleHtml).toContain("Artist Runtime");
     expect(consoleHtml).toContain("Run Cycle");
