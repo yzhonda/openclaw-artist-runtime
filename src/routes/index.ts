@@ -9,7 +9,7 @@ import { BrowserWorkerSunoConnector } from "../connectors/suno/browserWorkerConn
 import { safeRegisterRoute } from "../pluginApi.js";
 import { acknowledgeAlert } from "../services/alertAcks.js";
 import { collectAlerts } from "../services/alerts.js";
-import { listSongStates, readSongState } from "../services/artistState.js";
+import { listSongStates, readArtistMind, readSongState } from "../services/artistState.js";
 import { ArtistAutopilotService, pauseAutopilot, readAutopilotRunState, resumeAutopilot } from "../services/autopilotService.js";
 import { mergeResolvedConfig, patchResolvedConfig, readResolvedConfig } from "../services/runtimeConfig.js";
 import { readLatestSocialAction } from "../services/socialPublishing.js";
@@ -57,6 +57,18 @@ async function readAllSocialActions(workspaceRoot: string): Promise<SocialPublis
   const songs = await listSongStates(workspaceRoot);
   const all = await Promise.all(
     songs.map((song) => readJsonlEntries<SocialPublishLedgerEntry>(join(workspaceRoot, "songs", song.songId, "social", "social-publish.jsonl")))
+  );
+  return all.flat().sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+}
+
+async function readAllAuditEvents(workspaceRoot: string) {
+  const songs = await listSongStates(workspaceRoot);
+  const all = await Promise.all(
+    songs.map((song) =>
+      readJsonlEntries<Record<string, unknown> & { timestamp: string }>(
+        join(workspaceRoot, "songs", song.songId, "audit", "actions.jsonl")
+      ).then((entries) => entries.map((entry) => ({ ...entry, songId: song.songId })))
+    )
   );
   return all.flat().sort((left, right) => right.timestamp.localeCompare(left.timestamp));
 }
@@ -314,6 +326,16 @@ export async function buildConfigResponse(config?: Partial<ArtistRuntimeConfig>)
   return readResolvedConfig(defaultArtistRuntimeConfig.artist.workspaceRoot);
 }
 
+export async function buildArtistMindResponse(config?: Partial<ArtistRuntimeConfig>) {
+  const mergedConfig = applyConfigDefaults(config);
+  return readArtistMind(mergedConfig.artist.workspaceRoot);
+}
+
+export async function buildAuditLogResponse(config?: Partial<ArtistRuntimeConfig>) {
+  const mergedConfig = applyConfigDefaults(config);
+  return readAllAuditEvents(mergedConfig.artist.workspaceRoot);
+}
+
 export async function buildPlatformsResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = applyConfigDefaults(config);
   return buildPlatformStatuses(mergedConfig);
@@ -425,6 +447,18 @@ export function registerRoutes(api: unknown): void {
     method: "GET",
     path: "/plugins/artist-runtime/api/config",
     handler: async (input) => buildConfigResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: "GET",
+    path: "/plugins/artist-runtime/api/artist-mind",
+    handler: async (input) => buildArtistMindResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: "GET",
+    path: "/plugins/artist-runtime/api/audit",
+    handler: async (input) => buildAuditLogResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
   });
 
   safeRegisterRoute(api, {

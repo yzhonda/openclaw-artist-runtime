@@ -90,7 +90,8 @@ input[type="checkbox"] {
 }
 
 .card-grid,
-.two-column {
+.two-column,
+.single-column {
   display: grid;
   gap: 16px;
 }
@@ -103,6 +104,28 @@ input[type="checkbox"] {
 .two-column {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   margin-bottom: 16px;
+}
+
+.single-column {
+  grid-template-columns: minmax(0, 1fr);
+  margin-bottom: 16px;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.tab-button {
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.tab-button.is-active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #fff;
+  border-color: transparent;
 }
 
 .panel {
@@ -234,6 +257,14 @@ input[type="checkbox"] {
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid var(--line);
   padding: 12px;
+}
+
+.mind-block {
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: 0.95rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ink);
 }
 
 @media (max-width: 720px) {
