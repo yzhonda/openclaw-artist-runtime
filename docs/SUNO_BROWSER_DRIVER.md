@@ -140,20 +140,24 @@ If no new song URLs appear before timeout, the driver returns
 ## Round 41 import and audio download
 
 After a successful Round 40 live create, the driver can now revisit the returned
-`/song/<uuid>` URLs, extract the mp3 asset URL from the page payload, and save
+`/song/<uuid>` URLs, extract the audio asset URL from the page payload, and save
 the downloaded files under:
 
 ```txt
-runtime/suno/<runId>/<trackId>.mp3
+runtime/suno/<runId>/<trackId>.<mp3|m4a>
 ```
 
 Import stays fail-closed:
 
 - `urls=[]` returns `playwright_import_no_urls`
+- direct `audio[src*=".mp3"]` is preferred, then `audio[src*=".m4a"]`, then the
+  page payload script as fallback
 - per-song failures are accumulated into `reason`
-- at least one saved mp3 is required for `accepted: true`
+- at least one saved audio file is required for `accepted: true`
 - partial success keeps the successful paths and reports the failed URLs in
   `reason`
+- lightweight metadata (`title`, `durationSec`, `format`) is returned alongside
+  saved paths and mirrored into `/api/status`
 
 ## Credit budget
 

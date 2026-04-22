@@ -403,6 +403,9 @@ export class SunoBrowserWorker {
         lastImportOutcome: {
           runId,
           urlCount: 0,
+          pathCount: 0,
+          paths: [],
+          metadata: [],
           reason: blockedResult.reason,
           at: now(),
           dryRun
@@ -429,6 +432,9 @@ export class SunoBrowserWorker {
         lastImportOutcome: {
           runId,
           urlCount: 0,
+          pathCount: 0,
+          paths: [],
+          metadata: [],
           reason: "dry-run blocks Suno import",
           at: now(),
           dryRun: true
@@ -455,6 +461,9 @@ export class SunoBrowserWorker {
         lastImportOutcome: {
           runId,
           urlCount: 0,
+          pathCount: 0,
+          paths: [],
+          metadata: [],
           reason: "suno_browser_driver_missing_import",
           at: now(),
           dryRun
@@ -480,6 +489,9 @@ export class SunoBrowserWorker {
       lastImportOutcome: {
         runId: result.runId ?? runId,
         urlCount: result.urls.length,
+        pathCount: result.paths?.length ?? 0,
+        paths: result.paths,
+        metadata: result.metadata,
         reason: result.reason,
         at: result.importedAt ?? now(),
         dryRun: result.dryRun

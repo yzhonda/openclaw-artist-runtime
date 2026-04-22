@@ -1,6 +1,13 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { SunoCreateRequest, SunoCreateResult, SunoImportRequest, SunoImportResult, SunoSubmitMode } from "../types.js";
+import type {
+  SunoCreateRequest,
+  SunoCreateResult,
+  SunoImportRequest,
+  SunoImportResult,
+  SunoImportedAssetMetadata,
+  SunoSubmitMode
+} from "../types.js";
 import type { SunoBrowserDriver, SunoBrowserDriverProbe } from "./sunoBrowserWorker.js";
 import type { BrowserContext, Page } from "playwright";
 
@@ -208,6 +215,7 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
 
       const successfulUrls: string[] = [];
       const savedPaths: string[] = [];
+      const metadata: SunoImportedAssetMetadata[] = [];
       const failures: string[] = [];
 
       for (const songUrl of request.urls) {
@@ -231,10 +239,17 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
           }
 
           const buffer = Buffer.from(await response.arrayBuffer());
-          const outputPath = join(outputDir, `${asset.trackId}.mp3`);
+          const outputPath = join(outputDir, `${asset.trackId}.${asset.format}`);
           await writeFile(outputPath, buffer);
           successfulUrls.push(songUrl);
           savedPaths.push(outputPath);
+          metadata.push({
+            url: songUrl,
+            path: outputPath,
+            title: asset.title,
+            durationSec: asset.durationSec,
+            format: asset.format
+          });
         } catch (error) {
           failures.push(`${songUrl}: ${this.errorMessage(error)}`);
         }
@@ -245,6 +260,7 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
         runId: request.runId,
         urls: successfulUrls,
         paths: savedPaths,
+        metadata,
         reason: failures.length > 0 ? failures.join("; ") : "imported",
         dryRun: false
       };
@@ -391,27 +407,72 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
   private async extractSongAudio(
     page: Page,
     sourceUrl: string
-  ): Promise<{ trackId: string; audioUrl: string } | undefined> {
+  ): Promise<{
+    trackId: string;
+    audioUrl: string;
+    format: "mp3" | "m4a";
+    title?: string;
+    durationSec?: number;
+  } | undefined> {
     return page.evaluate((currentSongUrl) => {
+      const title = document.querySelector("h1")?.textContent?.trim() || document.title || undefined;
+      const audioTags = Array.from(document.querySelectorAll("audio")) as HTMLAudioElement[];
+      const normalize = (audioUrl: string | undefined) => {
+        if (!audioUrl || audioUrl.includes("sil-100.mp3")) {
+          return undefined;
+        }
+
+        const songMatch = currentSongUrl.match(/\/song\/([^/?#]+)/);
+        const audioMatch = audioUrl.match(/\/([^/?#]+)\.(mp3|m4a)(?:\?|$)/);
+        const trackId = songMatch?.[1] ?? audioMatch?.[1];
+        const format = audioMatch?.[2] as "mp3" | "m4a" | undefined;
+        if (!trackId || !format) {
+          return undefined;
+        }
+
+        const matchingAudio = audioTags.find((element) => (element.currentSrc || element.src) === audioUrl);
+        const rawDuration = matchingAudio?.duration;
+        const durationSec = typeof rawDuration === "number" && Number.isFinite(rawDuration) && rawDuration > 0
+          ? Math.round(rawDuration)
+          : undefined;
+        return { trackId, audioUrl, format, title, durationSec };
+      };
+
+      const directMp3 = normalize(
+        audioTags
+          .map((element) => element.currentSrc || element.src)
+          .find((src) => src.includes(".mp3") && !src.includes("sil-100.mp3"))
+      );
+      if (directMp3) {
+        return directMp3;
+      }
+
+      const directM4a = normalize(
+        audioTags
+          .map((element) => element.currentSrc || element.src)
+          .find((src) => src.includes(".m4a"))
+      );
+      if (directM4a) {
+        return directM4a;
+      }
+
       const scriptTexts = Array.from(document.scripts)
         .map((script) => script.textContent ?? "")
         .filter(Boolean);
-      const matches = scriptTexts.flatMap((text) => Array.from(text.matchAll(/https:\/\/cdn1\.suno\.ai\/[^"'\\\s]+\.mp3(?:\?[^"'\\\s]*)?/g)).map((match) => match[0]))
-        .filter((url) => !url.includes("sil-100.mp3"));
-
-      const audioUrl = matches[0];
-      if (!audioUrl) {
-        return undefined;
+      const scriptMp3 = normalize(
+        scriptTexts
+          .flatMap((text) => Array.from(text.matchAll(/https:\/\/cdn1\.suno\.ai\/[^"'\\\s]+\.mp3(?:\?[^"'\\\s]*)?/g)).map((match) => match[0]))
+          .find((url) => !url.includes("sil-100.mp3"))
+      );
+      if (scriptMp3) {
+        return scriptMp3;
       }
 
-      const songMatch = currentSongUrl.match(/\/song\/([^/?#]+)/);
-      const audioMatch = audioUrl.match(/\/([^/?#]+)\.mp3(?:\?|$)/);
-      const trackId = songMatch?.[1] ?? audioMatch?.[1];
-      if (!trackId) {
-        return undefined;
-      }
-
-      return { trackId, audioUrl };
+      return normalize(
+        scriptTexts
+          .flatMap((text) => Array.from(text.matchAll(/https:\/\/cdn1\.suno\.ai\/[^"'\\\s]+\.m4a(?:\?[^"'\\\s]*)?/g)).map((match) => match[0]))
+          [0]
+      );
     }, sourceUrl);
   }
 
