@@ -2,20 +2,9 @@ type SunoOutcome = {
   runId: string;
   accepted?: boolean;
   urlCount?: number;
-  pathCount?: number;
-  paths?: string[];
-  metadata?: ImportedAsset[];
   reason?: string;
   at: string;
   dryRun?: boolean;
-};
-
-export type ImportedAsset = {
-  url: string;
-  path: string;
-  format: "mp3" | "m4a";
-  title?: string;
-  durationSec?: number;
 };
 
 export type SunoOutcomeCardProps = {
@@ -28,40 +17,6 @@ export type SunoOutcomeCardProps = {
   lastCreateOutcome?: SunoOutcome;
   lastImportOutcome?: SunoOutcome;
 };
-
-export function buildImportedAssetRows(outcome?: SunoOutcome): ImportedAsset[] {
-  if (!outcome) {
-    return [];
-  }
-
-  if (outcome.metadata?.length) {
-    return outcome.metadata;
-  }
-
-  return (outcome.paths ?? []).map((path, index) => ({
-    url: outcome.runId,
-    path,
-    format: path.toLowerCase().endsWith(".m4a") ? "m4a" : "mp3",
-    title: `Imported asset ${index + 1}`
-  }));
-}
-
-export function importedAssetsPlaceholder(outcome?: SunoOutcome): string | null {
-  return buildImportedAssetRows(outcome).length === 0 ? "No imported assets yet." : null;
-}
-
-function formatDuration(durationSec?: number): string | null {
-  if (typeof durationSec !== "number" || !Number.isFinite(durationSec) || durationSec < 0) {
-    return null;
-  }
-  const minutes = Math.floor(durationSec / 60);
-  const seconds = Math.floor(durationSec % 60).toString().padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-
-function assetHref(path: string): string {
-  return path.startsWith("/") ? `file://${path}` : path;
-}
 
 function formatOutcome(
   label: string,
@@ -90,8 +45,6 @@ function formatOutcome(
 export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const createOutcome = formatOutcome("Last Create", props.lastCreateOutcome);
   const importOutcome = formatOutcome("Last Import", props.lastImportOutcome);
-  const importedAssets = buildImportedAssetRows(props.lastImportOutcome);
-  const importedAssetsEmpty = importedAssetsPlaceholder(props.lastImportOutcome);
 
   return (
     <div className="list">
@@ -124,30 +77,6 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
         </div>
         <strong>{importOutcome.title}</strong>
         <div className="muted">{importOutcome.detail}</div>
-        <div className="muted">
-          {props.lastImportOutcome?.pathCount ?? importedAssets.length} files
-          {props.lastImportOutcome?.urlCount !== undefined ? ` · ${props.lastImportOutcome.urlCount} urls` : ""}
-        </div>
-      </div>
-      <div className="item">
-        <div className="eyebrow">Imported Assets</div>
-        {importedAssetsEmpty ? <div className="muted">{importedAssetsEmpty}</div> : null}
-        {importedAssets.length > 0 ? (
-          <div className="asset-list">
-            {importedAssets.map((asset) => (
-              <div className="asset-row" key={`${asset.path}-${asset.url}`}>
-                <a className="asset-link" href={assetHref(asset.path)} target="_blank" rel="noreferrer">
-                  {asset.title ?? asset.path.split("/").at(-1) ?? asset.path}
-                </a>
-                <div className="muted">
-                  {asset.format}
-                  {formatDuration(asset.durationSec) ? ` · ${formatDuration(asset.durationSec)}` : ""}
-                  {asset.path ? ` · ${asset.path}` : ""}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
     </div>
   );

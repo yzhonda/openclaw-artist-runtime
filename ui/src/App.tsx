@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import "./styles.css";
 import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
-import { SunoOutcomeCard, type ImportedAsset } from "./SunoOutcomeCard";
+import { SunoOutcomeCard } from "./SunoOutcomeCard";
 import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes } from "../../src/types";
 
 type StatusResponse = {
@@ -35,25 +35,6 @@ type StatusResponse = {
     state: string;
     hardStopReason?: string;
     pendingAction?: string;
-    currentRunId?: string;
-    lastImportedRunId?: string;
-    lastCreateOutcome?: {
-      runId: string;
-      accepted: boolean;
-      reason: string;
-      at: string;
-      dryRun?: boolean;
-    };
-    lastImportOutcome?: {
-      runId: string;
-      urlCount: number;
-      pathCount?: number;
-      paths?: string[];
-      metadata?: ImportedAsset[];
-      reason?: string;
-      at: string;
-      dryRun?: boolean;
-    };
   };
   distributionWorker: {
     enabled: boolean;
@@ -101,12 +82,6 @@ type StatusResponse = {
     title: string;
     status: string;
     runCount: number;
-  };
-  lastSunoRun?: {
-    runId: string;
-    songId: string;
-    status: string;
-    urls: string[];
   };
   lastSocialAction?: {
     platform: string;
@@ -209,9 +184,6 @@ type SunoStatusResponse = {
   lastImportOutcome?: {
     runId: string;
     urlCount: number;
-    pathCount?: number;
-    paths?: string[];
-    metadata?: ImportedAsset[];
     reason?: string;
     at: string;
     dryRun?: boolean;
@@ -357,13 +329,6 @@ function platformLiveGoArmed(draft: ConfigDraft | null, platform: "x" | "instagr
     default:
       return draft.xLiveGoArmed;
   }
-}
-
-function currentImportedAssets(status: StatusResponse | null, sunoStatus: SunoStatusResponse | null): ImportedAsset[] {
-  return sunoStatus?.lastImportOutcome?.metadata
-    ?? sunoStatus?.worker.lastImportOutcome?.metadata
-    ?? status?.sunoWorker.lastImportOutcome?.metadata
-    ?? [];
 }
 
 function formatProbeReason(reason?: string): string {
@@ -938,18 +903,6 @@ export function App() {
             <div className="eyebrow">Suno Runs</div>
             <strong>{detail.sunoRuns.length}</strong>
             <div className="muted">{detail.sunoRuns.slice(0, 3).map((run) => `${run.runId}:${run.status}`).join(" · ") || "none"}</div>
-          </div>
-          <div className="item">
-            <div className="eyebrow">Imported Assets</div>
-            <strong>{currentImportedAssets(status, sunoStatus).length}</strong>
-            <div className="muted">
-              {status?.recentSong?.songId ?? detail.song.songId} · last run {status?.lastSunoRun?.runId ?? "none"}
-            </div>
-            <div className="muted">
-              {currentImportedAssets(status, sunoStatus).length
-                ? currentImportedAssets(status, sunoStatus).slice(0, 3).map((asset) => `${asset.title ?? asset.path.split("/").at(-1) ?? asset.path}:${asset.format}`).join(" · ")
-                : "No imported assets yet"}
-            </div>
           </div>
           <div className="item">
             <div className="eyebrow">Latest Prompt Pack</div>
