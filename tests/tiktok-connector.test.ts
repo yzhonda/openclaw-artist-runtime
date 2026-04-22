@@ -7,7 +7,7 @@ describe("TikTokConnector", () => {
     vi.unstubAllGlobals();
   });
 
-  it("reports not connected when auth env is missing", async () => {
+  it("reports account_not_created when auth env is missing", async () => {
     vi.stubEnv("OPENCLAW_TIKTOK_AUTH", "");
     vi.stubEnv("OPENCLAW_TIKTOK_ACCESS_TOKEN", "");
     vi.stubGlobal("fetch", vi.fn());
@@ -15,20 +15,20 @@ describe("TikTokConnector", () => {
     const connector = new TikTokConnector();
     await expect(connector.checkConnection()).resolves.toEqual({
       connected: false,
-      reason: "tiktok_auth_not_configured"
+      reason: "account_not_created"
     });
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it("reports connected when auth env is configured", async () => {
+  it("stays account_not_created even when auth env is configured", async () => {
     vi.stubEnv("OPENCLAW_TIKTOK_ACCESS_TOKEN", "configured-token");
     vi.stubEnv("OPENCLAW_TIKTOK_AUTH", "");
     vi.stubGlobal("fetch", vi.fn());
 
     const connector = new TikTokConnector();
     await expect(connector.checkConnection()).resolves.toEqual({
-      connected: true,
-      accountLabel: "configured_via_env"
+      connected: false,
+      reason: "account_not_created"
     });
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

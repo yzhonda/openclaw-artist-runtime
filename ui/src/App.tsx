@@ -62,6 +62,9 @@ type StatusResponse = {
   platforms: Record<string, {
     connected: boolean;
     authority: string;
+    accountLabel?: string;
+    reason?: string;
+    capabilitySummary?: Record<string, boolean | "unknown">;
     liveGoArmed?: boolean;
     effectiveDryRun?: boolean;
     postsToday?: number;
@@ -139,6 +142,8 @@ type PlatformDetail = {
   accountLabel?: string;
   reason?: string;
   capabilitySummary?: Record<string, boolean | "unknown">;
+  liveGoArmed?: boolean;
+  effectiveDryRun?: boolean;
 };
 
 type SunoStatusResponse = {
@@ -326,6 +331,65 @@ function platformLiveGoArmed(draft: ConfigDraft | null, platform: "x" | "instagr
   }
 }
 
+function formatProbeReason(reason?: string): string {
+  if (!reason) {
+    return "ready";
+  }
+  return reason.replace(/_/g, " ");
+}
+
+function platformProbeBadge(
+  platform: "x" | "instagram" | "tiktok",
+  detail: PlatformDetail
+): { label: string; className: string } {
+  if (platform === "tiktok") {
+    return {
+      label: "account not created",
+      className: "badge-frozen"
+    };
+  }
+
+  if (detail.connected) {
+    return {
+      label: "connected",
+      className: "badge-ok"
+    };
+  }
+
+  if (detail.reason === "instagram_auth_not_configured") {
+    return {
+      label: "auth missing",
+      className: "badge-warning"
+    };
+  }
+
+  if (detail.reason === "bird_cli_not_installed") {
+    return {
+      label: "bird missing",
+      className: "badge-warning"
+    };
+  }
+
+  if (detail.reason === "bird_auth_expired") {
+    return {
+      label: "auth expired",
+      className: "badge-warning"
+    };
+  }
+
+  if (detail.reason) {
+    return {
+      label: formatProbeReason(detail.reason),
+      className: "badge-warning"
+    };
+  }
+
+  return {
+    label: "offline",
+    className: "badge-warning"
+  };
+}
+
 export function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [config, setConfig] = useState<ConfigResponse | null>(null);
@@ -481,6 +545,9 @@ export function App() {
   const globalArmHeld = Boolean(configDraft && !configDraft.distributionLiveGoArmed);
 
   const testPlatform = async (platform: "x" | "instagram" | "tiktok") => {
+    if (platform === "tiktok") {
+      return;
+    }
     setBusy(`platform:${platform}`);
     try {
       const result = await apiPost<{ testedAt: string; status: PlatformDetail }>(`/platforms/${platform}/test`);
@@ -765,25 +832,37 @@ export function App() {
     <article className="panel">
       <div className="section-title">Platforms</div>
       <div className="list">
-        {status ? Object.entries(status.platforms).map(([platform, value]) => (
-          <div className="item" key={platform}>
-            <div className="inline-actions">
-              <strong>{platform}</strong>
+        {status ? Object.entries(status.platforms).map(([platform, value]) => {
+          const platformKey = platform as "x" | "instagram" | "tiktok";
+          const isTikTok = platformKey === "tiktok";
+          const probeResult = platformTests[platform]?.status ?? value;
+          const probeBadge = platformProbeBadge(platformKey, probeResult);
+          const testedAt = platformTests[platform]?.testedAt;
+          return (
+            <div className={`item${isTikTok ? " platform-frozen-card" : ""}`} key={platform}>
               <div className="inline-actions">
-                <button disabled={busy !== null} onClick={() => void testPlatform(platform as "x" | "instagram" | "tiktok")}>Test</button>
-                <button disabled={busy !== null} onClick={() => void togglePlatform(platform as "x" | "instagram" | "tiktok", !platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok"))}>
-                  {platformEnabled(configDraft, platform as "x" | "instagram" | "tiktok") ? "Disable" : "Enable"}
-                </button>
+                <strong>{platform}</strong>
+                <div className="inline-actions">
+                  <span className={`badge ${probeBadge.className}`}>{probeBadge.label}</span>
+                  {isTikTok ? (
+                    <button disabled title="アカウント未作成 / 凍結中">凍結中 / アカウント未作成</button>
+                  ) : (
+                    <button disabled={busy !== null} onClick={() => void testPlatform(platformKey)}>Probe 再走</button>
+                  )}
+                  <button disabled={busy !== null} onClick={() => void togglePlatform(platformKey, !platformEnabled(configDraft, platformKey))}>
+                    {platformEnabled(configDraft, platformKey) ? "Disable" : "Enable"}
+                  </button>
+                </div>
+              </div>
+              <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
+              <div className="muted">arm {platformLiveGoArmed(configDraft, platformKey) ? "armed" : "off"} · {value.effectiveDryRun ? "effective dry-run" : "live lane open"}</div>
+              <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
+              <div className="muted">
+                {testedAt ? `tested ${testedAt} · ${formatProbeReason(probeResult.reason)}` : `probe ${formatProbeReason(probeResult.reason)}`}
               </div>
             </div>
-            <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
-            <div className="muted">arm {platformLiveGoArmed(configDraft, platform as "x" | "instagram" | "tiktok") ? "armed" : "off"} · {value.effectiveDryRun ? "effective dry-run" : "live lane open"}</div>
-            <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
-            {platformTests[platform] ? (
-              <div className="muted">tested {platformTests[platform].testedAt} · {platformTests[platform].status.reason ?? "ok"}</div>
-            ) : null}
-          </div>
-        )) : <div className="item muted">Loading platforms.</div>}
+          );
+        }) : <div className="item muted">Loading platforms.</div>}
       </div>
     </article>
   );

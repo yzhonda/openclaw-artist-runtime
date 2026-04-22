@@ -63,11 +63,10 @@ Detailed setup and refresh steps live in `docs/CONNECTOR_AUTH.md`.
 
 ### TikTok
 
-- Current dry-run skeleton checks for one of:
-  - `OPENCLAW_TIKTOK_AUTH`
-  - `OPENCLAW_TIKTOK_ACCESS_TOKEN`
-- If neither variable is present, the connector reports
-  `tiktok_auth_not_configured`.
+- TikTok is currently frozen at the connector boundary while the operator
+  account is not created.
+- `/api/platforms/tiktok/test` reports `account_not_created` regardless of
+  local env state, and the Producer Console keeps the probe control disabled.
 - Publish/reply remain fail-closed until an official API adapter is implemented.
 
 ## Hard stops

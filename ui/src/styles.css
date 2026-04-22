@@ -307,6 +307,22 @@ textarea {
   border: 1px solid rgba(86, 95, 106, 0.2);
 }
 
+.badge-ok {
+  background: rgba(29, 106, 69, 0.12);
+  color: #1d6a45;
+  border: 1px solid rgba(29, 106, 69, 0.2);
+}
+
+.badge-warning {
+  background: rgba(159, 79, 45, 0.12);
+  color: var(--accent-dark);
+  border: 1px solid rgba(159, 79, 45, 0.2);
+}
+
+.platform-frozen-card button:disabled {
+  cursor: not-allowed;
+}
+
 .pill-complete {
   background: #dfeee3;
   color: #1d6a45;
