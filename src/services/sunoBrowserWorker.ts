@@ -1,6 +1,14 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { SunoLoginHandoff, SunoWorkerState, SunoWorkerStatus } from "../types.js";
+import type {
+  SunoCreateRequest,
+  SunoCreateResult,
+  SunoImportRequest,
+  SunoImportResult,
+  SunoLoginHandoff,
+  SunoWorkerState,
+  SunoWorkerStatus
+} from "../types.js";
 
 type SunoWorkerProbeState = Extract<
   SunoWorkerState,
@@ -14,12 +22,19 @@ export interface SunoBrowserDriverProbe {
 
 export interface SunoBrowserDriver {
   probe(): Promise<SunoBrowserDriverProbe>;
+  create?(request: SunoCreateRequest): Promise<SunoCreateResult>;
+  importResults?(request: SunoImportRequest): Promise<SunoImportResult>;
   stop?(): Promise<void>;
 }
 
 interface StartOptions {
   driver?: SunoBrowserDriver;
   requestedAction?: "operator_login_required" | "reconnect_requested";
+}
+
+interface WorkerAutomationOptions {
+  driver?: SunoBrowserDriver;
+  dryRun?: boolean;
 }
 
 function now(): string {
@@ -241,5 +256,138 @@ export class SunoBrowserWorker {
 
   async status(): Promise<SunoWorkerStatus> {
     return this.readState();
+  }
+
+  async startCreate(request: SunoCreateRequest, options: WorkerAutomationOptions = {}): Promise<SunoCreateResult> {
+    const current = await this.readState();
+    const dryRun = options.dryRun ?? request.dryRun;
+    const runId = request.runId ?? `worker_${Date.now().toString(36)}`;
+
+    if (!dryRun && current.state !== "connected") {
+      return {
+        accepted: false,
+        runId,
+        reason: "suno_worker_not_connected",
+        urls: []
+      };
+    }
+
+    await this.transition({
+      state: "generating",
+      connected: true,
+      pendingAction: "suno_create",
+      currentRunId: runId,
+      hardStopReason: undefined
+    });
+
+    if (dryRun) {
+      await this.transition({
+        state: "connected",
+        connected: true,
+        pendingAction: undefined,
+        currentRunId: runId
+      });
+      return {
+        accepted: false,
+        runId,
+        reason: "dry-run blocks Suno create",
+        urls: [],
+        dryRun: true
+      };
+    }
+
+    if (!options.driver?.create) {
+      await this.transition({
+        state: "connected",
+        connected: true,
+        pendingAction: undefined,
+        currentRunId: runId,
+        hardStopReason: "Suno browser driver create() is not configured."
+      });
+      return {
+        accepted: false,
+        runId,
+        reason: "suno_browser_driver_missing_create",
+        urls: []
+      };
+    }
+
+    const result = await options.driver.create({ ...request, dryRun, runId });
+    await this.transition({
+      state: result.accepted ? "generating" : "connected",
+      connected: true,
+      pendingAction: result.accepted ? "waiting_for_results" : undefined,
+      currentRunId: result.runId,
+      hardStopReason: result.accepted ? undefined : result.reason
+    });
+    return result;
+  }
+
+  async importRun(runId: string, options: WorkerAutomationOptions = {}): Promise<SunoImportResult> {
+    const current = await this.readState();
+    const dryRun = options.dryRun ?? false;
+
+    if (!dryRun && current.state !== "connected" && current.state !== "generating") {
+      return {
+        runId,
+        urls: [],
+        reason: "suno_worker_not_ready_for_import"
+      };
+    }
+
+    await this.transition({
+      state: "importing",
+      connected: true,
+      pendingAction: "suno_import_results",
+      currentRunId: runId,
+      hardStopReason: undefined
+    });
+
+    if (dryRun) {
+      await this.transition({
+        state: "connected",
+        connected: true,
+        pendingAction: undefined,
+        currentRunId: runId,
+        lastImportedRunId: runId
+      });
+      return {
+        runId,
+        urls: [],
+        importedAt: now(),
+        reason: "dry-run blocks Suno import",
+        dryRun: true
+      };
+    }
+
+    if (!options.driver?.importResults) {
+      await this.transition({
+        state: "connected",
+        connected: true,
+        pendingAction: undefined,
+        currentRunId: runId,
+        hardStopReason: "Suno browser driver importResults() is not configured."
+      });
+      return {
+        runId,
+        urls: [],
+        reason: "suno_browser_driver_missing_import"
+      };
+    }
+
+    const result = await options.driver.importResults({ runId });
+    await this.transition({
+      state: "connected",
+      connected: true,
+      pendingAction: undefined,
+      currentRunId: result.runId ?? runId,
+      lastImportedRunId: result.runId ?? runId,
+      hardStopReason: undefined
+    });
+    return {
+      ...result,
+      runId: result.runId ?? runId,
+      importedAt: result.importedAt ?? now()
+    };
   }
 }
