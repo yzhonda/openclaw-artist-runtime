@@ -20,6 +20,7 @@
 - Added Round 45 per-platform `distribution.platforms.{x,instagram,tiktok}.liveGoArmed` flags so each social lane now needs both the global arm and its own platform arm before upstream dry-run can release.
 - Added Round 46 Producer Console live-go toggles for the global arm plus X / Instagram platform arms, while keeping TikTok visibly frozen in the UI.
 - Added Round 47 Producer Console probe badges plus rerun controls for X / Instagram, while keeping TikTok visually frozen and probe-disabled.
+- Added Round 48 Producer Console imported-asset surfacing for the latest Suno import, showing read-only links plus static metadata without introducing playback UI.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
