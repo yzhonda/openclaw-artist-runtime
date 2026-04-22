@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import type { SunoCreateRequest, SunoCreateResult, SunoImportRequest, SunoImportResult } from "../types.js";
+import type { SunoCreateRequest, SunoCreateResult, SunoImportRequest, SunoImportResult, SunoSubmitMode } from "../types.js";
 import type { SunoBrowserDriver, SunoBrowserDriverProbe } from "./sunoBrowserWorker.js";
 import type { BrowserContext, Page } from "playwright";
 
@@ -9,6 +9,8 @@ export const PLAYWRIGHT_DRIVER_NOT_INSTALLED_DETAIL =
   "playwright module not installed — run `npm install` in project root";
 export const PLAYWRIGHT_DRIVER_LOGIN_REQUIRED_DETAIL =
   "Suno login required in persistent profile — run `scripts/openclaw-suno-login.sh` and complete operator login";
+export const PLAYWRIGHT_CREATE_SKIPPED_REASON = "submit_skipped";
+export const PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON = "submit_live_not_enabled_round_39";
 
 /**
  * Round 38 adds probe automation.
@@ -16,7 +18,10 @@ export const PLAYWRIGHT_DRIVER_LOGIN_REQUIRED_DETAIL =
  * flow. Each step still requires explicit GO.
  */
 export class PlaywrightSunoDriver implements SunoBrowserDriver {
-  constructor(readonly profilePath: string) {}
+  constructor(
+    readonly profilePath: string,
+    readonly submitMode: SunoSubmitMode = "skip"
+  ) {}
 
   async probe(): Promise<SunoBrowserDriverProbe> {
     let context: BrowserContext | undefined;
@@ -77,13 +82,64 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
   }
 
   async create(request: SunoCreateRequest): Promise<SunoCreateResult> {
-    return {
-      accepted: false,
-      runId: request.runId ?? "playwright-driver-stub",
-      reason: "playwright_driver_skeleton_only",
-      urls: [],
-      dryRun: request.dryRun
-    };
+    let context: BrowserContext | undefined;
+    const runId = request.runId ?? `playwright_${Date.now().toString(36)}`;
+
+    try {
+      const { chromium } = await import("playwright-extra");
+      const stealth = (await import("puppeteer-extra-plugin-stealth")).default;
+      chromium.use(stealth());
+      await mkdir(this.profilePath, { recursive: true });
+      context = await chromium.launchPersistentContext(this.profilePath, {
+        headless: false,
+        channel: "chrome",
+        args: ["--disable-blink-features=AutomationControlled"],
+        ignoreDefaultArgs: ["--enable-automation"]
+      });
+
+      const page = context.pages()[0] ?? await context.newPage();
+      await page.goto(SUNO_CREATE_URL, {
+        waitUntil: "domcontentloaded",
+        timeout: 20_000
+      });
+      await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+
+      const payload = request.payload ?? {};
+      const lyrics = this.readPayloadText(payload.lyrics);
+      const style = this.readPayloadText(payload.styleAndFeel);
+      const exclude = this.readPayloadText(payload.excludeStyles);
+      const instrumental = Boolean(payload.instrumental);
+
+      await this.fillCreateForm(page, { lyrics, style, exclude, instrumental });
+
+      return {
+        accepted: false,
+        runId,
+        reason: this.submitMode === "live" ? PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON : PLAYWRIGHT_CREATE_SKIPPED_REASON,
+        urls: [],
+        dryRun: request.dryRun
+      };
+    } catch (error) {
+      if (this.isModuleNotInstalled(error)) {
+        return {
+          accepted: false,
+          runId,
+          reason: PLAYWRIGHT_DRIVER_NOT_INSTALLED_DETAIL,
+          urls: [],
+          dryRun: request.dryRun
+        };
+      }
+
+      return {
+        accepted: false,
+        runId,
+        reason: `playwright_create_failed: ${this.errorMessage(error)}`,
+        urls: [],
+        dryRun: request.dryRun
+      };
+    } finally {
+      await context?.close().catch(() => undefined);
+    }
   }
 
   async importResults(request: SunoImportRequest): Promise<SunoImportResult> {
@@ -133,6 +189,55 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
     }
 
     return false;
+  }
+
+  private readPayloadText(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() ? value : undefined;
+  }
+
+  private async fillCreateForm(
+    page: Page,
+    input: {
+      lyrics?: string;
+      style?: string;
+      exclude?: string;
+      instrumental: boolean;
+    }
+  ): Promise<void> {
+    if (input.lyrics) {
+      await this.ensureLyricsMode(page);
+      await page.locator("textarea[data-testid=\"lyrics-textarea\"]").fill(input.lyrics);
+    }
+
+    if (input.style) {
+      await this.styleLocator(page).fill(input.style);
+    }
+
+    if (input.exclude) {
+      await page.locator("input[placeholder=\"Exclude styles\"]").fill(input.exclude);
+    }
+
+    if (input.instrumental) {
+      const button = page.locator("button[aria-label=\"Check this to generate an instrumental only song\"]");
+      const pressed = await button.getAttribute("aria-pressed").catch(() => null);
+      if (pressed !== "true") {
+        await button.click();
+      }
+    }
+  }
+
+  private async ensureLyricsMode(page: Page): Promise<void> {
+    const textarea = page.locator("textarea[data-testid=\"lyrics-textarea\"]");
+    if (await textarea.count().catch(() => 0)) {
+      return;
+    }
+    await page.locator("button[aria-label=\"Add your own lyrics\"]").click();
+  }
+
+  private styleLocator(page: Page) {
+    return page.locator(
+      "textarea[placeholder=\"Describe the sound you want\"], textarea[placeholder*=\"クラシック音楽\"], textarea[placeholder*=\"バイキングメタル\"], textarea[placeholder*=\"sound you want\"]"
+    ).first();
   }
 
   private isModuleNotInstalled(error: unknown): boolean {

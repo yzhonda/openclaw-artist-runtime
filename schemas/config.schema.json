@@ -101,6 +101,15 @@
               "default": "mock",
               "description": "Suno browser driver selection. 'mock' keeps dry-run-safe skeleton behavior. 'playwright' is reserved for operator machines that install playwright separately."
             },
+            "submitMode": {
+              "type": "string",
+              "enum": [
+                "skip",
+                "live"
+              ],
+              "default": "skip",
+              "description": "Suno create submit mode. 'skip' fills the create form but never clicks Create, so credit consumption stays at zero. 'live' is reserved for a later round and is currently rejected at runtime."
+            },
             "authority": {
               "type": "string",
               "enum": [

@@ -7,6 +7,7 @@ import {
   sunoAuthorityModes,
   sunoConnectionModes,
   sunoDriverModes,
+  sunoSubmitModes,
   tiktokAuthorityModes,
   type ArtistRuntimeConfig,
   type ValidationResult,
@@ -166,6 +167,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
               "enabled",
               "connectionMode",
               "driver",
+              "submitMode",
               "authority",
               "monthlyGenerationBudget",
               "maxGenerationsPerDay",
@@ -185,6 +187,9 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
           }
           if ("driver" in config.music.suno) {
             validateEnum("config.music.suno.driver", config.music.suno.driver, sunoDriverModes, errors);
+          }
+          if ("submitMode" in config.music.suno) {
+            validateEnum("config.music.suno.submitMode", config.music.suno.submitMode, sunoSubmitModes, errors);
           }
           if ("authority" in config.music.suno) {
             validateEnum("config.music.suno.authority", config.music.suno.authority, sunoAuthorityModes, errors);

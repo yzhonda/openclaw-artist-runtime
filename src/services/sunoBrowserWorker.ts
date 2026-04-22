@@ -8,6 +8,7 @@ import type {
   SunoImportResult,
   SunoLoginHandoff,
   SunoDriverMode,
+  SunoSubmitMode,
   SunoWorkerState,
   SunoWorkerStatus
 } from "../types.js";
@@ -44,6 +45,7 @@ interface SunoBrowserWorkerOptions {
   config?: Partial<ArtistRuntimeConfig>;
   driverMode?: SunoDriverMode;
   profilePath?: string;
+  submitMode?: SunoSubmitMode;
 }
 
 function now(): string {
@@ -170,7 +172,10 @@ export class SunoBrowserWorker {
 
     const driverMode = this.options.driverMode ?? this.options.config?.music?.suno?.driver ?? "mock";
     if (driverMode === "playwright") {
-      return new PlaywrightSunoDriver(this.options.profilePath ?? DEFAULT_SUNO_PROFILE_PATH);
+      return new PlaywrightSunoDriver(
+        this.options.profilePath ?? DEFAULT_SUNO_PROFILE_PATH,
+        this.options.submitMode ?? this.options.config?.music?.suno?.submitMode ?? "skip"
+      );
     }
 
     return undefined;

@@ -5,10 +5,11 @@ lane.
 
 ## Status
 
-Round 38 adds real Playwright probe support plus a manual first-login helper.
-The driver can now open Chromium against the dedicated Suno profile and detect
-whether the session is already logged in. Create/import remain stubbed, so
-credit consumption stays at zero.
+Round 39 keeps the real Playwright probe plus manual first-login helper, and
+adds create-form autofill without submission. The driver can now open Chromium
+against the dedicated Suno profile, detect whether the session is already
+logged in, and populate the `/create` form. It still does not click `Create`,
+so credit consumption stays at zero.
 
 ## Prerequisites
 
@@ -92,6 +93,22 @@ Default remains:
 }
 ```
 
+To control create behavior separately:
+
+```json
+{
+  "music": {
+    "suno": {
+      "submitMode": "skip"
+    }
+  }
+}
+```
+
+`submitMode: "skip"` is the default and fills the Suno form without clicking
+`Create`. `submitMode: "live"` is reserved for a later round and is currently
+rejected at runtime.
+
 ## Dry-run vs live
 
 `autopilot.dryRun` and `music.suno.driver` are separate controls:
@@ -99,14 +116,28 @@ Default remains:
 - `driver: "mock"` + `dryRun: true` keeps the current fully stubbed lane
 - `driver: "playwright"` + `dryRun: true` is the current probe-only / no-credit
   lane
+- `driver: "playwright"` + `submitMode: "skip"` fills lyrics/style/instrumental
+  fields on `/create` but still never clicks the `Create` button
 - `driver: "playwright"` + `dryRun: false` remains out of scope until later
   rounds add explicit GO and budget guards
+
+## Round 39 form-fill only
+
+The current create lane performs the following and then stops:
+
+1. opens `https://suno.com/create` in the dedicated persistent profile;
+2. fills lyrics, style, exclude styles, and the instrumental toggle when the
+   payload includes them;
+3. closes the context and returns `submit_skipped`.
+
+Even if `music.suno.submitMode` is set to `live`, Round 39 still returns
+`submit_live_not_enabled_round_39` and does not press the `Create` button.
 
 ## Credit budget
 
 Real Suno generation is still blocked in this round, so credit consumption stays
 zero. Budget control for live browser automation is planned before real create
-flow is enabled.
+submission is enabled.
 
 ## Rollback
 
