@@ -39,6 +39,9 @@ type StatusResponse = {
   distributionWorker: {
     enabled: boolean;
     dryRun: boolean;
+    liveGoArmed: boolean;
+    platformLiveGoArmed: Record<string, boolean>;
+    effectiveDryRun: Record<string, boolean>;
     lastSongId?: string;
     enabledPlatforms: string[];
     blockedReason?: string;
@@ -59,6 +62,8 @@ type StatusResponse = {
   platforms: Record<string, {
     connected: boolean;
     authority: string;
+    liveGoArmed?: boolean;
+    effectiveDryRun?: boolean;
     postsToday?: number;
     repliesToday?: number;
   }>;
@@ -96,10 +101,11 @@ type ConfigResponse = {
     cycleIntervalMinutes: number;
   };
   distribution: {
+    liveGoArmed: boolean;
     platforms: {
-      x: { enabled: boolean; authority: string };
-      instagram: { enabled: boolean; authority: string };
-      tiktok: { enabled: boolean; authority: string };
+      x: { enabled: boolean; liveGoArmed: boolean; authority: string };
+      instagram: { enabled: boolean; liveGoArmed: boolean; authority: string };
+      tiktok: { enabled: boolean; liveGoArmed: boolean; authority: string };
     };
   };
 };
@@ -305,6 +311,21 @@ function platformEnabled(draft: ConfigDraft | null, platform: "x" | "instagram" 
   }
 }
 
+function platformLiveGoArmed(draft: ConfigDraft | null, platform: "x" | "instagram" | "tiktok"): boolean {
+  if (!draft) {
+    return false;
+  }
+  switch (platform) {
+    case "instagram":
+      return draft.instagramLiveGoArmed;
+    case "tiktok":
+      return draft.tiktokLiveGoArmed;
+    case "x":
+    default:
+      return draft.xLiveGoArmed;
+  }
+}
+
 export function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [config, setConfig] = useState<ConfigResponse | null>(null);
@@ -457,6 +478,7 @@ export function App() {
   };
 
   const configValidationError = configDraft ? validateConfigDraft(configDraft) : null;
+  const globalArmHeld = Boolean(configDraft && !configDraft.distributionLiveGoArmed);
 
   const testPlatform = async (platform: "x" | "instagram" | "tiktok") => {
     setBusy(`platform:${platform}`);
@@ -562,6 +584,15 @@ export function App() {
           <div className="eyebrow">Daily Counters</div>
           <div className="muted">posts {status?.distributionWorker.postsToday ?? 0} · replies {status?.distributionWorker.repliesToday ?? 0}</div>
         </div>
+        <div className="item">
+          <div className="eyebrow">Live-Go Arms</div>
+          <div className="muted">global {status?.distributionWorker.liveGoArmed ? "armed" : "off"}</div>
+          <div className="muted">
+            x {status?.distributionWorker.platformLiveGoArmed?.x ? "armed" : "off"} ·
+            ig {status?.distributionWorker.platformLiveGoArmed?.instagram ? "armed" : "off"} ·
+            tt {status?.distributionWorker.platformLiveGoArmed?.tiktok ? "armed" : "off"}
+          </div>
+        </div>
       </div>
     </article>
   );
@@ -647,6 +678,8 @@ export function App() {
         <div className="config-form">
           <label className="toggle"><input type="checkbox" checked={configDraft.autopilotEnabled} onChange={(event) => updateConfigDraft({ autopilotEnabled: event.target.checked })} />Autopilot enabled</label>
           <label className="toggle"><input type="checkbox" checked={configDraft.dryRun} onChange={(event) => updateConfigDraft({ dryRun: event.target.checked })} />Dry-run safety</label>
+          <label className="toggle"><input type="checkbox" checked={configDraft.distributionLiveGoArmed} onChange={(event) => updateConfigDraft({ distributionLiveGoArmed: event.target.checked })} />Live-Go Arm (global)</label>
+          {globalArmHeld ? <div className="warning-banner">Global live-go arm is OFF. Every platform arm stays held upstream even if its own toggle is on.</div> : null}
           {!configDraft.dryRun ? <div className="warning-banner">Dry-run is OFF. The runtime stays fail-closed, but this arm can permit live side effects if the connectors are ready.</div> : null}
           <div className="field-grid">
             <label>
@@ -659,26 +692,46 @@ export function App() {
             </label>
           </div>
           <div className="field-grid">
-            <label className="platform-config">
+            <label className={`platform-config${globalArmHeld ? " is-held" : ""}`}>
               <div className="toggle"><input type="checkbox" checked={configDraft.xEnabled} onChange={(event) => updateConfigDraft({ xEnabled: event.target.checked })} />X enabled</div>
+              <div className="toggle toggle-arm-row">
+                <input type="checkbox" checked={configDraft.xLiveGoArmed} onChange={(event) => updateConfigDraft({ xLiveGoArmed: event.target.checked })} />
+                X live-go arm
+                {globalArmHeld ? <span className="badge badge-held">held by global</span> : null}
+                {status?.platforms.x?.effectiveDryRun ? <span className="badge badge-dry-run">effective dry-run</span> : null}
+              </div>
               <div className="eyebrow">X Authority</div>
               <select value={configDraft.xAuthority} onChange={(event) => updateConfigDraft({ xAuthority: event.target.value as ConfigDraft["xAuthority"] })}>
                 {xAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
               </select>
             </label>
-            <label className="platform-config">
+            <label className={`platform-config${globalArmHeld ? " is-held" : ""}`}>
               <div className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => updateConfigDraft({ instagramEnabled: event.target.checked })} />Instagram enabled</div>
+              <div className="toggle toggle-arm-row">
+                <input type="checkbox" checked={configDraft.instagramLiveGoArmed} onChange={(event) => updateConfigDraft({ instagramLiveGoArmed: event.target.checked })} />
+                Instagram live-go arm
+                {globalArmHeld ? <span className="badge badge-held">held by global</span> : null}
+                {status?.platforms.instagram?.effectiveDryRun ? <span className="badge badge-dry-run">effective dry-run</span> : null}
+              </div>
               <div className="eyebrow">Instagram Authority</div>
               <select value={configDraft.instagramAuthority} onChange={(event) => updateConfigDraft({ instagramAuthority: event.target.value as ConfigDraft["instagramAuthority"] })}>
                 {instagramAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
               </select>
             </label>
-            <label className="platform-config">
+            <label className="platform-config is-frozen" title="アカウント未作成 / 凍結中">
               <div className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => updateConfigDraft({ tiktokEnabled: event.target.checked })} />TikTok enabled</div>
+              <div className="toggle toggle-arm-row" title="アカウント未作成 / 凍結中">
+                <input type="checkbox" checked={configDraft.tiktokLiveGoArmed} disabled readOnly />
+                TikTok live-go arm
+                <span className="badge badge-frozen">frozen</span>
+                {globalArmHeld ? <span className="badge badge-held">held by global</span> : null}
+                {status?.platforms.tiktok?.effectiveDryRun ? <span className="badge badge-dry-run">effective dry-run</span> : null}
+              </div>
               <div className="eyebrow">TikTok Authority</div>
               <select value={configDraft.tiktokAuthority} onChange={(event) => updateConfigDraft({ tiktokAuthority: event.target.value as ConfigDraft["tiktokAuthority"] })}>
                 {tiktokAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
               </select>
+              <div className="muted platform-note">TikTok stays frozen until the operator account exists. The arm toggle is visible for status only.</div>
             </label>
           </div>
           <div className="muted">artist {config.artist.artistId} · workspace {config.artist.workspaceRoot}</div>
@@ -724,6 +777,7 @@ export function App() {
               </div>
             </div>
             <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
+            <div className="muted">arm {platformLiveGoArmed(configDraft, platform as "x" | "instagram" | "tiktok") ? "armed" : "off"} · {value.effectiveDryRun ? "effective dry-run" : "live lane open"}</div>
             <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
             {platformTests[platform] ? (
               <div className="muted">tested {platformTests[platform].testedAt} · {platformTests[platform].status.reason ?? "ok"}</div>

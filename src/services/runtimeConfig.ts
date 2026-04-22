@@ -8,6 +8,22 @@ function configOverridePath(root: string): string {
   return join(root, "runtime", "config-overrides.json");
 }
 
+function enforceFrozenPlatformBoundaries(config: ArtistRuntimeConfig): ArtistRuntimeConfig {
+  return {
+    ...config,
+    distribution: {
+      ...config.distribution,
+      platforms: {
+        ...config.distribution.platforms,
+        tiktok: {
+          ...config.distribution.platforms.tiktok,
+          liveGoArmed: false
+        }
+      }
+    }
+  };
+}
+
 export async function readConfigOverrides(root: string): Promise<Partial<ArtistRuntimeConfig>> {
   const contents = await readFile(configOverridePath(root), "utf8").catch(() => "");
   if (!contents) {
@@ -17,7 +33,7 @@ export async function readConfigOverrides(root: string): Promise<Partial<ArtistR
 }
 
 export async function readResolvedConfig(root: string): Promise<ArtistRuntimeConfig> {
-  return applyConfigDefaults(await readConfigOverrides(root));
+  return enforceFrozenPlatformBoundaries(applyConfigDefaults(await readConfigOverrides(root)));
 }
 
 export async function resolveRuntimeConfig(
@@ -30,7 +46,7 @@ export async function resolveRuntimeConfig(
 }
 
 export function mergeResolvedConfig(current: ArtistRuntimeConfig, patch: Partial<ArtistRuntimeConfig>): ArtistRuntimeConfig {
-  return applyConfigDefaults({
+  return enforceFrozenPlatformBoundaries(applyConfigDefaults({
     ...current,
     ...patch,
     artist: { ...current.artist, ...patch.artist },
@@ -50,11 +66,11 @@ export function mergeResolvedConfig(current: ArtistRuntimeConfig, patch: Partial
       }
     },
     safety: { ...current.safety, ...patch.safety }
-  });
+  }));
 }
 
 export async function writeConfigOverrides(root: string, config: ArtistRuntimeConfig): Promise<ArtistRuntimeConfig> {
-  const validation = validateConfig(config);
+  const validation = validateConfig(enforceFrozenPlatformBoundaries(config));
   if (!validation.ok || !validation.value) {
     throw new Error(`invalid config: ${validation.errors.join("; ")}`);
   }

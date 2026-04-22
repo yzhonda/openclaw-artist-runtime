@@ -121,6 +121,8 @@ The config editor source now owns both:
 
 - enable/disable toggles for each social platform
 - authority-mode payload shaping for `distribution.platforms.{x,instagram,tiktok}.authority`
+- global + per-platform live-go arm payload shaping, with TikTok forced back to
+  `liveGoArmed: false` in the frozen UI lane
 - the Suno browser-driver selector payload path under `music.suno.driver`
 
 ### API route catalog
@@ -181,7 +183,12 @@ workaround.
 - `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
+  This suite now also locks the Round 46 TikTok freeze boundary: even if
+  `/api/config/update` receives `distribution.platforms.tiktok.liveGoArmed=true`,
+  the persisted resolved config is sanitized back to `false`.
 - `tests/config-editor-payload.test.ts`
+  This suite now covers global/per-platform live-go draft shaping and the
+  frozen TikTok arm in the bundled UI payload builder.
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
 - `tests/suno-playwright-create.test.ts`
@@ -255,6 +262,7 @@ That UI source now explicitly includes:
 
 - `ui/src/SunoOutcomeCard.tsx` for the compact Suno status/outcome block
 - `ui/src/configEditor.ts` authority-aware config draft / payload shaping
+  plus the Round 46 global/per-platform live-go arm controls
 - bundled + fallback parity for Suno dry-run badges and authority selectors
 
 Also keep the repo-local verification scripts because they are the documented safe-install and safe-smoke path for this plugin:

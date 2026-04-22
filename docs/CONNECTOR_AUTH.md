@@ -26,6 +26,8 @@ Use it together with:
   hold can release. Arming only the global flag still keeps every platform on
   dry-run. Arming only one platform while the global flag is off still keeps
   that platform on dry-run.
+- Producer Console now exposes both arm levels directly. TikTok's arm checkbox
+  is intentionally greyed out and frozen until the operator account exists.
 - Arming either or both flags does **not** enable real publishing by itself.
   Each connector still fails closed at its own edge until that platform's live
   lane is explicitly opened.
@@ -123,6 +125,8 @@ Use it together with:
   is reached.
 - Non-dry-run publish attempts are rejected with `requires_explicit_live_go`
   even when auth is configured. Live posting remains outside the current lane.
+- Producer Console splits the arm into global + Instagram-specific toggles, so
+  operators can pre-arm Instagram without lifting X or TikTok.
 
 ## TikTok
 
@@ -148,3 +152,5 @@ Use it together with:
   real adapter is introduced.
 - The upstream social pipeline also requires both the global arm and the TikTok
   platform arm to be `true` before it will even attempt to leave dry-run.
+- Producer Console keeps the TikTok arm visible but frozen, reflecting the
+  current account-not-created boundary rather than a ready live lane.

@@ -151,4 +151,50 @@ describe("config/update behaviour", () => {
     expect(updated.autopilot.songsPerWeek).toBe(6);
     expect(updated.autopilot.cycleIntervalMinutes).toBe(15);
   });
+
+  it("config/update route persists global and platform live-go arms but keeps TikTok frozen", async () => {
+    const root = makeWorkspace();
+
+    const registered = new Map<string, (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void>();
+    registerRoutes({
+      registerHttpRoute(definition: { path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void }) {
+        registered.set(definition.path, definition.handler);
+      }
+    });
+
+    const handler = registered.get("/plugins/artist-runtime/api/config/update");
+    expect(handler).toBeTruthy();
+
+    const response = createMockResponse();
+    await handler?.(
+      createMockRequest(
+        "POST",
+        "/plugins/artist-runtime/api/config/update",
+        JSON.stringify({
+          config: { artist: { workspaceRoot: root } },
+          patch: {
+            distribution: {
+              liveGoArmed: true,
+              platforms: {
+                x: { liveGoArmed: true },
+                instagram: { liveGoArmed: true },
+                tiktok: { liveGoArmed: true }
+              }
+            }
+          }
+        }),
+        { "content-type": "application/json" }
+      ),
+      response.res
+    );
+
+    expect(response.readStatus()).toBe(200);
+    expect(response.readHeader("content-type")).toContain("application/json");
+
+    const updated = JSON.parse(response.readBody()) as Awaited<ReturnType<typeof readResolvedConfig>>;
+    expect(updated.distribution.liveGoArmed).toBe(true);
+    expect(updated.distribution.platforms.x.liveGoArmed).toBe(true);
+    expect(updated.distribution.platforms.instagram.liveGoArmed).toBe(true);
+    expect(updated.distribution.platforms.tiktok.liveGoArmed).toBe(false);
+  });
 });

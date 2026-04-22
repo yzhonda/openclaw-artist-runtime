@@ -43,6 +43,16 @@ describe("config schema", () => {
     expect(result.errors[0]).toContain("not allowed");
   });
 
+  it("rejects non-boolean global live-go flags", () => {
+    const result = validateConfig({
+      distribution: {
+        liveGoArmed: "yes"
+      }
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain("config.distribution.liveGoArmed must be a boolean");
+  });
+
   it("applies defaults to partial config", () => {
     const merged = applyConfigDefaults({ autopilot: { enabled: true } });
     expect(merged.autopilot.enabled).toBe(true);
