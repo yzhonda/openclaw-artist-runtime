@@ -133,6 +133,34 @@ describe("PlaywrightSunoDriver importResults", () => {
     expect(writeFileMock).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps mp3 format when the extracted asset points at an mp3 download", async () => {
+    const { context } = createContext([
+      {
+        trackId: "song-boundary-mp3",
+        audioUrl: "https://cdn1.suno.ai/song-boundary-mp3.mp3",
+        format: "mp3",
+        title: "Boundary MP3"
+      }
+    ]);
+    launchPersistentContextMock.mockResolvedValue(context);
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(new Response(new Uint8Array([9, 9, 9]), { status: 200 }));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "live", "/tmp/workspace");
+
+    const result = await driver.importResults({
+      runId: "run-import-boundary-mp3",
+      urls: ["https://suno.com/song/song-boundary-mp3"]
+    });
+
+    expect(result.paths).toEqual([
+      "/tmp/workspace/runtime/suno/run-import-boundary-mp3/song-boundary-mp3.mp3"
+    ]);
+    expect(result.metadata?.[0]).toMatchObject({
+      format: "mp3",
+      path: "/tmp/workspace/runtime/suno/run-import-boundary-mp3/song-boundary-mp3.mp3"
+    });
+  });
+
   it("returns accepted with a partial-failure reason when at least one download succeeds", async () => {
     const { context } = createContext([
       {
@@ -197,6 +225,69 @@ describe("PlaywrightSunoDriver importResults", () => {
       reason: "imported",
       dryRun: false
     });
+  });
+
+  it("keeps the m4a fallback path when the extracted asset already resolved to m4a", async () => {
+    const { context } = createContext([
+      {
+        trackId: "song-boundary-m4a",
+        audioUrl: "https://cdn1.suno.ai/song-boundary-m4a.m4a",
+        format: "m4a",
+        title: "Boundary M4A"
+      }
+    ]);
+    launchPersistentContextMock.mockResolvedValue(context);
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(new Response(new Uint8Array([6, 6, 6]), { status: 200 }));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "live", "/tmp/workspace");
+
+    const result = await driver.importResults({
+      runId: "run-import-boundary-m4a",
+      urls: ["https://suno.com/song/song-boundary-m4a"]
+    });
+
+    expect(result.paths).toEqual([
+      "/tmp/workspace/runtime/suno/run-import-boundary-m4a/song-boundary-m4a.m4a"
+    ]);
+    expect(result.metadata?.[0]).toMatchObject({
+      format: "m4a",
+      path: "/tmp/workspace/runtime/suno/run-import-boundary-m4a/song-boundary-m4a.m4a"
+    });
+  });
+
+  it("returns empty imported paths when extracted assets fail download with 404s", async () => {
+    const { context } = createContext([
+      {
+        trackId: "song-boundary-404-a",
+        audioUrl: "https://cdn1.suno.ai/song-boundary-404-a.mp3",
+        format: "mp3",
+        title: "Boundary 404 A"
+      },
+      {
+        trackId: "song-boundary-404-b",
+        audioUrl: "https://cdn1.suno.ai/song-boundary-404-b.m4a",
+        format: "m4a",
+        title: "Boundary 404 B"
+      }
+    ]);
+    launchPersistentContextMock.mockResolvedValue(context);
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(new Response("missing", { status: 404 }))
+      .mockResolvedValueOnce(new Response("missing", { status: 404 }));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "live", "/tmp/workspace");
+
+    const result = await driver.importResults({
+      runId: "run-import-boundary-404",
+      urls: [
+        "https://suno.com/song/song-boundary-404-a",
+        "https://suno.com/song/song-boundary-404-b"
+      ]
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.paths).toEqual([]);
+    expect(result.metadata).toEqual([]);
+    expect(result.reason).toContain("download failed with HTTP 404");
   });
 
   it("fails closed when no song URLs are provided", async () => {

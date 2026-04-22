@@ -163,6 +163,22 @@ Import stays fail-closed:
 - lightweight metadata (`title`, `durationSec`, `format`) is returned alongside
   saved paths and mirrored into `/api/status`
 
+Round 49 now locks the cheap boundary cases in mock-only tests:
+
+- extracted `.mp3` assets stay `.mp3` on disk and in metadata
+- extracted `.m4a` fallback assets stay `.m4a` on disk and in metadata
+- 404 downloads fail closed with empty imported paths and a recorded reason
+
+## Imported assets in Producer Console
+
+- Producer Console now mirrors the latest imported Suno asset evidence from
+  `lastImportOutcome.paths` and `lastImportOutcome.metadata`.
+- Imported assets are shown as read-only links plus static metadata (`title`,
+  `durationSec`, `format`, `path`). There is no inline player, playback widget,
+  or metadata editor in this lane.
+- If no imported files have been recorded yet, the Console keeps the explicit
+  placeholder `No imported assets yet.`
+
 ## Credit budget
 
 `submitMode: "skip"` still consumes zero credits. `submitMode: "live"` now

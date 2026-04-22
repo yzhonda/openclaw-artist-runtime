@@ -116,6 +116,8 @@ The Console source now includes:
 - platform probe badges plus rerun controls for X / Instagram
 - ticker and recent X dry-run status
 - Suno lifecycle plus create/import outcome cards rendered from `/api/suno/status`
+- imported asset summaries mirrored from the latest Suno import outcome, with
+  read-only links and static metadata only
 - the same Suno/status markers mirrored in the fallback inline Console shell
 
 The config editor source now owns both:
@@ -202,6 +204,13 @@ workaround.
   This suite now fixes the two-stage live polling contract: `/create` card
   success, `/me` fallback success, and full timeout.
 - `tests/suno-playwright-import.test.ts`
+  This suite now locks the cheap import-format boundaries too: extracted
+  `.mp3` stays `.mp3`, extracted `.m4a` stays `.m4a`, and 404 downloads fail
+  closed with empty imported paths.
+- `tests/suno-imported-assets-surface.test.ts`
+  This suite fixes the Round 48 UI/status seam: imported Suno asset metadata is
+  mirrored into `/api/status` and `/api/suno/status`, while the UI helper stays
+  on read-only links plus the explicit empty placeholder.
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
