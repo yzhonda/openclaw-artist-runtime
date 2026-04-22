@@ -45,7 +45,8 @@ function resolveSocialDryRun(config: ArtistRuntimeConfig, platform: SocialPlatfo
   return config.autopilot.dryRun
     || !config.distribution.enabled
     || !config.distribution.liveGoArmed
-    || !config.distribution.platforms[platform].enabled;
+    || !config.distribution.platforms[platform].enabled
+    || !config.distribution.platforms[platform].liveGoArmed;
 }
 
 function getSocialLedgerPath(root: string, songId: string): string {

@@ -71,6 +71,9 @@ Producer Console status surfaces. In practice that means:
 
 - `src/services/runtimeConfig.ts` owns the persisted-config resolver now used by
   read routes, mutating routes, and `/api/config/update`.
+- `src/services/socialPublishing.ts` now enforces a two-level social live arm:
+  `distribution.liveGoArmed` plus `distribution.platforms.{x,instagram,tiktok}.liveGoArmed`
+  must both be `true` before upstream dry-run can release.
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
 - `src/services/sunoPlaywrightDriver.ts` now owns the real Playwright-backed
@@ -173,6 +176,8 @@ workaround.
   at `requires_explicit_live_go`.
   Round 44 extends the same seam with `distribution.liveGoArmed=false`, fixing
   the global social live arm across X / Instagram / TikTok.
+  Round 45 adds the per-platform arm seam, proving that global + platform flags
+  must both be armed before upstream dry-run can release.
 - `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
@@ -189,6 +194,8 @@ workaround.
 - `tests/status-ticker.test.ts`
   This suite now also fixes the `/api/status` contract for imported Suno
   `paths[]` / `metadata[]` exposure.
+  It also locks the social status surface for `liveGoArmed`,
+  `platformLiveGoArmed`, and per-platform `effectiveDryRun`.
 - `tests/persisted-config-helper-routes.test.ts`
 - `tests/mutating-route-config-resolution.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
@@ -233,7 +240,7 @@ for distribution operators:
 
 `docs/CONNECTOR_AUTH.md` now also documents the Instagram Graph API skeleton
 route (`/me/accounts -> /media -> /media_publish`), the required scopes, the
-global `distribution.liveGoArmed` guard, and the fact that Round 42-44 still
+global + per-platform `liveGoArmed` guards, and the fact that Round 42-45 still
 block live posting with an upstream dry-run hold plus
 `requires_explicit_live_go` at the connector edge.
 

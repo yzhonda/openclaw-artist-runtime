@@ -302,9 +302,12 @@ function validateXPlatform(value: unknown, errors: string[]): void {
     errors.push("config.distribution.platforms.x must be an object");
     return;
   }
-  validateKnownKeys("config.distribution.platforms.x", value, ["enabled", "connector", "authority", "maxPostsPerDay", "maxRepliesPerDay", "autoPostTypes"], errors);
+  validateKnownKeys("config.distribution.platforms.x", value, ["enabled", "liveGoArmed", "connector", "authority", "maxPostsPerDay", "maxRepliesPerDay", "autoPostTypes"], errors);
   if ("enabled" in value && typeof value.enabled !== "boolean") {
     errors.push("config.distribution.platforms.x.enabled must be a boolean");
+  }
+  if ("liveGoArmed" in value && typeof value.liveGoArmed !== "boolean") {
+    errors.push("config.distribution.platforms.x.liveGoArmed must be a boolean");
   }
   if ("connector" in value && value.connector !== "bird") {
     errors.push("config.distribution.platforms.x.connector must be bird");
@@ -328,9 +331,12 @@ function validateInstagramPlatform(value: unknown, errors: string[]): void {
     errors.push("config.distribution.platforms.instagram must be an object");
     return;
   }
-  validateKnownKeys("config.distribution.platforms.instagram", value, ["enabled", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
+  validateKnownKeys("config.distribution.platforms.instagram", value, ["enabled", "liveGoArmed", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
   if ("enabled" in value && typeof value.enabled !== "boolean") {
     errors.push("config.distribution.platforms.instagram.enabled must be a boolean");
+  }
+  if ("liveGoArmed" in value && typeof value.liveGoArmed !== "boolean") {
+    errors.push("config.distribution.platforms.instagram.liveGoArmed must be a boolean");
   }
   if ("connector" in value && value.connector !== "instagram_content_publishing") {
     errors.push("config.distribution.platforms.instagram.connector must be instagram_content_publishing");
@@ -351,9 +357,12 @@ function validateTikTokPlatform(value: unknown, errors: string[]): void {
     errors.push("config.distribution.platforms.tiktok must be an object");
     return;
   }
-  validateKnownKeys("config.distribution.platforms.tiktok", value, ["enabled", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
+  validateKnownKeys("config.distribution.platforms.tiktok", value, ["enabled", "liveGoArmed", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
   if ("enabled" in value && typeof value.enabled !== "boolean") {
     errors.push("config.distribution.platforms.tiktok.enabled must be a boolean");
+  }
+  if ("liveGoArmed" in value && typeof value.liveGoArmed !== "boolean") {
+    errors.push("config.distribution.platforms.tiktok.liveGoArmed must be a boolean");
   }
   if ("connector" in value && value.connector !== "tiktok_content_posting") {
     errors.push("config.distribution.platforms.tiktok.connector must be tiktok_content_posting");

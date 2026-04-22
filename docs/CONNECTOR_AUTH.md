@@ -19,10 +19,14 @@ Use it together with:
   artifacts, screenshots, or repository docs.
 - Check connector state from Producer Console `Platforms` and `Status` before
   retrying any live distribution action.
-- `distribution.liveGoArmed` stays `false` by default. Until the producer arms
-  it, every X / Instagram / TikTok publish path is forced back into dry-run
-  before any connector publish call is attempted.
-- Arming `distribution.liveGoArmed` alone does **not** enable real publishing.
+- Social live arming now has two levels:
+  - `distribution.liveGoArmed`
+  - `distribution.platforms.{x,instagram,tiktok}.liveGoArmed`
+- Both flags must be `true` for a given platform before the upstream dry-run
+  hold can release. Arming only the global flag still keeps every platform on
+  dry-run. Arming only one platform while the global flag is off still keeps
+  that platform on dry-run.
+- Arming either or both flags does **not** enable real publishing by itself.
   Each connector still fails closed at its own edge until that platform's live
   lane is explicitly opened.
 - Use `POST /plugins/artist-runtime/api/platforms/{id}/test` for connector health
@@ -72,6 +76,8 @@ Use it together with:
 
 - Dry-run publish/reply paths stay fail-closed and do not perform real external
   side effects.
+- The upstream social pipeline also requires both the global arm and the X
+  platform arm to be `true` before it will even attempt to leave dry-run.
 
 ## Instagram
 
@@ -111,9 +117,10 @@ Use it together with:
   wired for the Graph account lookup, media container, and publish-stage fetch
   sequence, but this round still returns `dry-run blocks publish`.
 - The upper social distribution pipeline now adds a second hold: if
-  `distribution.enabled` is off, `distribution.liveGoArmed` is off, or the
-  target platform toggle is off, the publish request is forced back into
-  dry-run before the connector publish path is reached.
+  `distribution.enabled` is off, `distribution.liveGoArmed` is off, the
+  Instagram platform arm is off, or the target platform toggle is off, the
+  publish request is forced back into dry-run before the connector publish path
+  is reached.
 - Non-dry-run publish attempts are rejected with `requires_explicit_live_go`
   even when auth is configured. Live posting remains outside the current lane.
 
@@ -139,3 +146,5 @@ Use it together with:
 - TikTok remains a dry-run-safe skeleton today. Capability checks can report
   configured/not-configured state, but publish/reply stay fail-closed until a
   real adapter is introduced.
+- The upstream social pipeline also requires both the global arm and the TikTok
+  platform arm to be `true` before it will even attempt to leave dry-run.

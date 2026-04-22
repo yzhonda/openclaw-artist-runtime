@@ -39,6 +39,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     platforms: {
       x: {
         enabled: false,
+        liveGoArmed: false,
         connector: "bird",
         authority: "auto_publish",
         maxPostsPerDay: 3,
@@ -47,6 +48,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
       },
       instagram: {
         enabled: false,
+        liveGoArmed: false,
         connector: "instagram_content_publishing",
         authority: "auto_publish_visuals",
         maxPostsPerDay: 1,
@@ -54,6 +56,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
       },
       tiktok: {
         enabled: false,
+        liveGoArmed: false,
         connector: "tiktok_content_posting",
         authority: "auto_publish_clips",
         maxPostsPerDay: 1,

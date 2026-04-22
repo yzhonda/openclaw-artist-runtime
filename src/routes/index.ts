@@ -139,6 +139,12 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
     x: {
       connected: xConnection.connected,
       authority: config.distribution.platforms.x.authority,
+      liveGoArmed: config.distribution.platforms.x.liveGoArmed,
+      effectiveDryRun: config.autopilot.dryRun
+        || !config.distribution.enabled
+        || !config.distribution.liveGoArmed
+        || !config.distribution.platforms.x.enabled
+        || !config.distribution.platforms.x.liveGoArmed,
       capabilitySummary: await xConnector.checkCapabilities(),
       accountLabel: xConnection.accountLabel,
       reason: xConnection.reason,
@@ -149,6 +155,12 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
     instagram: {
       connected: instagramConnection.connected,
       authority: config.distribution.platforms.instagram.authority,
+      liveGoArmed: config.distribution.platforms.instagram.liveGoArmed,
+      effectiveDryRun: config.autopilot.dryRun
+        || !config.distribution.enabled
+        || !config.distribution.liveGoArmed
+        || !config.distribution.platforms.instagram.enabled
+        || !config.distribution.platforms.instagram.liveGoArmed,
       capabilitySummary: await instagramConnector.checkCapabilities(),
       accountLabel: instagramConnection.accountLabel,
       reason: instagramConnection.reason,
@@ -159,6 +171,12 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
     tiktok: {
       connected: tiktokConnection.connected,
       authority: config.distribution.platforms.tiktok.authority,
+      liveGoArmed: config.distribution.platforms.tiktok.liveGoArmed,
+      effectiveDryRun: config.autopilot.dryRun
+        || !config.distribution.enabled
+        || !config.distribution.liveGoArmed
+        || !config.distribution.platforms.tiktok.enabled
+        || !config.distribution.platforms.tiktok.liveGoArmed,
       capabilitySummary: await tiktokConnector.checkCapabilities(),
       accountLabel: tiktokConnection.accountLabel,
       reason: tiktokConnection.reason,

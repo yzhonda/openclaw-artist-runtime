@@ -81,7 +81,7 @@ describe("status ticker and reply simulation routes", () => {
         enabled: true,
         liveGoArmed: false,
         platforms: {
-          x: { enabled: true }
+          x: { enabled: true, liveGoArmed: true }
         }
       }
     });
@@ -96,14 +96,24 @@ describe("status ticker and reply simulation routes", () => {
     expect(status.config.autopilot.dryRun).toBe(false);
     expect(status.config.distribution.liveGoArmed).toBe(false);
     expect(status.config.distribution.platforms.x.enabled).toBe(true);
+    expect(status.config.distribution.platforms.x.liveGoArmed).toBe(true);
     expect(status.ticker.intervalMs).toBe(900000);
     expect(status.distributionWorker.liveGoArmed).toBe(false);
+    expect(status.distributionWorker.platformLiveGoArmed).toMatchObject({
+      x: true,
+      instagram: false,
+      tiktok: false
+    });
     expect(status.distributionWorker.effectiveDryRun).toMatchObject({
       x: true,
       instagram: true,
       tiktok: true
     });
     expect(status.distributionWorker.blockedReason).toContain("live-go arm");
+    expect(status.platforms.x.liveGoArmed).toBe(true);
+    expect(status.platforms.x.effectiveDryRun).toBe(true);
+    expect(status.platforms.instagram.liveGoArmed).toBe(false);
+    expect(status.platforms.instagram.effectiveDryRun).toBe(true);
   });
 
   it("updates ticker getters when /api/run-cycle is triggered", async () => {

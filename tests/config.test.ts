@@ -48,7 +48,24 @@ describe("config schema", () => {
     expect(merged.autopilot.enabled).toBe(true);
     expect(merged.autopilot.dryRun).toBe(true);
     expect(merged.distribution.liveGoArmed).toBe(false);
+    expect(merged.distribution.platforms.x.liveGoArmed).toBe(false);
+    expect(merged.distribution.platforms.instagram.liveGoArmed).toBe(false);
+    expect(merged.distribution.platforms.tiktok.liveGoArmed).toBe(false);
     expect(merged.music.suno.authority).toBe("auto_create_and_select_take");
+  });
+
+  it("rejects non-boolean platform live-go flags", () => {
+    const result = validateConfig({
+      distribution: {
+        platforms: {
+          instagram: {
+            liveGoArmed: "yes"
+          }
+        }
+      }
+    });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain("config.distribution.platforms.instagram.liveGoArmed must be a boolean");
   });
 
   it("keeps manifest schema and schema copy aligned", () => {
