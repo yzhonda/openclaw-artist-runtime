@@ -372,6 +372,9 @@ export interface SunoWorkerStatus {
   lastImportOutcome?: {
     runId: string;
     urlCount: number;
+    pathCount?: number;
+    paths?: string[];
+    metadata?: SunoImportedAssetMetadata[];
     reason?: string;
     at: string;
     dryRun?: boolean;
@@ -404,11 +407,20 @@ export interface SunoImportResult {
   accepted?: boolean;
   urls: string[];
   paths?: string[];
+  metadata?: SunoImportedAssetMetadata[];
   runId?: string;
   selectedTakeId?: string;
   importedAt?: string;
   reason?: string;
   dryRun?: boolean;
+}
+
+export interface SunoImportedAssetMetadata {
+  url: string;
+  path: string;
+  format: "mp3" | "m4a";
+  title?: string;
+  durationSec?: number;
 }
 
 export interface SunoRunRecord {

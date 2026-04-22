@@ -42,7 +42,13 @@ vi.mock("node:fs/promises", async () => {
   };
 });
 
-function createContext(audioAssets: Array<{ trackId: string; audioUrl: string } | undefined>) {
+function createContext(audioAssets: Array<{
+  trackId: string;
+  audioUrl: string;
+  format?: "mp3" | "m4a";
+  title?: string;
+  durationSec?: number;
+} | undefined>) {
   const page = {
     goto: vi.fn(async () => undefined),
     waitForLoadState: vi.fn(async () => undefined),
@@ -73,11 +79,17 @@ describe("PlaywrightSunoDriver importResults", () => {
     const { context } = createContext([
       {
         trackId: "song-1",
-        audioUrl: "https://cdn1.suno.ai/song-1.mp3"
+        audioUrl: "https://cdn1.suno.ai/song-1.mp3",
+        format: "mp3",
+        title: "Song One",
+        durationSec: 181
       },
       {
         trackId: "song-2",
-        audioUrl: "https://cdn1.suno.ai/song-2.mp3"
+        audioUrl: "https://cdn1.suno.ai/song-2.mp3",
+        format: "mp3",
+        title: "Song Two",
+        durationSec: 202
       }
     ]);
     launchPersistentContextMock.mockResolvedValue(context);
@@ -99,6 +111,22 @@ describe("PlaywrightSunoDriver importResults", () => {
         "/tmp/workspace/runtime/suno/run-import-1/song-1.mp3",
         "/tmp/workspace/runtime/suno/run-import-1/song-2.mp3"
       ],
+      metadata: [
+        {
+          url: "https://suno.com/song/song-1",
+          path: "/tmp/workspace/runtime/suno/run-import-1/song-1.mp3",
+          title: "Song One",
+          durationSec: 181,
+          format: "mp3"
+        },
+        {
+          url: "https://suno.com/song/song-2",
+          path: "/tmp/workspace/runtime/suno/run-import-1/song-2.mp3",
+          title: "Song Two",
+          durationSec: 202,
+          format: "mp3"
+        }
+      ],
       reason: "imported",
       dryRun: false
     });
@@ -109,7 +137,9 @@ describe("PlaywrightSunoDriver importResults", () => {
     const { context } = createContext([
       {
         trackId: "song-1",
-        audioUrl: "https://cdn1.suno.ai/song-1.mp3"
+        audioUrl: "https://cdn1.suno.ai/song-1.mp3",
+        format: "mp3",
+        title: "Song One"
       },
       undefined
     ]);
@@ -128,6 +158,45 @@ describe("PlaywrightSunoDriver importResults", () => {
     expect(result.paths).toEqual(["/tmp/workspace/runtime/suno/run-import-2/song-1.mp3"]);
     expect(result.reason).toContain("https://suno.com/song/song-2: audio asset not found");
     expect(writeFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to m4a when mp3 is unavailable and keeps metadata", async () => {
+    const { context } = createContext([
+      {
+        trackId: "song-3",
+        audioUrl: "https://cdn1.suno.ai/song-3.m4a",
+        format: "m4a",
+        title: "Song Three",
+        durationSec: 144
+      }
+    ]);
+    launchPersistentContextMock.mockResolvedValue(context);
+    vi.mocked(globalThis.fetch)
+      .mockResolvedValueOnce(new Response(new Uint8Array([7, 8, 9]), { status: 200 }));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "live", "/tmp/workspace");
+
+    const result = await driver.importResults({
+      runId: "run-import-4",
+      urls: ["https://suno.com/song/song-3"]
+    });
+
+    expect(result).toMatchObject({
+      accepted: true,
+      runId: "run-import-4",
+      urls: ["https://suno.com/song/song-3"],
+      paths: ["/tmp/workspace/runtime/suno/run-import-4/song-3.m4a"],
+      metadata: [
+        {
+          url: "https://suno.com/song/song-3",
+          path: "/tmp/workspace/runtime/suno/run-import-4/song-3.m4a",
+          title: "Song Three",
+          durationSec: 144,
+          format: "m4a"
+        }
+      ],
+      reason: "imported",
+      dryRun: false
+    });
   });
 
   it("fails closed when no song URLs are provided", async () => {

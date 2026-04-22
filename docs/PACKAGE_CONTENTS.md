@@ -76,6 +76,8 @@ Producer Console status surfaces. In practice that means:
 - `src/services/sunoPlaywrightDriver.ts` now owns the real Playwright-backed
   login probe, live create submit/polling lane, and the local mp3 import
   downloader under `runtime/suno/<runId>/`.
+  It now also returns lightweight import metadata and `.m4a` fallback assets
+  through the same worker/status path.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -172,6 +174,8 @@ workaround.
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/status-ticker.test.ts`
+  This suite now also fixes the `/api/status` contract for imported Suno
+  `paths[]` / `metadata[]` exposure.
 - `tests/persisted-config-helper-routes.test.ts`
 - `tests/mutating-route-config-resolution.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`

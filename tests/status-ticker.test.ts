@@ -9,6 +9,7 @@ import { resetAutopilotTickerForTest, AutopilotTicker } from "../src/services/au
 import { ensureArtistWorkspace } from "../src/services/artistWorkspace";
 import { patchResolvedConfig } from "../src/services/runtimeConfig";
 import { createSongIdea } from "../src/services/songIdeation";
+import { SunoBrowserWorker } from "../src/services/sunoBrowserWorker";
 
 function createMockRequest(method: string, url: string, body?: string, headers?: Record<string, string>): IncomingMessage {
   const req = Readable.from(body ? [body] : []) as IncomingMessage;
@@ -181,6 +182,85 @@ describe("status ticker and reply simulation routes", () => {
         songId: created.songId,
         dryRun: true
       }
+    });
+  });
+
+  it("surfaces imported paths and metadata through /api/status", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-import-meta-"));
+    await ensureArtistWorkspace(root);
+    const worker = new SunoBrowserWorker(root);
+
+    await worker.start({
+      driver: {
+        async probe() {
+          return { state: "connected" as const };
+        },
+        async importResults({ runId, urls }) {
+          return {
+            accepted: true,
+            runId,
+            urls,
+            paths: [`${root}/runtime/suno/${runId}/song-1.mp3`],
+            metadata: [
+              {
+                url: urls[0],
+                path: `${root}/runtime/suno/${runId}/song-1.mp3`,
+                title: "Recovered Track",
+                durationSec: 187,
+                format: "mp3" as const
+              }
+            ],
+            importedAt: "2026-04-22T00:00:00.000Z",
+            reason: "imported"
+          };
+        }
+      }
+    });
+    await worker.importRun("run-status-meta", ["https://suno.com/song/song-1"], {
+      driver: {
+        async probe() {
+          return { state: "connected" as const };
+        },
+        async importResults({ runId, urls }) {
+          return {
+            accepted: true,
+            runId,
+            urls,
+            paths: [`${root}/runtime/suno/${runId}/song-1.mp3`],
+            metadata: [
+              {
+                url: urls[0],
+                path: `${root}/runtime/suno/${runId}/song-1.mp3`,
+                title: "Recovered Track",
+                durationSec: 187,
+                format: "mp3" as const
+              }
+            ],
+            importedAt: "2026-04-22T00:00:00.000Z",
+            reason: "imported"
+          };
+        }
+      }
+    });
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.sunoWorker.lastImportOutcome).toMatchObject({
+      runId: "run-status-meta",
+      urlCount: 1,
+      pathCount: 1,
+      paths: [`${root}/runtime/suno/run-status-meta/song-1.mp3`],
+      metadata: [
+        {
+          url: "https://suno.com/song/song-1",
+          path: `${root}/runtime/suno/run-status-meta/song-1.mp3`,
+          title: "Recovered Track",
+          durationSec: 187,
+          format: "mp3"
+        }
+      ]
     });
   });
 });
