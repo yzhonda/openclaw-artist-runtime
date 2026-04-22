@@ -170,6 +170,16 @@ consumes real Suno credits and should only be enabled after explicit operator
 approval. Round 41 audio import/download does not create new generations on its
 own; it only pulls finished outputs from the returned song URLs.
 
+## Imported assets in Producer Console
+
+- Producer Console now mirrors the latest imported Suno asset evidence from
+  `lastImportOutcome.paths` and `lastImportOutcome.metadata`.
+- Imported assets are shown as read-only links plus static metadata (`title`,
+  `durationSec`, `format`, `path`). There is no inline player, playback widget,
+  or metadata editor in this lane.
+- If no imported files have been recorded yet, the Console keeps the explicit
+  placeholder `No imported assets yet.`
+
 ## Rollback
 
 Set `music.suno.driver` back to `mock` to return immediately to the built-in
