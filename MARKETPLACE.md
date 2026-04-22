@@ -27,6 +27,30 @@ Artist Runtime turns an OpenClaw agent into a public artist daemon. It maintains
 
 This plugin can consume Suno credits and publish publicly to connected social accounts when autopilot and distribution are enabled. Configure budgets and dry-run mode before enabling production autopilot.
 
+## Connector credentials summary
+
+- **X (Bird):** requires the `bird` CLI on `PATH` plus Bird's own authenticated local cookie/token store.
+- **Instagram:** uses `OPENCLAW_INSTAGRAM_AUTH` or `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` for env-based capability checks.
+- **TikTok:** uses `OPENCLAW_TIKTOK_AUTH` or `OPENCLAW_TIKTOK_ACCESS_TOKEN` for env-based capability checks.
+
+See also:
+
+- `CAPABILITIES.md` for connector contracts and fail-closed behavior
+- `SECURITY.md` for secret handling boundaries
+- `PRIVACY.md` for local-only credential storage expectations
+- `PUBLISHING.md` for release checklist requirements
+
+## Credential refresh troubleshooting
+
+If a connector stops reporting `connected: true`, start here:
+
+1. **X (Bird):** re-authenticate the `bird` CLI so its local cookie/token store is current, then rerun the platform test route.
+2. **Instagram / TikTok:** refresh the shell environment so `OPENCLAW_INSTAGRAM_AUTH` / `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` or `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN` contain current values.
+3. **Health check:** call `POST /plugins/artist-runtime/api/platforms/{id}/test` for `x`, `instagram`, or `tiktok` and inspect the returned `reason`.
+4. **Console surface:** open Producer Console `Platforms` and `Status` first. Those views surface the same connector/account state before any live distribution action is retried.
+
+Do not paste connector secrets into ledgers, package files, or repository docs while refreshing credentials.
+
 ## Suggested tags
 
 music, suno, artist, social, x, instagram, tiktok, automation, creator-tools, public-agent
