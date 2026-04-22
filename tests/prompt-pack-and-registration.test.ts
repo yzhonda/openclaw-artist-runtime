@@ -205,6 +205,8 @@ describe("registration shells", () => {
     const consoleHtml = await producerConsoleHtml();
     expect(consoleHtml).toContain("Artist Runtime");
     expect(consoleHtml).toContain("Run Cycle");
+    expect(consoleHtml).toContain("Config Editor");
+    expect(consoleHtml).toContain("Songs Per Week");
     expect((await buildConfigResponse()).artist.artistId).toBe("artist");
 
     const rootHandler = registered.routeHandlers.get("/plugins/artist-runtime");

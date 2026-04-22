@@ -194,6 +194,25 @@ textarea {
   gap: 10px;
 }
 
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.field-error {
+  color: var(--critical);
+  font-weight: 600;
+}
+
+.warning-banner {
+  border-radius: 14px;
+  border: 1px solid rgba(153, 100, 0, 0.25);
+  background: rgba(244, 227, 196, 0.72);
+  color: var(--warning);
+  padding: 0.8rem 0.9rem;
+}
+
 .toggle {
   display: flex;
   align-items: center;
