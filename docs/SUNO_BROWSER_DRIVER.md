@@ -5,11 +5,10 @@ lane.
 
 ## Status
 
-Round 39 keeps the real Playwright probe plus manual first-login helper, and
-adds create-form autofill without submission. The driver can now open Chromium
-against the dedicated Suno profile, detect whether the session is already
-logged in, and populate the `/create` form. It still does not click `Create`,
-so credit consumption stays at zero.
+Round 40 keeps the real Playwright probe plus manual first-login helper, and
+now allows `submitMode: "live"` to click `Create` and poll the Suno library for
+new song URLs. `submitMode: "skip"` still fills the form without submission for
+credit-safe rehearsals.
 
 ## Prerequisites
 
@@ -106,8 +105,8 @@ To control create behavior separately:
 ```
 
 `submitMode: "skip"` is the default and fills the Suno form without clicking
-`Create`. `submitMode: "live"` is reserved for a later round and is currently
-rejected at runtime.
+`Create`. `submitMode: "live"` is now the operator-approved path that clicks
+`Create` and waits for new Suno song URLs to appear in the library.
 
 ## Dry-run vs live
 
@@ -118,26 +117,30 @@ rejected at runtime.
   lane
 - `driver: "playwright"` + `submitMode: "skip"` fills lyrics/style/instrumental
   fields on `/create` but still never clicks the `Create` button
-- `driver: "playwright"` + `dryRun: false` remains out of scope until later
-  rounds add explicit GO and budget guards
+- `driver: "playwright"` + `submitMode: "live"` clicks `Create` and polls
+  `https://suno.com/me` until new song URLs appear or the timeout is hit
 
-## Round 39 form-fill only
+## Round 40 live submit
 
-The current create lane performs the following and then stops:
+The live create lane now performs the following:
 
-1. opens `https://suno.com/create` in the dedicated persistent profile;
-2. fills lyrics, style, exclude styles, and the instrumental toggle when the
+1. snapshots the current song URLs from `https://suno.com/me`;
+2. opens `https://suno.com/create` in the dedicated persistent profile;
+3. fills lyrics, style, exclude styles, and the instrumental toggle when the
    payload includes them;
-3. closes the context and returns `submit_skipped`.
+4. clicks `button[aria-label="Create song"]` only when
+   `music.suno.submitMode = "live"`;
+5. polls the library every 3 seconds for up to 10 minutes and returns the new
+   `/song/<uuid>` URLs once they appear.
 
-Even if `music.suno.submitMode` is set to `live`, Round 39 still returns
-`submit_live_not_enabled_round_39` and does not press the `Create` button.
+If no new song URLs appear before timeout, the driver returns
+`playwright_live_timeout` and leaves result import/download to later rounds.
 
 ## Credit budget
 
-Real Suno generation is still blocked in this round, so credit consumption stays
-zero. Budget control for live browser automation is planned before real create
-submission is enabled.
+`submitMode: "skip"` still consumes zero credits. `submitMode: "live"` now
+consumes real Suno credits and should only be enabled after explicit operator
+approval. Result import and audio download remain separate later-round work.
 
 ## Rollback
 

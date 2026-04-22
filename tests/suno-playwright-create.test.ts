@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON,
   PLAYWRIGHT_CREATE_SKIPPED_REASON,
+  PLAYWRIGHT_LIVE_TIMEOUT_REASON,
   PlaywrightSunoDriver,
+  SUNO_LIBRARY_URL,
   SUNO_CREATE_URL
 } from "../src/services/sunoPlaywrightDriver";
 
@@ -40,11 +41,17 @@ function createPage() {
   const counts: Record<string, number> = {
     "textarea[data-testid=\"lyrics-textarea\"]": 1
   };
+  const songUrlSnapshots: string[][] = [
+    ["https://suno.com/song/existing-1"]
+  ];
   return {
     clicks,
     fills,
+    songUrlSnapshots,
     goto: vi.fn(async () => undefined),
     waitForLoadState: vi.fn(async () => undefined),
+    waitForTimeout: vi.fn(async () => undefined),
+    evaluate: vi.fn(async () => songUrlSnapshots.shift() ?? []),
     locator: vi.fn((selector: string) => ({
       first: () => ({
         fill: vi.fn(async (value: string) => {
@@ -100,7 +107,11 @@ describe("PlaywrightSunoDriver create", () => {
     });
 
     expect(result.reason).toBe(PLAYWRIGHT_CREATE_SKIPPED_REASON);
-    expect(page.goto).toHaveBeenCalledWith(SUNO_CREATE_URL, {
+    expect(page.goto).toHaveBeenNthCalledWith(1, SUNO_LIBRARY_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 20_000
+    });
+    expect(page.goto).toHaveBeenNthCalledWith(2, SUNO_CREATE_URL, {
       waitUntil: "domcontentloaded",
       timeout: 20_000
     });
@@ -109,7 +120,7 @@ describe("PlaywrightSunoDriver create", () => {
       value: "line one\nline two"
     });
     expect(page.fills).toContainEqual({
-      selector: "textarea[placeholder=\"Describe the sound you want\"], textarea[placeholder*=\"クラシック音楽\"], textarea[placeholder*=\"バイキングメタル\"], textarea[placeholder*=\"sound you want\"]",
+      selector: "[data-testid=\"create-form-styles-wrapper\"] textarea, textarea[placeholder=\"Describe the sound you want\"], textarea[placeholder*=\"クラシック音楽\"], textarea[placeholder*=\"バイキングメタル\"], textarea[placeholder*=\"sound you want\"]",
       value: "cold synth texture"
     });
     expect(page.fills).toContainEqual({
@@ -117,6 +128,7 @@ describe("PlaywrightSunoDriver create", () => {
       value: "generic edm drop"
     });
     expect(page.clicks).not.toContain("button[aria-label=\"Create song\"]");
+    expect(page.waitForTimeout).not.toHaveBeenCalled();
     expect(context.close).toHaveBeenCalledTimes(1);
   });
 
@@ -140,8 +152,12 @@ describe("PlaywrightSunoDriver create", () => {
     expect(page.clicks).not.toContain("button[aria-label=\"Create song\"]");
   });
 
-  it("rejects live submit mode in round 39 without clicking Create", async () => {
+  it("clicks Create and returns accepted with new song URLs in live mode", async () => {
     const { page, context } = createContext();
+    page.songUrlSnapshots.push(
+      ["https://suno.com/song/existing-1"],
+      ["https://suno.com/song/existing-1", "https://suno.com/song/new-1", "https://suno.com/song/new-2"]
+    );
     launchPersistentContextMock.mockResolvedValue(context);
     const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "live");
 
@@ -154,8 +170,43 @@ describe("PlaywrightSunoDriver create", () => {
       }
     });
 
-    expect(result.reason).toBe(PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON);
-    expect(page.clicks).not.toContain("button[aria-label=\"Create song\"]");
+    expect(result).toEqual({
+      accepted: true,
+      runId: "run-003",
+      reason: "submitted",
+      urls: ["https://suno.com/song/new-1", "https://suno.com/song/new-2"],
+      dryRun: false
+    });
+    expect(page.clicks).toContain("button[aria-label=\"Create song\"]");
+  });
+
+  it("times out in live mode when no new song URLs appear", async () => {
+    const { page, context } = createContext();
+    page.songUrlSnapshots.push(
+      ["https://suno.com/song/existing-1"],
+      ["https://suno.com/song/existing-1"],
+      ["https://suno.com/song/existing-1"]
+    );
+    launchPersistentContextMock.mockResolvedValue(context);
+    const driver = new PlaywrightSunoDriver(
+      ".openclaw-browser-profiles/suno",
+      "live",
+      { intervalMs: 1, timeoutMs: 2 }
+    );
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-004",
+      payload: {
+        lyrics: "line one"
+      }
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe(PLAYWRIGHT_LIVE_TIMEOUT_REASON);
+    expect(page.clicks).toContain("button[aria-label=\"Create song\"]");
+    expect(page.waitForTimeout).toHaveBeenCalledWith(1);
   });
 
   it("fails closed when Playwright launch raises an error", async () => {
@@ -165,7 +216,7 @@ describe("PlaywrightSunoDriver create", () => {
     const result = await driver.create({
       dryRun: false,
       authority: "auto_create_and_select_take",
-      runId: "run-004",
+      runId: "run-005",
       payload: {}
     });
 

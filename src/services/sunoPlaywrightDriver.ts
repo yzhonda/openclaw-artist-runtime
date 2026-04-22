@@ -5,12 +5,15 @@ import type { BrowserContext, Page } from "playwright";
 
 export const DEFAULT_SUNO_PROFILE_PATH = ".openclaw-browser-profiles/suno";
 export const SUNO_CREATE_URL = "https://suno.com/create";
+export const SUNO_LIBRARY_URL = "https://suno.com/me";
 export const PLAYWRIGHT_DRIVER_NOT_INSTALLED_DETAIL =
   "playwright module not installed — run `npm install` in project root";
 export const PLAYWRIGHT_DRIVER_LOGIN_REQUIRED_DETAIL =
   "Suno login required in persistent profile — run `scripts/openclaw-suno-login.sh` and complete operator login";
 export const PLAYWRIGHT_CREATE_SKIPPED_REASON = "submit_skipped";
-export const PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON = "submit_live_not_enabled_round_39";
+export const PLAYWRIGHT_LIVE_TIMEOUT_REASON = "playwright_live_timeout";
+export const PLAYWRIGHT_POLL_INTERVAL_MS = 3_000;
+export const PLAYWRIGHT_POLL_TIMEOUT_MS = 10 * 60 * 1_000;
 
 /**
  * Round 38 adds probe automation.
@@ -20,7 +23,11 @@ export const PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON = "submit_live_not_enabled_r
 export class PlaywrightSunoDriver implements SunoBrowserDriver {
   constructor(
     readonly profilePath: string,
-    readonly submitMode: SunoSubmitMode = "skip"
+    readonly submitMode: SunoSubmitMode = "skip",
+    private readonly polling = {
+      intervalMs: PLAYWRIGHT_POLL_INTERVAL_MS,
+      timeoutMs: PLAYWRIGHT_POLL_TIMEOUT_MS
+    }
   ) {}
 
   async probe(): Promise<SunoBrowserDriverProbe> {
@@ -98,6 +105,7 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
       });
 
       const page = context.pages()[0] ?? await context.newPage();
+      const baselineUrls = new Set(await this.readSongUrls(page));
       await page.goto(SUNO_CREATE_URL, {
         waitUntil: "domcontentloaded",
         timeout: 20_000
@@ -112,10 +120,33 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
 
       await this.fillCreateForm(page, { lyrics, style, exclude, instrumental });
 
+      if (this.submitMode === "skip") {
+        return {
+          accepted: false,
+          runId,
+          reason: PLAYWRIGHT_CREATE_SKIPPED_REASON,
+          urls: [],
+          dryRun: request.dryRun
+        };
+      }
+
+      await page.locator("button[aria-label=\"Create song\"]").click();
+      await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+      const urls = await this.pollForGeneratedSongs(page, baselineUrls);
+      if (urls.length > 0) {
+        return {
+          accepted: true,
+          runId,
+          reason: "submitted",
+          urls,
+          dryRun: request.dryRun
+        };
+      }
+
       return {
         accepted: false,
         runId,
-        reason: this.submitMode === "live" ? PLAYWRIGHT_CREATE_LIVE_DISABLED_REASON : PLAYWRIGHT_CREATE_SKIPPED_REASON,
+        reason: PLAYWRIGHT_LIVE_TIMEOUT_REASON,
         urls: [],
         dryRun: request.dryRun
       };
@@ -236,8 +267,34 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
 
   private styleLocator(page: Page) {
     return page.locator(
-      "textarea[placeholder=\"Describe the sound you want\"], textarea[placeholder*=\"クラシック音楽\"], textarea[placeholder*=\"バイキングメタル\"], textarea[placeholder*=\"sound you want\"]"
+      "[data-testid=\"create-form-styles-wrapper\"] textarea, textarea[placeholder=\"Describe the sound you want\"], textarea[placeholder*=\"クラシック音楽\"], textarea[placeholder*=\"バイキングメタル\"], textarea[placeholder*=\"sound you want\"]"
     ).first();
+  }
+
+  private async readSongUrls(page: Page): Promise<string[]> {
+    await page.goto(SUNO_LIBRARY_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 20_000
+    });
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
+    return page.evaluate(() => Array.from(document.querySelectorAll("a[href*='/song/']"))
+      .map((element) => (element as HTMLAnchorElement).href)
+      .filter((href) => href.startsWith("https://suno.com/song/")));
+  }
+
+  private async pollForGeneratedSongs(page: Page, baselineUrls: Set<string>): Promise<string[]> {
+    const maxAttempts = Math.max(1, Math.ceil(this.polling.timeoutMs / this.polling.intervalMs));
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const currentUrls = await this.readSongUrls(page);
+      const newUrls = currentUrls.filter((url) => !baselineUrls.has(url));
+      if (newUrls.length > 0) {
+        return newUrls;
+      }
+      if (attempt < maxAttempts - 1) {
+        await page.waitForTimeout(this.polling.intervalMs);
+      }
+    }
+    return [];
   }
 
   private isModuleNotInstalled(error: unknown): boolean {
