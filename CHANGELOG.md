@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Marketplace listing docs now summarize connector credential requirements and include a first-pass credential refresh troubleshooting section for X/Bird, Instagram, and TikTok.
+
 ## 0.3.0 - 2026-04-22
 
 ### Added
