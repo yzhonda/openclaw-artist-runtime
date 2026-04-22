@@ -35,6 +35,7 @@ This plugin can consume Suno credits and publish publicly to connected social ac
 
 See also:
 
+- `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh guide
 - `CAPABILITIES.md` for connector contracts and fail-closed behavior
 - `SECURITY.md` for secret handling boundaries
 - `PRIVACY.md` for local-only credential storage expectations
@@ -42,14 +43,11 @@ See also:
 
 ## Credential refresh troubleshooting
 
-If a connector stops reporting `connected: true`, start here:
-
-1. **X (Bird):** re-authenticate the `bird` CLI so its local cookie/token store is current, then rerun the platform test route.
-2. **Instagram / TikTok:** refresh the shell environment so `OPENCLAW_INSTAGRAM_AUTH` / `OPENCLAW_INSTAGRAM_ACCESS_TOKEN` or `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN` contain current values.
-3. **Health check:** call `POST /plugins/artist-runtime/api/platforms/{id}/test` for `x`, `instagram`, or `tiktok` and inspect the returned `reason`.
-4. **Console surface:** open Producer Console `Platforms` and `Status` first. Those views surface the same connector/account state before any live distribution action is retried.
-
-Do not paste connector secrets into ledgers, package files, or repository docs while refreshing credentials.
+If a connector stops reporting `connected: true`, re-authenticate Bird or refresh
+the Instagram/TikTok env vars, then rerun `POST /plugins/artist-runtime/api/platforms/{id}/test`.
+Check Producer Console `Platforms` / `Status` before retrying distribution, and
+do not paste connector secrets into ledgers, package files, or repository docs.
+For platform-by-platform steps, use `docs/CONNECTOR_AUTH.md`.
 
 ## Suggested tags
 

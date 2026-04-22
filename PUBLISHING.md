@@ -13,6 +13,7 @@ Before publishing:
 - Ensure no lifecycle `postinstall` scripts are required.
 - Ensure no secrets, local profiles, songs, or runtime files are included.
 - Ensure `SECURITY.md`, `PRIVACY.md`, `CAPABILITIES.md`, and `MARKETPLACE.md` are current.
+- Ensure `docs/CONNECTOR_AUTH.md` is current if connector setup or refresh flow changed.
 - Ensure `ui/node_modules` is not included in the tarball.
 - If connector verification is part of the release check, ensure operator-local
   auth prerequisites are present before testing:
@@ -21,6 +22,8 @@ Before publishing:
   - TikTok uses `OPENCLAW_TIKTOK_AUTH` or `OPENCLAW_TIKTOK_ACCESS_TOKEN`.
 - Ensure those credentials remain local-only (shell profile / env injection) and
   are not written into logs, package files, or committed `.env` files.
+- Use `docs/CONNECTOR_AUTH.md` as the operator-facing source of truth for setup,
+  refresh, and connector health checks.
 
 ## Local verification
 

@@ -23,6 +23,8 @@ Therefore all external side effects must pass authority checks and audit logging
 
 ### Connector secret contract
 
+For platform-by-platform setup and refresh flow, see `docs/CONNECTOR_AUTH.md`.
+
 - `XBirdConnector` does not read passwords from plugin config. It depends on the
   local `bird` CLI and that CLI's own authenticated cookie/token store.
 - `InstagramConnector` currently checks only these environment variables:

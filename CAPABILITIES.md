@@ -42,6 +42,8 @@ When enabled and configured, this plugin can:
 
 ## Connector contracts
 
+Detailed setup and refresh steps live in `docs/CONNECTOR_AUTH.md`.
+
 ### X (Bird)
 
 - Requires the `bird` CLI to be installed and available on `PATH`.
