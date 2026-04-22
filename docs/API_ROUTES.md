@@ -20,6 +20,8 @@ current OpenClaw Gateway.
 - `POST /api/platforms/x/simulate-reply` is always dry-run.
 - `safeRegisterRoute()` currently defaults `auth` to `plugin`, and the routes in
   `src/routes/index.ts` do not override that default today.
+- For the operator-facing meaning of that `plugin` boundary, see
+  `docs/GATEWAY_AUTH.md`.
 
 ## Console shell
 
@@ -92,6 +94,7 @@ current OpenClaw Gateway.
   `suno` because the OpenClaw Gateway still mounts `:param` paths literally.
 - Read and mutating routes both use `resolveRuntimeConfig()` so multi-workspace
   and persisted-override behavior stays consistent across the Console.
+- Gateway/plugin auth boundary notes live in `docs/GATEWAY_AUTH.md`.
 - The route catalog here is intentionally higher-level than `src/types.ts`; when
   exact field-level contracts matter, treat `src/types.ts` as the canonical
   machine-readable source.

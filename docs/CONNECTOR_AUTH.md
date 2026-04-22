@@ -9,6 +9,7 @@ Use it together with:
 - `SECURITY.md` for secret handling requirements
 - `PRIVACY.md` for local-only credential storage boundaries
 - `PUBLISHING.md` for release/package checklist items
+- `docs/GATEWAY_AUTH.md` for the HTTP/gateway boundary around these connector checks
 - `docs/API_ROUTES.md` for the plugin HTTP surface
 
 ## Shared rules

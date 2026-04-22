@@ -13,6 +13,13 @@ Report security issues privately through the repository security advisory featur
 Artist Runtime is powerful. It can operate logged-in browser sessions, generate music, and publish publicly.
 Therefore all external side effects must pass authority checks and audit logging.
 
+## Gateway auth boundary
+
+The plugin route surface currently relies on the OpenClaw Gateway's plugin-level
+access boundary rather than per-route auth logic inside the plugin. See
+`docs/GATEWAY_AUTH.md` for the operator-facing explanation and deployment
+recommendations.
+
 ## Credential handling
 
 - Do not store Suno passwords.

@@ -14,6 +14,7 @@ Before publishing:
 - Ensure no secrets, local profiles, songs, or runtime files are included.
 - Ensure `SECURITY.md`, `PRIVACY.md`, `CAPABILITIES.md`, and `MARKETPLACE.md` are current.
 - Ensure `docs/CONNECTOR_AUTH.md` is current if connector setup or refresh flow changed.
+- Ensure `docs/GATEWAY_AUTH.md` still matches the actual gateway/plugin auth boundary.
 - Ensure `ui/node_modules` is not included in the tarball.
 - If connector verification is part of the release check, ensure operator-local
   auth prerequisites are present before testing:
@@ -82,6 +83,7 @@ Then open the Producer Console route and confirm dry-run mode blocks external si
 - [ ] Marketplace screenshots updated.
 - [ ] Security disclosures reviewed.
 - [ ] Privacy disclosures reviewed.
+- [ ] Gateway auth boundary reviewed against `docs/GATEWAY_AUTH.md`.
 - [ ] Connector env / CLI prerequisites verified locally and excluded from package output.
 - [ ] Package dry-run clean.
 - [ ] ClawHub dry-run clean.
