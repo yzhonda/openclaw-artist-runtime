@@ -98,9 +98,15 @@ These are part of the package surface because the current OpenClaw Gateway treat
 The Console source now includes:
 
 - a live config editor (`ui/src/configEditor.ts`)
+- platform authority selectors for X / Instagram / TikTok
 - ticker and recent X dry-run status
 - Suno lifecycle plus create/import outcome cards rendered from `/api/suno/status`
 - the same Suno/status markers mirrored in the fallback inline Console shell
+
+The config editor source now owns both:
+
+- enable/disable toggles for each social platform
+- authority-mode payload shaping for `distribution.platforms.{x,instagram,tiktok}.authority`
 
 ### Repo-local OpenClaw sandbox scripts
 
@@ -121,6 +127,8 @@ The Console source now includes:
 - `tests/autopilot-ticker.test.ts`
 - `tests/autopilot-full-cycle.test.ts`
 - `tests/x-bird-connector.test.ts`
+- `tests/instagram-connector.test.ts`
+- `tests/tiktok-connector.test.ts`
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
 - `tests/config-editor-payload.test.ts`
@@ -189,8 +197,19 @@ Console parity:
 - `src/pluginApi.ts`
 - `src/routes/index.ts`
 - `ui/src/App.tsx`
+- `ui/src/configEditor.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
+
+Also keep the social connector source and tests together, because the package now
+ships one aligned dry-run contract across X, Instagram, and TikTok:
+
+- `src/connectors/social/xBirdConnector.ts`
+- `src/connectors/social/instagramConnector.ts`
+- `src/connectors/social/tiktokConnector.ts`
+- `tests/x-bird-connector.test.ts`
+- `tests/instagram-connector.test.ts`
+- `tests/tiktok-connector.test.ts`
 
 ## What may be slimmed later
 

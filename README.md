@@ -48,6 +48,9 @@ dispatch under the current OpenClaw Gateway matcher, and CI regression gates on
 - Producer Console exposes a live config editor for `autopilot` and
   `distribution.platforms.*`, ticker status, recent X dry-run results, and a
   dry-run simulate-reply form backed by plugin API routes only.
+- Producer Console config editing now covers both platform enablement and
+  `distribution.platforms.*.authority`, so X / Instagram / TikTok safety modes
+  can be switched live from the bundled UI or the fallback inline shell.
 - Producer Console now surfaces Suno worker lifecycle and automation outcomes end
   to end: `currentRunId`, `lastImportedRunId`, `lastCreateOutcome`, and
   `lastImportOutcome` are exposed from `/api/suno/status` and rendered in both
@@ -62,6 +65,9 @@ dispatch under the current OpenClaw Gateway matcher, and CI regression gates on
 - Suno worker automation now has a full mock-only skeleton: lifecycle state,
   manual login handoff, create/import driver contracts, connector wiring, and
   persisted outcomes are all in place without executing a real browser or Suno run.
+- Social connector skeletons are now aligned across all three platforms:
+  X/Bird, Instagram, and TikTok each expose auth probing plus fail-closed
+  publish/reply behavior, with Instagram/TikTok staying mock-only and dry-run-safe.
 - Repo-local verification includes `scripts/openclaw-local-gateway`,
   `scripts/openclaw-local-http-smoke.sh`, `scripts/openclaw-local-write-smoke.sh`,
   and `scripts/openclaw-local-ticker-observe.sh`.
@@ -177,9 +183,10 @@ Before public distribution, update:
 
 The plugin serves a built Producer Console from `ui/dist/` when present.
 If the bundle is missing, the plugin falls back to a minimal inline Console shell for safe inspection-only use.
-The bundled Console includes the config editor, ticker/status cards, recent X result
-surface, Suno outcome cards, and auto-refresh polling; the fallback Console keeps the
-same core control tower actions available for safe operation.
+The bundled Console includes the config editor, platform authority selectors,
+ticker/status cards, recent X result surface, Suno outcome cards, and
+auto-refresh polling; the fallback Console keeps the same core control tower
+actions available for safe operation.
 
 To build just the Console:
 

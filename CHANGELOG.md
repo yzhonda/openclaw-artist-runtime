@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+- Producer Console config editing now includes `distribution.platforms.x.authority`, `distribution.platforms.instagram.authority`, and `distribution.platforms.tiktok.authority` selectors in both the bundled React UI and the fallback inline shell (`5836e96`).
+- Instagram and TikTok connectors now match the X/Bird dry-run contract with env-based auth probes plus fail-closed publish/reply skeletons (`d4a3a3b`).
+
 ## 0.2.0 - 2026-04-22
 
 ### Added
