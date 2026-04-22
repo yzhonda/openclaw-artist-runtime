@@ -1,6 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { createSunoPromptPack } from "../src/suno-production/generatePromptPack";
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
@@ -9,6 +11,41 @@ import { registerHooks } from "../src/hooks";
 import { buildArtistMindResponse, buildAuditLogResponse, buildConfigResponse, buildPromptLedgerResponse, buildRecoveryResponse, buildStatusResponse, producerConsoleHtml, registerRoutes, uiBuildIsFresh } from "../src/routes";
 import { registerServices } from "../src/services";
 import { registerTools } from "../src/tools";
+
+function createMockRequest(method: string, url: string, body?: string, headers?: Record<string, string>): IncomingMessage {
+  const req = Readable.from(body ? [body] : []) as IncomingMessage;
+  req.method = method;
+  req.url = url;
+  req.headers = headers ?? {};
+  return req;
+}
+
+function createMockResponse() {
+  let body = "";
+  const headers: Record<string, string> = {};
+  const res = {
+    statusCode: 200,
+    headersSent: false,
+    setHeader(name: string, value: string) {
+      headers[name.toLowerCase()] = value;
+      return this;
+    },
+    end(chunk?: string | Buffer) {
+      if (chunk) {
+        body += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+      }
+      this.headersSent = true;
+      return this;
+    }
+  } as unknown as ServerResponse;
+
+  return {
+    res,
+    readBody: () => body,
+    readHeader: (name: string) => headers[name.toLowerCase()],
+    readStatus: () => (res as unknown as { statusCode: number }).statusCode
+  };
+}
 
 describe("prompt pack", () => {
   it("builds a valid prompt pack", () => {
@@ -112,7 +149,8 @@ describe("registration shells", () => {
       tools: [] as string[],
       hooks: [] as string[],
       services: [] as string[],
-      routes: [] as string[]
+      routes: [] as string[],
+      routeHandlers: new Map<string, (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void>()
     };
     const api = {
       registerTool(definition: { name: string }) {
@@ -124,8 +162,9 @@ describe("registration shells", () => {
       registerService(definition: { id?: string; name?: string }) {
         registered.services.push(definition.id ?? definition.name ?? "unknown");
       },
-      registerHttpRoute(definition: { path: string }) {
+      registerHttpRoute(definition: { path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void }) {
         registered.routes.push(definition.path);
+        registered.routeHandlers.set(definition.path, definition.handler);
       }
     };
 
@@ -167,5 +206,34 @@ describe("registration shells", () => {
     expect(consoleHtml).toContain("Artist Runtime");
     expect(consoleHtml).toContain("Run Cycle");
     expect((await buildConfigResponse()).artist.artistId).toBe("artist");
+
+    const rootHandler = registered.routeHandlers.get("/plugins/artist-runtime");
+    expect(rootHandler).toBeTruthy();
+    const rootResponse = createMockResponse();
+    await rootHandler?.(createMockRequest("GET", "/plugins/artist-runtime"), rootResponse.res);
+    expect(rootResponse.readStatus()).toBe(200);
+    expect(rootResponse.readHeader("content-type")).toContain("text/html");
+    expect(rootResponse.readBody()).toContain("Artist Runtime");
+
+    const statusHandler = registered.routeHandlers.get("/plugins/artist-runtime/api/status");
+    expect(statusHandler).toBeTruthy();
+    const statusResponse = createMockResponse();
+    await statusHandler?.(createMockRequest("GET", "/plugins/artist-runtime/api/status"), statusResponse.res);
+    expect(statusResponse.readHeader("content-type")).toContain("application/json");
+    expect(JSON.parse(statusResponse.readBody()).dryRun).toBe(true);
+
+    const platformTestHandler = registered.routeHandlers.get("/plugins/artist-runtime/api/platforms/:id/test");
+    expect(platformTestHandler).toBeTruthy();
+    const platformResponse = createMockResponse();
+    await platformTestHandler?.(
+      createMockRequest(
+        "POST",
+        "/plugins/artist-runtime/api/platforms/x/test",
+        JSON.stringify({ config: { artist: { workspaceRoot: mkdtempSync(join(tmpdir(), "artist-runtime-route-")) } } }),
+        { "content-type": "application/json" }
+      ),
+      platformResponse.res
+    );
+    expect(JSON.parse(platformResponse.readBody()).platform).toBe("x");
   });
 });
