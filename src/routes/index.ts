@@ -1,5 +1,6 @@
 import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { applyConfigDefaults } from "../config/schema.js";
 import { defaultArtistRuntimeConfig } from "../config/defaultConfig.js";
 import { InstagramConnector } from "../connectors/social/instagramConnector.js";
@@ -823,7 +824,15 @@ export function registerRoutes(api: unknown): void {
   });
 }
 
-export async function uiBuildIsFresh(projectRoot = process.cwd()): Promise<boolean> {
+const PLUGIN_ROOT = (() => {
+  try {
+    return join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+  } catch {
+    return process.cwd();
+  }
+})();
+
+export async function uiBuildIsFresh(projectRoot = PLUGIN_ROOT): Promise<boolean> {
   const uiRoot = join(projectRoot, "ui");
   const distIndexPath = join(uiRoot, "dist", "index.html");
   const distIndexStat = await stat(distIndexPath).catch(() => undefined);
@@ -843,7 +852,11 @@ export async function uiBuildIsFresh(projectRoot = process.cwd()): Promise<boole
   return sourceStats.every((sourceStat) => !sourceStat || sourceStat.mtimeMs <= distIndexStat.mtimeMs);
 }
 
-async function builtProducerConsoleHtml(projectRoot = process.cwd()): Promise<string | undefined> {
+function stripUiBasePath(assetPath: string): string {
+  return assetPath.replace(/^\/plugins\/artist-runtime\/ui\//, "").replace(/^\//, "");
+}
+
+async function builtProducerConsoleHtml(projectRoot = PLUGIN_ROOT): Promise<string | undefined> {
   try {
     if (!(await uiBuildIsFresh(projectRoot))) {
       return undefined;
@@ -853,8 +866,8 @@ async function builtProducerConsoleHtml(projectRoot = process.cwd()): Promise<st
     const indexHtml = await readFile(join(uiRoot, "index.html"), "utf8");
     const cssMatches = Array.from(indexHtml.matchAll(/<link[^>]+href="([^"]+\.css)"[^>]*>/g)).map((match) => match[1]);
     const scriptMatches = Array.from(indexHtml.matchAll(/<script[^>]+src="([^"]+\.js)"[^>]*><\/script>/g)).map((match) => match[1]);
-    const cssChunks = await Promise.all(cssMatches.map(async (href) => readFile(join(uiRoot, href.replace(/^\//, "")), "utf8")));
-    const scriptChunks = await Promise.all(scriptMatches.map(async (src) => readFile(join(uiRoot, src.replace(/^\//, "")), "utf8")));
+    const cssChunks = await Promise.all(cssMatches.map(async (href) => readFile(join(uiRoot, stripUiBasePath(href)), "utf8")));
+    const scriptChunks = await Promise.all(scriptMatches.map(async (src) => readFile(join(uiRoot, stripUiBasePath(src)), "utf8")));
 
     return indexHtml
       .replace(/<link[^>]+href="[^"]+\.css"[^>]*>/g, "")
