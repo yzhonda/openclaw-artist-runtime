@@ -14,3 +14,9 @@ coverage/
 songs/
 artist/
 .local/
+
+# workspace artifacts generated at repo root when workspaceRoot defaults to "."
+/ARTIST.md
+/HEARTBEAT.md
+/SOUL.md
+/runtime/
