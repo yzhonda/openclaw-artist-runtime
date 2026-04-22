@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  PLAYWRIGHT_CREATE_CARD_REASON,
   PLAYWRIGHT_CREATE_SKIPPED_REASON,
+  PLAYWRIGHT_LIBRARY_DIFF_REASON,
   PLAYWRIGHT_LIVE_TIMEOUT_REASON,
   PlaywrightSunoDriver,
   SUNO_LIBRARY_URL,
@@ -41,12 +43,14 @@ function createPage() {
   const counts: Record<string, number> = {
     "textarea[data-testid=\"lyrics-textarea\"]": 1
   };
+  const createCardSnapshots: string[][] = [];
   const songUrlSnapshots: string[][] = [
     ["https://suno.com/song/existing-1"]
   ];
   return {
     clicks,
     fills,
+    createCardSnapshots,
     songUrlSnapshots,
     goto: vi.fn(async () => undefined),
     waitForLoadState: vi.fn(async () => undefined),
@@ -65,7 +69,8 @@ function createPage() {
         clicks.push(selector);
       }),
       count: vi.fn(async () => counts[selector] ?? 0),
-      getAttribute: vi.fn(async (name: string) => (name === "aria-pressed" ? attributes[selector] ?? null : null))
+      getAttribute: vi.fn(async (name: string) => (name === "aria-pressed" ? attributes[selector] ?? null : null)),
+      evaluateAll: vi.fn(async () => createCardSnapshots.shift() ?? [])
     }))
   };
 }
@@ -159,7 +164,12 @@ describe("PlaywrightSunoDriver create", () => {
       ["https://suno.com/song/existing-1", "https://suno.com/song/new-1", "https://suno.com/song/new-2"]
     );
     launchPersistentContextMock.mockResolvedValue(context);
-    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "live");
+    const driver = new PlaywrightSunoDriver(
+      ".openclaw-browser-profiles/suno",
+      "live",
+      ".",
+      { intervalMs: 1, timeoutMs: 3, createCardTimeoutMs: 1 }
+    );
 
     const result = await driver.create({
       dryRun: false,
@@ -173,15 +183,82 @@ describe("PlaywrightSunoDriver create", () => {
     expect(result).toEqual({
       accepted: true,
       runId: "run-003",
-      reason: "submitted",
+      reason: PLAYWRIGHT_LIBRARY_DIFF_REASON,
       urls: ["https://suno.com/song/new-1", "https://suno.com/song/new-2"],
       dryRun: false
     });
     expect(page.clicks).toContain("button[aria-label=\"Create song\"]");
   });
 
+  it("returns accepted from create-card polling before library fallback", async () => {
+    const { page, context } = createContext();
+    page.createCardSnapshots.push([], ["https://suno.com/song/new-card-1"]);
+    launchPersistentContextMock.mockResolvedValue(context);
+    const driver = new PlaywrightSunoDriver(
+      ".openclaw-browser-profiles/suno",
+      "live",
+      ".",
+      { intervalMs: 1, timeoutMs: 4, createCardTimeoutMs: 2 }
+    );
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-003b",
+      payload: {
+        lyrics: "line one"
+      }
+    });
+
+    expect(result).toEqual({
+      accepted: true,
+      runId: "run-003b",
+      reason: PLAYWRIGHT_CREATE_CARD_REASON,
+      urls: ["https://suno.com/song/new-card-1"],
+      dryRun: false
+    });
+    expect(page.clicks).toContain("button[aria-label=\"Create song\"]");
+    expect(page.goto.mock.calls.filter(([url]) => url === SUNO_LIBRARY_URL)).toHaveLength(1);
+  });
+
+  it("falls back to library diff when create-card polling finds nothing", async () => {
+    const { page, context } = createContext();
+    page.createCardSnapshots.push([], [], []);
+    page.songUrlSnapshots.push(
+      ["https://suno.com/song/existing-1"],
+      ["https://suno.com/song/existing-1", "https://suno.com/song/new-lib-1"]
+    );
+    launchPersistentContextMock.mockResolvedValue(context);
+    const driver = new PlaywrightSunoDriver(
+      ".openclaw-browser-profiles/suno",
+      "live",
+      ".",
+      { intervalMs: 1, timeoutMs: 4, createCardTimeoutMs: 2 }
+    );
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-003c",
+      payload: {
+        lyrics: "line one"
+      }
+    });
+
+    expect(result).toEqual({
+      accepted: true,
+      runId: "run-003c",
+      reason: PLAYWRIGHT_LIBRARY_DIFF_REASON,
+      urls: ["https://suno.com/song/new-lib-1"],
+      dryRun: false
+    });
+    expect(page.waitForTimeout).toHaveBeenCalledWith(1);
+    expect(page.goto.mock.calls.filter(([url]) => url === SUNO_LIBRARY_URL).length).toBeGreaterThan(1);
+  });
+
   it("times out in live mode when no new song URLs appear", async () => {
     const { page, context } = createContext();
+    page.createCardSnapshots.push([], [], []);
     page.songUrlSnapshots.push(
       ["https://suno.com/song/existing-1"],
       ["https://suno.com/song/existing-1"],
@@ -192,7 +269,7 @@ describe("PlaywrightSunoDriver create", () => {
       ".openclaw-browser-profiles/suno",
       "live",
       ".",
-      { intervalMs: 1, timeoutMs: 2 }
+      { intervalMs: 1, timeoutMs: 4, createCardTimeoutMs: 2 }
     );
 
     const result = await driver.create({
@@ -208,6 +285,38 @@ describe("PlaywrightSunoDriver create", () => {
     expect(result.reason).toBe(PLAYWRIGHT_LIVE_TIMEOUT_REASON);
     expect(page.clicks).toContain("button[aria-label=\"Create song\"]");
     expect(page.waitForTimeout).toHaveBeenCalledWith(1);
+  });
+
+  it("times out when both create-card polling and library fallback find no new songs", async () => {
+    const { page, context } = createContext();
+    page.createCardSnapshots.push([], [], []);
+    page.songUrlSnapshots.push(
+      ["https://suno.com/song/existing-1"],
+      ["https://suno.com/song/existing-1"],
+      ["https://suno.com/song/existing-1"]
+    );
+    launchPersistentContextMock.mockResolvedValue(context);
+    const driver = new PlaywrightSunoDriver(
+      ".openclaw-browser-profiles/suno",
+      "live",
+      ".",
+      { intervalMs: 1, timeoutMs: 4, createCardTimeoutMs: 2 }
+    );
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-004b",
+      payload: {
+        lyrics: "line one"
+      }
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe(PLAYWRIGHT_LIVE_TIMEOUT_REASON);
+    expect(page.clicks).toContain("button[aria-label=\"Create song\"]");
+    expect(page.waitForTimeout).toHaveBeenCalledWith(1);
+    expect(page.goto.mock.calls.filter(([url]) => url === SUNO_LIBRARY_URL).length).toBeGreaterThan(1);
   });
 
   it("fails closed when Playwright launch raises an error", async () => {

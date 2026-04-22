@@ -78,6 +78,8 @@ Producer Console status surfaces. In practice that means:
   downloader under `runtime/suno/<runId>/`.
   It now also returns lightweight import metadata and `.m4a` fallback assets
   through the same worker/status path.
+  Live create polling now prefers `/create` generation-card song links before
+  falling back to the older `/me` library-diff lane.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -169,6 +171,8 @@ workaround.
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
 - `tests/suno-playwright-create.test.ts`
+  This suite now fixes the two-stage live polling contract: `/create` card
+  success, `/me` fallback success, and full timeout.
 - `tests/suno-playwright-import.test.ts`
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`

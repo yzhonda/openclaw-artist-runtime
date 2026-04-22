@@ -107,7 +107,8 @@ To control create behavior separately:
 
 `submitMode: "skip"` is the default and fills the Suno form without clicking
 `Create`. `submitMode: "live"` is now the operator-approved path that clicks
-`Create` and waits for new Suno song URLs to appear in the library.
+`Create` and waits for new Suno song URLs to appear first on `/create`, then in
+the library if the card view stays silent.
 
 ## Dry-run vs live
 
@@ -131,8 +132,11 @@ The live create lane now performs the following:
    payload includes them;
 4. clicks `button[aria-label="Create song"]` only when
    `music.suno.submitMode = "live"`;
-5. polls the library every 3 seconds for up to 10 minutes and returns the new
-   `/song/<uuid>` URLs once they appear.
+5. polls `/create` generation cards every 3 seconds for up to 3 minutes and
+   prefers those song URLs first;
+6. if `/create` stays quiet, falls back to `https://suno.com/me` library diff
+   polling for the remaining 7 minutes;
+7. returns the new `/song/<uuid>` URLs once either lane observes them.
 
 If no new song URLs appear before timeout, the driver returns
 `playwright_live_timeout`.

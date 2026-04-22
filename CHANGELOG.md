@@ -13,6 +13,7 @@
 - Added Round 40 live submit polling so the Playwright Suno lane can click `Create` and wait for new library song URLs when `music.suno.submitMode = "live"`.
 - Added Round 41 audio import/download so finished Suno song URLs can be revisited and saved under `runtime/suno/<runId>/` as local mp3 artifacts.
 - Added Round 41.1 import metadata/status surfacing so saved Suno assets now carry `format`, optional `title`, and optional `durationSec`, with `/api/status` exposing the imported paths/metadata.
+- Added Round 41.2 two-stage live submit polling so `/create` generation cards are checked before the older library-diff fallback.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
@@ -22,6 +23,7 @@
 - The Playwright Suno lane now snapshots existing library URLs, submits live generations only in `submitMode = "live"`, and fails closed with `playwright_live_timeout` when no new song URLs arrive.
 - The Playwright Suno lane now turns returned `/song/<uuid>` URLs into local mp3 files and reports partial-import failures without discarding successful downloads.
 - The Playwright Suno import lane now falls back to `.m4a` when `.mp3` is unavailable and mirrors saved paths plus lightweight metadata into the worker status surface.
+- The Playwright live create lane now reports whether success came from `/create` card polling or the `/me` library-diff fallback, while keeping the library path as the final safety net.
 
 ### Fixed
 - Suno Google OAuth login now uses the stealth-plugin + Chrome-channel probe/login lane instead of the default automation markers that were getting blocked.
