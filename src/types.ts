@@ -18,12 +18,13 @@ export const socialAuthorityModes = [
 ] as const;
 export const socialRiskLevels = ["low", "medium", "high"] as const;
 export const capabilityStates = [true, false, "unknown"] as const;
-export const sunoWorkerStates = ["disconnected", "connected", "login_challenge", "captcha", "payment_prompt", "ui_mismatch", "quota_exhausted", "paused"] as const;
+export const sunoWorkerStates = ["disconnected", "connecting", "connected", "login_required", "login_challenge", "captcha", "payment_prompt", "ui_mismatch", "quota_exhausted", "paused", "stopped"] as const;
 export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generation", "take_selection", "asset_generation", "publishing", "completed", "paused", "failed_closed"] as const;
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "published", "archived", "failed"] as const;
 export const sunoRunStatuses = ["blocked_dry_run", "blocked_authority", "accepted", "imported", "failed"] as const;
 export const alertSeverities = ["info", "warning", "critical"] as const;
 export const setupChecklistStates = ["complete", "pending", "attention"] as const;
+export const sunoLoginHandoffStates = ["waiting_for_operator", "completed"] as const;
 
 export type ProducerDigestMode = (typeof producerDigestModes)[number];
 export type SunoConnectionMode = (typeof sunoConnectionModes)[number];
@@ -43,6 +44,7 @@ export type SongStatus = (typeof songStatuses)[number];
 export type SunoRunStatus = (typeof sunoRunStatuses)[number];
 export type AlertSeverity = (typeof alertSeverities)[number];
 export type SetupChecklistState = (typeof setupChecklistStates)[number];
+export type SunoLoginHandoffState = (typeof sunoLoginHandoffStates)[number];
 
 export interface ArtistConfig {
   mode: "public_artist";
@@ -336,6 +338,14 @@ export interface SocialDistributionWorkerStatus {
   repliesToday: number;
 }
 
+export interface SunoLoginHandoff {
+  state: SunoLoginHandoffState;
+  reason: "operator_login_required" | "reconnect_requested" | "login_challenge" | "captcha" | "payment_prompt";
+  message: string;
+  requestedAt: string;
+  completedAt?: string;
+}
+
 export interface SunoWorkerStatus {
   state: SunoWorkerState;
   connected: boolean;
@@ -343,6 +353,7 @@ export interface SunoWorkerStatus {
   lastTransitionAt?: string;
   failureCount?: number;
   pendingAction?: string;
+  loginHandoff?: SunoLoginHandoff;
 }
 
 export interface SunoCreateRequest {
