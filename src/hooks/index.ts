@@ -19,4 +19,16 @@ export function registerHooks(api: unknown): void {
     event: "after_tool_call",
     handler: async () => ({ status: "audited" })
   });
+
+  // P3 anchor: gateway lifecycle hooks. skeleton only — autopilot.runCycle の
+  // 周期呼び出しは P3 本実装で乗せる。詳細: docs/log/codex/008-heartbeat-research.md
+  safeRegisterHook(api, {
+    event: "gateway_start",
+    handler: async () => ({ status: "artist-runtime:ready" })
+  });
+
+  safeRegisterHook(api, {
+    event: "gateway_stop",
+    handler: async () => ({ status: "artist-runtime:stopped" })
+  });
 }
