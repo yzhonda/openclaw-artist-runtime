@@ -15,10 +15,11 @@ export type ConfigEditorSource = {
     cycleIntervalMinutes: number;
   };
   distribution: {
+    liveGoArmed: boolean;
     platforms: {
-      x: { enabled: boolean; authority: XAuthority };
-      instagram: { enabled: boolean; authority: InstagramAuthority };
-      tiktok: { enabled: boolean; authority: TikTokAuthority };
+      x: { enabled: boolean; liveGoArmed: boolean; authority: XAuthority };
+      instagram: { enabled: boolean; liveGoArmed: boolean; authority: InstagramAuthority };
+      tiktok: { enabled: boolean; liveGoArmed: boolean; authority: TikTokAuthority };
     };
   };
 };
@@ -28,11 +29,15 @@ export type ConfigDraft = {
   dryRun: boolean;
   songsPerWeek: string;
   cycleIntervalMinutes: string;
+  distributionLiveGoArmed: boolean;
   xEnabled: boolean;
+  xLiveGoArmed: boolean;
   xAuthority: XAuthority;
   instagramEnabled: boolean;
+  instagramLiveGoArmed: boolean;
   instagramAuthority: InstagramAuthority;
   tiktokEnabled: boolean;
+  tiktokLiveGoArmed: boolean;
   tiktokAuthority: TikTokAuthority;
 };
 
@@ -44,10 +49,11 @@ export type ConfigUpdatePatch = {
     cycleIntervalMinutes: number;
   };
   distribution: {
+    liveGoArmed: boolean;
     platforms: {
-      x: { enabled: boolean; authority: XAuthority };
-      instagram: { enabled: boolean; authority: InstagramAuthority };
-      tiktok: { enabled: boolean; authority: TikTokAuthority };
+      x: { enabled: boolean; liveGoArmed: boolean; authority: XAuthority };
+      instagram: { enabled: boolean; liveGoArmed: boolean; authority: InstagramAuthority };
+      tiktok: { enabled: boolean; liveGoArmed: boolean; authority: TikTokAuthority };
     };
   };
 };
@@ -66,11 +72,15 @@ export function buildConfigDraft(source: ConfigEditorSource): ConfigDraft {
     dryRun: source.autopilot.dryRun,
     songsPerWeek: String(source.autopilot.songsPerWeek),
     cycleIntervalMinutes: String(source.autopilot.cycleIntervalMinutes),
+    distributionLiveGoArmed: source.distribution.liveGoArmed,
     xEnabled: source.distribution.platforms.x.enabled,
+    xLiveGoArmed: source.distribution.platforms.x.liveGoArmed,
     xAuthority: source.distribution.platforms.x.authority,
     instagramEnabled: source.distribution.platforms.instagram.enabled,
+    instagramLiveGoArmed: source.distribution.platforms.instagram.liveGoArmed,
     instagramAuthority: source.distribution.platforms.instagram.authority,
     tiktokEnabled: source.distribution.platforms.tiktok.enabled,
+    tiktokLiveGoArmed: source.distribution.platforms.tiktok.liveGoArmed,
     tiktokAuthority: source.distribution.platforms.tiktok.authority
   };
 }
@@ -107,10 +117,12 @@ export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
       cycleIntervalMinutes
     },
     distribution: {
+      liveGoArmed: draft.distributionLiveGoArmed,
       platforms: {
-        x: { enabled: draft.xEnabled, authority: draft.xAuthority },
-        instagram: { enabled: draft.instagramEnabled, authority: draft.instagramAuthority },
-        tiktok: { enabled: draft.tiktokEnabled, authority: draft.tiktokAuthority }
+        x: { enabled: draft.xEnabled, liveGoArmed: draft.xLiveGoArmed, authority: draft.xAuthority },
+        instagram: { enabled: draft.instagramEnabled, liveGoArmed: draft.instagramLiveGoArmed, authority: draft.instagramAuthority },
+        // TikTok stays frozen in the UI lane until the operator account exists.
+        tiktok: { enabled: draft.tiktokEnabled, liveGoArmed: false, authority: draft.tiktokAuthority }
       }
     }
   };

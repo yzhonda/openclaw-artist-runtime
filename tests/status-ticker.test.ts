@@ -114,6 +114,46 @@ describe("status ticker and reply simulation routes", () => {
     expect(status.platforms.x.effectiveDryRun).toBe(true);
     expect(status.platforms.instagram.liveGoArmed).toBe(false);
     expect(status.platforms.instagram.effectiveDryRun).toBe(true);
+    expect(status.platforms.tiktok.liveGoArmed).toBe(false);
+    expect(status.platforms.tiktok.effectiveDryRun).toBe(true);
+  });
+
+  it("surfaces armed global and X platform live-go state in /api/status", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-live-go-"));
+    await ensureArtistWorkspace(root);
+    await patchResolvedConfig(root, {
+      artist: { workspaceRoot: root },
+      autopilot: { enabled: true, dryRun: false },
+      distribution: {
+        enabled: true,
+        liveGoArmed: true,
+        platforms: {
+          x: { enabled: true, liveGoArmed: true },
+          instagram: { enabled: true, liveGoArmed: false },
+          tiktok: { enabled: true, liveGoArmed: true }
+        }
+      }
+    });
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.distributionWorker.liveGoArmed).toBe(true);
+    expect(status.distributionWorker.platformLiveGoArmed).toMatchObject({
+      x: true,
+      instagram: false,
+      tiktok: false
+    });
+    expect(status.distributionWorker.effectiveDryRun).toMatchObject({
+      x: false,
+      instagram: true,
+      tiktok: true
+    });
+    expect(status.platforms.x.liveGoArmed).toBe(true);
+    expect(status.platforms.x.effectiveDryRun).toBe(false);
+    expect(status.platforms.tiktok.liveGoArmed).toBe(false);
+    expect(status.platforms.tiktok.effectiveDryRun).toBe(true);
   });
 
   it("updates ticker getters when /api/run-cycle is triggered", async () => {
