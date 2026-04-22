@@ -238,6 +238,24 @@ export class ArtistAutopilotService {
       lastRunAt: nowIso()
     };
 
+    if (
+      song
+      && stage === "publishing"
+      && existing.lastSuccessfulStage === "publishing"
+      && config.autopilot.dryRun
+      && existing.blockedReason?.includes("dry-run")
+    ) {
+      return writeAutopilotState(input.workspaceRoot, {
+        ...baseState,
+        currentSongId: song.songId,
+        stage: "completed",
+        blockedReason: existing.blockedReason,
+        lastError: undefined,
+        lastSuccessfulStage: "completed",
+        cycleCount: existing.cycleCount + 1
+      });
+    }
+
     if (existing.runId === runId && existing.lastSuccessfulStage === stage && stage !== "planning") {
       return writeAutopilotState(input.workspaceRoot, baseState);
     }
