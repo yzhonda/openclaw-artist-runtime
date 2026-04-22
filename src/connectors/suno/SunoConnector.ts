@@ -3,5 +3,5 @@ import type { SunoCreateRequest, SunoCreateResult, SunoImportResult, SunoWorkerS
 export interface SunoConnector {
   status(): Promise<SunoWorkerStatus>;
   create(input: SunoCreateRequest): Promise<SunoCreateResult>;
-  importResults(input: { runId: string }): Promise<SunoImportResult>;
+  importResults(input: { runId: string; urls: string[] }): Promise<SunoImportResult>;
 }

@@ -174,7 +174,8 @@ export class SunoBrowserWorker {
     if (driverMode === "playwright") {
       return new PlaywrightSunoDriver(
         this.options.profilePath ?? DEFAULT_SUNO_PROFILE_PATH,
-        this.options.submitMode ?? this.options.config?.music?.suno?.submitMode ?? "skip"
+        this.options.submitMode ?? this.options.config?.music?.suno?.submitMode ?? "skip",
+        this.workspaceRoot
       );
     }
 
@@ -387,7 +388,7 @@ export class SunoBrowserWorker {
     return result;
   }
 
-  async importRun(runId: string, options: WorkerAutomationOptions = {}): Promise<SunoImportResult> {
+  async importRun(runId: string, urls: string[] = [], options: WorkerAutomationOptions = {}): Promise<SunoImportResult> {
     const current = await this.readState();
     const dryRun = options.dryRun ?? false;
     const driver = this.resolveDriver(options.driver);
@@ -434,8 +435,10 @@ export class SunoBrowserWorker {
         }
       });
       return {
+        accepted: false,
         runId,
         urls: [],
+        paths: [],
         importedAt: now(),
         reason: "dry-run blocks Suno import",
         dryRun: true
@@ -458,13 +461,15 @@ export class SunoBrowserWorker {
         }
       });
       return {
+        accepted: false,
         runId,
         urls: [],
+        paths: [],
         reason: "suno_browser_driver_missing_import"
       };
     }
 
-    const result = await driver.importResults({ runId });
+    const result = await driver.importResults({ runId, urls });
     await this.transition({
       state: "connected",
       connected: true,

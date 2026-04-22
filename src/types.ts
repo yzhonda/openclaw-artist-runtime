@@ -397,10 +397,13 @@ export interface SunoCreateResult {
 
 export interface SunoImportRequest {
   runId: string;
+  urls: string[];
 }
 
 export interface SunoImportResult {
+  accepted?: boolean;
   urls: string[];
+  paths?: string[];
   runId?: string;
   selectedTakeId?: string;
   importedAt?: string;

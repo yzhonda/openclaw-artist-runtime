@@ -27,10 +27,12 @@ function createDriver(overrides: Partial<SunoBrowserDriver> = {}): SunoBrowserDr
         urls: []
       };
     },
-    async importResults({ runId }) {
+    async importResults({ runId, urls }) {
       return {
+        accepted: urls.length > 0,
         runId,
-        urls: ["https://example.com/take-1.mp3"],
+        urls,
+        paths: ["runtime/suno/run-driver/take-1.mp3"],
         importedAt: "2026-04-22T00:00:00.000Z"
       };
     },
@@ -116,13 +118,14 @@ describe("SunoBrowserWorker automation skeleton", () => {
     const worker = new SunoBrowserWorker(root);
     const driver = createDriver({ importResults: vi.fn() });
 
-    const result = await worker.importRun("run-dry-import", { driver, dryRun: true });
+    const result = await worker.importRun("run-dry-import", ["https://example.com/song-1"], { driver, dryRun: true });
     const status = await worker.status();
 
     expect(result).toMatchObject({
       runId: "run-dry-import",
       reason: "dry-run blocks Suno import",
-      dryRun: true
+      dryRun: true,
+      accepted: false
     });
     expect(driver.importResults).not.toHaveBeenCalled();
     expect(status.state).toBe("connected");
@@ -135,20 +138,23 @@ describe("SunoBrowserWorker automation skeleton", () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-import-real-"));
     const worker = new SunoBrowserWorker(root);
     const driver = createDriver({
-      importResults: vi.fn(async ({ runId }) => ({
+      importResults: vi.fn(async ({ runId, urls }) => ({
+        accepted: true,
         runId,
-        urls: ["https://example.com/take-1.mp3"],
+        urls,
+        paths: ["runtime/suno/run-real-import/song-1.mp3"],
         importedAt: "2026-04-22T00:00:00.000Z"
       }))
     });
 
     await worker.start({ driver });
-    const result = await worker.importRun("run-real-import", { driver });
+    const result = await worker.importRun("run-real-import", ["https://example.com/song-1"], { driver });
     const status = await worker.status();
 
     expect(driver.importResults).toHaveBeenCalledTimes(1);
     expect(result.runId).toBe("run-real-import");
-    expect(result.urls).toEqual(["https://example.com/take-1.mp3"]);
+    expect(result.urls).toEqual(["https://example.com/song-1"]);
+    expect(result.paths).toEqual(["runtime/suno/run-real-import/song-1.mp3"]);
     expect(status.state).toBe("connected");
     expect(status.lastImportedRunId).toBe("run-real-import");
     expect(spawnMock).not.toHaveBeenCalled();
@@ -168,8 +174,10 @@ describe("SunoBrowserWorker automation skeleton", () => {
       dryRun: true
     }));
     const importRun = vi.fn(async () => ({
+      accepted: false,
       runId: "run-connector-import",
       urls: [],
+      paths: [],
       reason: "dry-run blocks Suno import",
       dryRun: true
     }));
@@ -185,13 +193,16 @@ describe("SunoBrowserWorker automation skeleton", () => {
       payload: { style: "test" },
       runId: "run-connector-create"
     });
-    const importResult = await connector.importResults({ runId: "run-connector-import" });
+    const importResult = await connector.importResults({
+      runId: "run-connector-import",
+      urls: ["https://example.com/song-1"]
+    });
 
     expect(startCreate).toHaveBeenCalledWith(
       expect.objectContaining({ runId: "run-connector-create" }),
       { dryRun: true }
     );
-    expect(importRun).toHaveBeenCalledWith("run-connector-import");
+    expect(importRun).toHaveBeenCalledWith("run-connector-import", ["https://example.com/song-1"]);
     expect(createResult.runId).toBe("run-connector-create");
     expect(importResult.runId).toBe("run-connector-import");
     expect(spawnMock).not.toHaveBeenCalled();
@@ -208,9 +219,11 @@ describe("SunoBrowserWorker automation skeleton", () => {
         reason: "mock create accepted",
         urls: []
       })),
-      importResults: vi.fn(async ({ runId }) => ({
+      importResults: vi.fn(async ({ runId, urls }) => ({
+        accepted: true,
         runId,
-        urls: ["https://example.com/take-1.mp3"],
+        urls,
+        paths: ["runtime/suno/run-status-import/song-1.mp3"],
         importedAt: "2026-04-22T00:00:00.000Z",
         reason: "mock import complete"
       }))
@@ -226,7 +239,7 @@ describe("SunoBrowserWorker automation skeleton", () => {
       },
       { driver }
     );
-    await worker.importRun("run-status-import", { driver });
+    await worker.importRun("run-status-import", ["https://example.com/song-1"], { driver });
 
     const status = await buildSunoStatusResponse({ artist: { workspaceRoot: root } });
 

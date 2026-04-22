@@ -11,6 +11,7 @@
 - Added `playwright-extra` and `puppeteer-extra-plugin-stealth` so the Suno login lane can ride the Chrome/stealth path documented for operators.
 - Added Round 39 Playwright create-form fill support plus `music.suno.submitMode`, keeping the Create button blocked while the Suno lane stays credit-safe.
 - Added Round 40 live submit polling so the Playwright Suno lane can click `Create` and wait for new library song URLs when `music.suno.submitMode = "live"`.
+- Added Round 41 audio import/download so finished Suno song URLs can be revisited and saved under `runtime/suno/<runId>/` as local mp3 artifacts.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
@@ -18,6 +19,7 @@
 - Added the `playwright` runtime dependency and documented the operator-side Chromium install boundary without enabling real create/import yet.
 - The Playwright Suno lane now fills lyrics/style/instrumental fields on `/create` and returns `submit_skipped` until Round 40 unlocks real submission.
 - The Playwright Suno lane now snapshots existing library URLs, submits live generations only in `submitMode = "live"`, and fails closed with `playwright_live_timeout` when no new song URLs arrive.
+- The Playwright Suno lane now turns returned `/song/<uuid>` URLs into local mp3 files and reports partial-import failures without discarding successful downloads.
 
 ### Fixed
 - Suno Google OAuth login now uses the stealth-plugin + Chrome-channel probe/login lane instead of the default automation markers that were getting blocked.
