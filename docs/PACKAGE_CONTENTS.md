@@ -113,6 +113,7 @@ The Console source now includes:
 
 - a live config editor (`ui/src/configEditor.ts`)
 - platform authority selectors for X / Instagram / TikTok
+- platform probe badges plus rerun controls for X / Instagram
 - ticker and recent X dry-run status
 - Suno lifecycle plus create/import outcome cards rendered from `/api/suno/status`
 - the same Suno/status markers mirrored in the fallback inline Console shell
@@ -181,6 +182,12 @@ workaround.
   Round 45 adds the per-platform arm seam, proving that global + platform flags
   must both be armed before upstream dry-run can release.
 - `tests/tiktok-connector.test.ts`
+  This suite now fixes the Round 47 freeze boundary: `checkConnection()` stays
+  on `account_not_created` even if TikTok auth env vars are present.
+- `tests/platform-probe-badge-wiring.test.ts`
+  This suite fixes the Round 47 route/UI seam: X and Instagram probes can be
+  rerun through `/api/platforms/{id}/test`, while TikTok stays frozen at
+  `account_not_created` even when env vars are set.
 - `tests/social-publishing-reply.test.ts`
 - `tests/config-update-route.test.ts`
   This suite now also locks the Round 46 TikTok freeze boundary: even if

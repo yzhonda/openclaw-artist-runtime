@@ -19,6 +19,7 @@
 - Added Round 44 `distribution.liveGoArmed` plus `/api/status` dry-run surfacing so the producer can see the global social live arm and each platform's effective dry-run state.
 - Added Round 45 per-platform `distribution.platforms.{x,instagram,tiktok}.liveGoArmed` flags so each social lane now needs both the global arm and its own platform arm before upstream dry-run can release.
 - Added Round 46 Producer Console live-go toggles for the global arm plus X / Instagram platform arms, while keeping TikTok visibly frozen in the UI.
+- Added Round 47 Producer Console probe badges plus rerun controls for X / Instagram, while keeping TikTok visually frozen and probe-disabled.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
@@ -34,6 +35,7 @@
 - `publishSocialAction()` now also forces social publish back into dry-run whenever `distribution.liveGoArmed` is false, and `distributionWorker` mirrors `liveGoArmed` plus per-platform `effectiveDryRun` into `/api/status`.
 - `publishSocialAction()` now also holds the social lane in dry-run whenever the target platform arm is off, and `/api/status` mirrors `platformLiveGoArmed` alongside each platform's `effectiveDryRun`.
 - Producer Console config payloads now carry global/per-platform live-go arms through the existing `/api/config/update` flow, with TikTok forced back to `liveGoArmed=false` at persistence time.
+- TikTok connector health now reports `account_not_created` regardless of env state, and the UI short-circuits all TikTok probe fetch paths before they can fire.
 
 ### Fixed
 - Suno Google OAuth login now uses the stealth-plugin + Chrome-channel probe/login lane instead of the default automation markers that were getting blocked.

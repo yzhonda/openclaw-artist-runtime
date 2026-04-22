@@ -132,24 +132,24 @@ Use it together with:
 
 ### Contract
 
-- The current connector checks one of:
-  - `OPENCLAW_TIKTOK_AUTH`
-  - `OPENCLAW_TIKTOK_ACCESS_TOKEN`
-- If neither variable is present, the connector reports
-  `tiktok_auth_not_configured`.
+- TikTok is currently frozen while the operator account is not created.
+- `POST /plugins/artist-runtime/api/platforms/tiktok/test` reports
+  `account_not_created` regardless of local env state.
+- Producer Console shows the TikTok probe badge as frozen and keeps the probe
+  button disabled, so the UI never emits a TikTok probe fetch.
 
 ### Refresh
 
-1. Update `OPENCLAW_TIKTOK_AUTH` or `OPENCLAW_TIKTOK_ACCESS_TOKEN` in the active
-   shell environment or launch profile.
-2. Reload the shell/session that launches OpenClaw so the environment is current.
-3. Re-run [`POST /plugins/artist-runtime/api/platforms/tiktok/test`](./API_ROUTES.md#post-apiplatformstiktoktest).
+1. Treat TikTok as frozen until the operator has actually created the account.
+2. Keep [`POST /plugins/artist-runtime/api/platforms/tiktok/test`](./API_ROUTES.md#post-apiplatformstiktoktest)
+   as the canonical status route; it should stay on `account_not_created` in
+   this lane.
+3. Do not arm or probe TikTok from Producer Console while the freeze is active.
 
 ### Dry-run behavior
 
-- TikTok remains a dry-run-safe skeleton today. Capability checks can report
-  configured/not-configured state, but publish/reply stay fail-closed until a
-  real adapter is introduced.
+- TikTok remains a dry-run-safe skeleton today. Publish/reply stay fail-closed
+  until a real adapter is introduced.
 - The upstream social pipeline also requires both the global arm and the TikTok
   platform arm to be `true` before it will even attempt to leave dry-run.
 - Producer Console keeps the TikTok arm visible but frozen, reflecting the
