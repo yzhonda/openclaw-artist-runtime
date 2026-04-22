@@ -93,7 +93,8 @@ dispatch under the current OpenClaw Gateway matcher, and CI regression gates on
 
 See `CHANGELOG.md` for the active feature set. For implementation details and
 contributor onboarding, start with `AGENTS.md`, then `CODEX_START_HERE.md`, then the
-docs in order.
+docs in order. For the live plugin HTTP surface, use `docs/API_ROUTES.md` as the
+route catalog.
 
 ## Key package files
 
@@ -226,6 +227,12 @@ SECURITY.md
 PRIVACY.md
 MARKETPLACE.md
 PUBLISHING.md
+```
+
+For the plugin HTTP/API surface, start with:
+
+```txt
+docs/API_ROUTES.md
 ```
 
 The package is deliberately larger than a minimal plugin sample because it is meant to preserve enough detail for a coding agent to continue implementation without access to the original conversation.

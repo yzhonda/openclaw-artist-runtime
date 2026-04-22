@@ -41,6 +41,7 @@ The package still needs curation: built UI assets belong in the tarball, while l
 ├── docs/full-spec/                    # original detailed product/architecture specs
 ├── docs/codex-detailed-specs/         # same detailed specs retained for compatibility
 ├── docs/*.md                          # distribution-focused docs
+├── docs/API_ROUTES.md                 # plugin HTTP route catalog for Console consumers
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -107,6 +108,15 @@ The config editor source now owns both:
 
 - enable/disable toggles for each social platform
 - authority-mode payload shaping for `distribution.platforms.{x,instagram,tiktok}.authority`
+
+### API route catalog
+
+- `docs/API_ROUTES.md`
+
+This document exists so plugin consumers do not have to reverse-read
+`src/routes/index.ts` just to understand the HTTP surface. It catalogs the
+Console shell route plus the `/api/*` read and mutating routes, including the
+family-dispatch note required by the current OpenClaw Gateway matcher behavior.
 
 ### Repo-local OpenClaw sandbox scripts
 
