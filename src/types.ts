@@ -356,6 +356,20 @@ export interface SunoWorkerStatus {
   loginHandoff?: SunoLoginHandoff;
   currentRunId?: string;
   lastImportedRunId?: string;
+  lastCreateOutcome?: {
+    runId: string;
+    accepted: boolean;
+    reason: string;
+    at: string;
+    dryRun?: boolean;
+  };
+  lastImportOutcome?: {
+    runId: string;
+    urlCount: number;
+    reason?: string;
+    at: string;
+    dryRun?: boolean;
+  };
 }
 
 export interface SunoCreateRequest {
@@ -557,4 +571,17 @@ export interface StatusResponse {
   recentSong?: SongState;
   lastSunoRun?: SunoRunRecord;
   lastSocialAction?: SocialPublishLedgerEntry;
+}
+
+export interface SunoStatusResponse {
+  worker: SunoWorkerStatus;
+  currentSongId?: string;
+  latestRun?: SunoRunRecord;
+  recentRuns: SunoRunRecord[];
+  latestPromptPackVersion?: number;
+  latestPromptPackMetadata?: unknown;
+  currentRunId?: string;
+  lastImportedRunId?: string;
+  lastCreateOutcome?: SunoWorkerStatus["lastCreateOutcome"];
+  lastImportOutcome?: SunoWorkerStatus["lastImportOutcome"];
 }

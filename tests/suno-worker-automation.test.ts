@@ -2,6 +2,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildSunoStatusResponse } from "../src/routes";
+import { BrowserWorkerSunoConnector } from "../src/connectors/suno/browserWorkerConnector";
 import { SunoBrowserWorker, type SunoBrowserDriver } from "../src/services/sunoBrowserWorker";
 
 const { spawnMock } = vi.hoisted(() => ({
@@ -149,6 +151,97 @@ describe("SunoBrowserWorker automation skeleton", () => {
     expect(result.urls).toEqual(["https://example.com/take-1.mp3"]);
     expect(status.state).toBe("connected");
     expect(status.lastImportedRunId).toBe("run-real-import");
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("routes connector create/import through worker methods", async () => {
+    const status = vi.fn(async () => ({
+      state: "connected" as const,
+      connected: true
+    }));
+    const startCreate = vi.fn(async () => ({
+      accepted: false,
+      runId: "run-connector-create",
+      reason: "dry-run blocks Suno create",
+      urls: [],
+      dryRun: true
+    }));
+    const importRun = vi.fn(async () => ({
+      runId: "run-connector-import",
+      urls: [],
+      reason: "dry-run blocks Suno import",
+      dryRun: true
+    }));
+    const connector = new BrowserWorkerSunoConnector(".", {
+      status,
+      startCreate,
+      importRun
+    });
+
+    const createResult = await connector.create({
+      dryRun: true,
+      authority: "auto_create_and_select_take",
+      payload: { style: "test" },
+      runId: "run-connector-create"
+    });
+    const importResult = await connector.importResults({ runId: "run-connector-import" });
+
+    expect(startCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: "run-connector-create" }),
+      { dryRun: true }
+    );
+    expect(importRun).toHaveBeenCalledWith("run-connector-import");
+    expect(createResult.runId).toBe("run-connector-create");
+    expect(importResult.runId).toBe("run-connector-import");
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("exposes create/import outcomes through /api/suno/status", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-status-"));
+    const worker = new SunoBrowserWorker(root);
+    const driver = createDriver({
+      create: vi.fn(async (request) => ({
+        accepted: true,
+        runId: request.runId ?? "run-status-create",
+        reason: "mock create accepted",
+        urls: []
+      })),
+      importResults: vi.fn(async ({ runId }) => ({
+        runId,
+        urls: ["https://example.com/take-1.mp3"],
+        importedAt: "2026-04-22T00:00:00.000Z",
+        reason: "mock import complete"
+      }))
+    });
+
+    await worker.start({ driver });
+    await worker.startCreate(
+      {
+        dryRun: false,
+        authority: "auto_create_and_select_take",
+        payload: { style: "test" },
+        runId: "run-status-create"
+      },
+      { driver }
+    );
+    await worker.importRun("run-status-import", { driver });
+
+    const status = await buildSunoStatusResponse({ artist: { workspaceRoot: root } });
+
+    expect(status.currentRunId).toBe("run-status-import");
+    expect(status.lastImportedRunId).toBe("run-status-import");
+    expect(status.lastCreateOutcome).toMatchObject({
+      runId: "run-status-create",
+      accepted: true,
+      reason: "mock create accepted"
+    });
+    expect(status.lastImportOutcome).toMatchObject({
+      runId: "run-status-import",
+      urlCount: 1,
+      reason: "mock import complete"
+    });
     expect(spawnMock).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

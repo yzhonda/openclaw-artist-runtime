@@ -32,6 +32,7 @@ import type {
   SocialPlatform,
   SocialPublishLedgerEntry,
   StatusResponse,
+  SunoStatusResponse,
   SunoRunRecord
 } from "../types.js";
 
@@ -426,7 +427,7 @@ export async function buildPlatformDetailResponse(platform: SocialPlatform, conf
   return (await buildPlatformStatuses(mergedConfig))[platform];
 }
 
-export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConfig>) {
+export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConfig>): Promise<SunoStatusResponse> {
   const mergedConfig = await resolveRuntimeConfig(config);
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
   const recentSong = (await listSongStates(workspaceRoot))[0];
@@ -438,7 +439,11 @@ export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConf
     latestRun: recentSong ? await readLatestSunoRun(workspaceRoot, recentSong.songId) : undefined,
     recentRuns: recentSong ? await readAllSunoRuns(workspaceRoot, recentSong.songId) : [],
     latestPromptPackVersion: latestPromptPack?.version,
-    latestPromptPackMetadata: latestPromptPack?.metadata
+    latestPromptPackMetadata: latestPromptPack?.metadata,
+    currentRunId: worker.currentRunId,
+    lastImportedRunId: worker.lastImportedRunId,
+    lastCreateOutcome: worker.lastCreateOutcome,
+    lastImportOutcome: worker.lastImportOutcome
   };
 }
 

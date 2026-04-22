@@ -2,23 +2,20 @@ import type { SunoCreateRequest, SunoCreateResult, SunoImportResult } from "../.
 import { SunoBrowserWorker } from "../../services/sunoBrowserWorker.js";
 import type { SunoConnector } from "./SunoConnector.js";
 
+type WorkerMethods = Pick<SunoBrowserWorker, "status" | "startCreate" | "importRun">;
+
 export class BrowserWorkerSunoConnector implements SunoConnector {
-  constructor(private readonly workspaceRoot = ".", private readonly worker = new SunoBrowserWorker(workspaceRoot)) {}
+  constructor(private readonly workspaceRoot = ".", private readonly worker: WorkerMethods = new SunoBrowserWorker(workspaceRoot)) {}
 
   async status() {
     return this.worker.status();
   }
 
   async create(input: SunoCreateRequest): Promise<SunoCreateResult> {
-    return {
-      accepted: false,
-      runId: `dry_${Date.now().toString(36)}`,
-      reason: input.dryRun ? "dry-run blocks Suno create" : "Suno browser worker is not enabled in this environment",
-      urls: []
-    };
+    return this.worker.startCreate(input, { dryRun: input.dryRun });
   }
 
-  async importResults(_input: { runId: string }): Promise<SunoImportResult> {
-    return { urls: [] };
+  async importResults(input: { runId: string }): Promise<SunoImportResult> {
+    return this.worker.importRun(input.runId);
   }
 }
