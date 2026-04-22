@@ -283,12 +283,12 @@ async function buildSetupReadiness(
 }
 
 export async function buildSongsResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   return listSongStates(mergedConfig.artist.workspaceRoot);
 }
 
 export async function buildSongDetailResponse(songId: string, config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
   const [state, brief, promptLedger, sunoRuns, latestSocialAction, selectedTake, socialAssets, latestPromptPack, takeHistory] = await Promise.all([
     readSongState(workspaceRoot, songId),
@@ -317,12 +317,12 @@ export async function buildSongDetailResponse(songId: string, config?: Partial<A
 }
 
 export async function buildSongLedgerResponse(songId: string, config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   return readJsonlEntries<PromptLedgerEntry>(join(mergedConfig.artist.workspaceRoot, "songs", songId, "prompts", "prompt-ledger.jsonl"));
 }
 
 export async function buildPromptLedgerResponse(songId?: string, config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   if (songId) {
     return readJsonlEntries<PromptLedgerEntry>(getSongPromptLedgerPath(mergedConfig.artist.workspaceRoot, songId));
   }
@@ -338,17 +338,14 @@ export async function buildPromptLedgerResponse(songId?: string, config?: Partia
 }
 
 export async function buildAlertsResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   const platforms = await buildPlatformStatuses(mergedConfig);
   const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot).status();
   return collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
 }
 
 export async function buildConfigResponse(config?: Partial<ArtistRuntimeConfig>) {
-  if (config) {
-    return resolveRuntimeConfig(config);
-  }
-  return readResolvedConfig(defaultArtistRuntimeConfig.artist.workspaceRoot);
+  return resolveRuntimeConfig(config);
 }
 
 async function resolveRuntimeConfig(config?: Partial<ArtistRuntimeConfig>): Promise<ArtistRuntimeConfig> {
@@ -361,17 +358,17 @@ async function resolveRuntimeConfig(config?: Partial<ArtistRuntimeConfig>): Prom
 }
 
 export async function buildArtistMindResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   return readArtistMind(mergedConfig.artist.workspaceRoot);
 }
 
 export async function buildAuditLogResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   return readAllAuditEvents(mergedConfig.artist.workspaceRoot);
 }
 
 export async function buildRecoveryResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   const [status, audit] = await Promise.all([
     buildStatusResponse(mergedConfig),
     buildAuditLogResponse(mergedConfig)
@@ -394,17 +391,17 @@ export async function buildRecoveryResponse(config?: Partial<ArtistRuntimeConfig
 }
 
 export async function buildPlatformsResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   return buildPlatformStatuses(mergedConfig);
 }
 
 export async function buildPlatformDetailResponse(platform: SocialPlatform, config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   return (await buildPlatformStatuses(mergedConfig))[platform];
 }
 
 export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConfig>) {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
   const recentSong = (await listSongStates(workspaceRoot))[0];
   const worker = await new BrowserWorkerSunoConnector(workspaceRoot).status();
