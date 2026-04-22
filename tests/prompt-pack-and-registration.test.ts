@@ -6,7 +6,7 @@ import { createSunoPromptPack } from "../src/suno-production/generatePromptPack"
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
 import { validateSunoPromptPack } from "../src/validators/promptPackValidator";
 import { registerHooks } from "../src/hooks";
-import { buildArtistMindResponse, buildAuditLogResponse, buildConfigResponse, buildStatusResponse, producerConsoleHtml, registerRoutes, uiBuildIsFresh } from "../src/routes";
+import { buildArtistMindResponse, buildAuditLogResponse, buildConfigResponse, buildPromptLedgerResponse, buildRecoveryResponse, buildStatusResponse, producerConsoleHtml, registerRoutes, uiBuildIsFresh } from "../src/routes";
 import { registerServices } from "../src/services";
 import { registerTools } from "../src/tools";
 
@@ -143,6 +143,8 @@ describe("registration shells", () => {
     expect(registered.routes).toContain("/plugins/artist-runtime/api/config");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/artist-mind");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/audit");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/recovery");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/prompt-ledger");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/connect");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/platforms/:id/disconnect");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/suno/connect");
@@ -153,10 +155,14 @@ describe("registration shells", () => {
     const status = await buildStatusResponse();
     const artistMind = await buildArtistMindResponse();
     const audit = await buildAuditLogResponse();
+    const promptLedger = await buildPromptLedgerResponse();
+    const recovery = await buildRecoveryResponse();
     expect(status.dryRun).toBe(true);
     expect(status.platforms.x.authority).toBe("auto_publish");
     expect(typeof artistMind.artist).toBe("string");
     expect(Array.isArray(audit)).toBe(true);
+    expect(Array.isArray(promptLedger)).toBe(true);
+    expect(recovery.diagnostics.dryRun).toBe(true);
     const consoleHtml = await producerConsoleHtml();
     expect(consoleHtml).toContain("Artist Runtime");
     expect(consoleHtml).toContain("Run Cycle");

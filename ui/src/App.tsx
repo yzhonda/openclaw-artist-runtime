@@ -153,6 +153,47 @@ type AuditEntry = {
   details?: Record<string, unknown>;
 };
 
+type PromptLedgerEntry = {
+  id?: string;
+  timestamp?: string;
+  stage?: string;
+  runId?: string;
+  songId?: string;
+  outputSummary?: string;
+  artistReason?: string;
+};
+
+type RecoveryResponse = {
+  autopilot: {
+    stage: string;
+    blockedReason?: string;
+    lastError?: string;
+  };
+  sunoWorker: {
+    state: string;
+    hardStopReason?: string;
+    pendingAction?: string;
+  };
+  distributionWorker: {
+    enabled: boolean;
+    blockedReason?: string;
+  };
+  alerts: Array<{
+    id: string;
+    severity: "info" | "warning" | "critical";
+    message: string;
+  }>;
+  recentAudit: AuditEntry[];
+  diagnostics: {
+    workspaceRoot: string;
+    dryRun: boolean;
+    recentSongId?: string;
+    currentRunId?: string;
+    currentSongId?: string;
+    blockedReason?: string;
+  };
+};
+
 type ConsoleView = "dashboard" | "setup" | "music" | "platforms" | "songs" | "prompt-ledger" | "alerts" | "artist-mind" | "settings" | "recovery";
 
 const consoleViews: Array<{ id: ConsoleView; label: string }> = [
@@ -231,6 +272,8 @@ export function App() {
   const [sunoStatus, setSunoStatus] = useState<SunoStatusResponse | null>(null);
   const [artistMind, setArtistMind] = useState<ArtistMindResponse | null>(null);
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [promptLedgerEntries, setPromptLedgerEntries] = useState<PromptLedgerEntry[]>([]);
+  const [recovery, setRecovery] = useState<RecoveryResponse | null>(null);
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ConsoleView>("dashboard");
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
@@ -241,28 +284,36 @@ export function App() {
   const refresh = async (preferredSongId?: string | null) => {
     try {
       setError(null);
-      const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries] = await Promise.all([
+      const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery] = await Promise.all([
         apiGet<StatusResponse>("/status"),
         apiGet<SongSummary[]>("/songs"),
         apiGet<ConfigResponse>("/config"),
         apiGet<SunoStatusResponse>("/suno/status"),
         apiGet<ArtistMindResponse>("/artist-mind"),
-        apiGet<AuditEntry[]>("/audit")
+        apiGet<AuditEntry[]>("/audit"),
+        apiGet<RecoveryResponse>("/recovery")
       ]);
       const nextSelectedSongId = preferredSongId
         ?? selectedSongId
         ?? nextStatus.recentSong?.songId
         ?? nextSongs[0]?.songId
         ?? null;
-      const nextDetail = nextSelectedSongId
-        ? await apiGet<SongDetail>(`/songs/${nextSelectedSongId}`)
-        : null;
+      const [nextDetail, nextPromptLedgerEntries] = await Promise.all([
+        nextSelectedSongId
+          ? apiGet<SongDetail>(`/songs/${nextSelectedSongId}`)
+          : Promise.resolve(null),
+        nextSelectedSongId
+          ? apiGet<PromptLedgerEntry[]>(`/songs/${nextSelectedSongId}/ledger`)
+          : apiGet<PromptLedgerEntry[]>("/prompt-ledger")
+      ]);
       startTransition(() => {
         setStatus(nextStatus);
         setConfig(nextConfig);
         setSunoStatus(nextSunoStatus);
         setArtistMind(nextArtistMind);
         setAuditEntries(nextAuditEntries);
+        setPromptLedgerEntries(nextPromptLedgerEntries);
+        setRecovery(nextRecovery);
         setSongs(nextSongs);
         setDetail(nextDetail);
         setSelectedSongId(nextSelectedSongId);
@@ -585,16 +636,13 @@ export function App() {
     <article className="panel">
       <div className="section-title">Prompt Ledger</div>
       <div className="list">
-        {detail?.promptLedger.length ? detail.promptLedger.slice().reverse().slice(0, 12).map((entry, index) => {
-          const record = entry as { stage?: string; timestamp?: string; outputSummary?: string; runId?: string; artistReason?: string };
-          return (
-            <div className="item" key={`${record.timestamp ?? "entry"}-${index}`}>
-              <strong>{record.stage ?? "unknown_stage"}</strong>
-              <div className="muted">{record.timestamp ?? "no timestamp"}{record.runId ? ` · ${record.runId}` : ""}</div>
-              <div className="muted">{record.outputSummary ?? record.artistReason ?? "No summary."}</div>
-            </div>
-          );
-        }) : <div className="item muted">No prompt ledger entries for the selected song.</div>}
+        {promptLedgerEntries.length ? promptLedgerEntries.slice(0, 16).map((record, index) => (
+          <div className="item" key={`${record.timestamp ?? "entry"}-${index}`}>
+            <strong>{record.stage ?? "unknown_stage"}</strong>
+            <div className="muted">{record.timestamp ?? "no timestamp"}{record.runId ? ` · ${record.runId}` : ""}{record.songId ? ` · ${record.songId}` : ""}</div>
+            <div className="muted">{record.outputSummary ?? record.artistReason ?? "No summary."}</div>
+          </div>
+        )) : <div className="item muted">No prompt ledger entries for the selected song.</div>}
       </div>
     </article>
   );
@@ -643,8 +691,8 @@ export function App() {
       <div className="section-title">Recovery</div>
       <div className="list">
         <div className="item">
-          <strong>{status?.autopilot.blockedReason ?? status?.autopilot.lastError ?? "No active block."}</strong>
-          <div className="muted">autopilot stage {status?.autopilot.stage ?? "-"}</div>
+          <strong>{recovery?.diagnostics.blockedReason ?? recovery?.autopilot.lastError ?? "No active block."}</strong>
+          <div className="muted">autopilot stage {recovery?.autopilot.stage ?? status?.autopilot.stage ?? "-"}</div>
         </div>
         <div className="inline-actions">
           <button disabled={busy !== null} onClick={() => void runAction("pause")}>Pause</button>
@@ -655,7 +703,20 @@ export function App() {
         </div>
         <div className="item">
           <div className="eyebrow">Distribution Block</div>
-          <div className="muted">{status?.distributionWorker.blockedReason ?? "distribution ready"}</div>
+          <div className="muted">{recovery?.distributionWorker.blockedReason ?? status?.distributionWorker.blockedReason ?? "distribution ready"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Diagnostics</div>
+          <div className="muted">workspace {recovery?.diagnostics.workspaceRoot ?? "-"}</div>
+          <div className="muted">song {recovery?.diagnostics.currentSongId ?? recovery?.diagnostics.recentSongId ?? "none"} · run {recovery?.diagnostics.currentRunId ?? "none"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Recent Recovery Audit</div>
+          <div className="muted">
+            {recovery?.recentAudit.length
+              ? recovery.recentAudit.slice(0, 5).map((entry) => `${entry.eventType ?? "audit"}:${entry.songId ?? "global"}`).join(" · ")
+              : "No recent audit entries."}
+          </div>
         </div>
       </div>
     </article>
