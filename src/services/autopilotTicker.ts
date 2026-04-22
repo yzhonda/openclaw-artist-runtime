@@ -1,5 +1,5 @@
 import { applyConfigDefaults } from "../config/schema.js";
-import type { ArtistRuntimeConfig } from "../types.js";
+import type { AutopilotRunState, ArtistRuntimeConfig } from "../types.js";
 import { ArtistAutopilotService, readAutopilotRunState } from "./autopilotService.js";
 
 type PartialDeep<T> = {
@@ -18,6 +18,11 @@ export interface AutopilotTickerOptions {
   intervalMs?: number;
   getConfig?: () => PartialDeep<ArtistRuntimeConfig> | undefined;
   onOutcome?: (outcome: AutopilotTickOutcome) => void;
+}
+
+export interface AutopilotManualRunResult {
+  outcome: AutopilotTickOutcome;
+  state: AutopilotRunState;
 }
 
 const FALLBACK_INTERVAL_MS = 5 * 60 * 1000;
@@ -49,33 +54,47 @@ export class AutopilotTicker {
   }
 
   async tick(configOverride?: PartialDeep<ArtistRuntimeConfig>): Promise<AutopilotTickOutcome> {
+    return (await this.runNow(configOverride)).outcome;
+  }
+
+  async runNow(configOverride?: PartialDeep<ArtistRuntimeConfig>): Promise<AutopilotManualRunResult> {
     const baseConfig = configOverride ?? this.options.getConfig?.();
     const resolved = applyConfigDefaults(baseConfig);
+    const workspaceRoot = resolved.artist.workspaceRoot;
 
     if (!resolved.autopilot.enabled) {
-      return this.emit("skipped:disabled");
+      return {
+        outcome: this.emit("skipped:disabled"),
+        state: await readAutopilotRunState(workspaceRoot)
+      };
     }
 
-    const state = await readAutopilotRunState(resolved.artist.workspaceRoot);
+    const state = await readAutopilotRunState(workspaceRoot);
     if (state.paused) {
-      return this.emit("skipped:paused");
+      return { outcome: this.emit("skipped:paused"), state };
     }
     if (state.hardStopReason) {
-      return this.emit("skipped:hardStop");
+      return { outcome: this.emit("skipped:hardStop"), state };
     }
     if (running) {
-      return this.emit("skipped:concurrent");
+      return { outcome: this.emit("skipped:concurrent"), state };
     }
 
     running = true;
     try {
-      await new ArtistAutopilotService().runCycle({
-        workspaceRoot: resolved.artist.workspaceRoot,
+      const nextState = await new ArtistAutopilotService().runCycle({
+        workspaceRoot,
         config: resolved
       });
-      return this.emit("ran");
+      return {
+        outcome: this.emit("ran"),
+        state: nextState
+      };
     } catch {
-      return this.emit("error");
+      return {
+        outcome: this.emit("error"),
+        state: await readAutopilotRunState(workspaceRoot)
+      };
     } finally {
       running = false;
     }

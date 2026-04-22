@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { buildStatusResponse, registerRoutes } from "../src/routes";
 import { resetAutopilotTickerForTest, AutopilotTicker } from "../src/services/autopilotTicker";
 import { ensureArtistWorkspace } from "../src/services/artistWorkspace";
+import { patchResolvedConfig } from "../src/services/runtimeConfig";
 import { createSongIdea } from "../src/services/songIdeation";
 
 function createMockRequest(method: string, url: string, body?: string, headers?: Record<string, string>): IncomingMessage {
@@ -67,6 +68,73 @@ describe("status ticker and reply simulation routes", () => {
     expect(status.ticker.lastOutcome).toBe("ran");
     expect(status.ticker.lastTickAt).toMatch(/\d{4}-\d{2}-\d{2}T/);
     expect(status.ticker.intervalMs).toBe(120000);
+  });
+
+  it("reads persisted config overrides into /api/status", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-config-"));
+    await ensureArtistWorkspace(root);
+    await patchResolvedConfig(root, {
+      artist: { workspaceRoot: root },
+      autopilot: { enabled: true, dryRun: true, songsPerWeek: 6, cycleIntervalMinutes: 15 },
+      distribution: {
+        platforms: {
+          x: { enabled: true }
+        }
+      }
+    });
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.autopilot.enabled).toBe(true);
+    expect(status.config.autopilot.songsPerWeek).toBe(6);
+    expect(status.config.autopilot.cycleIntervalMinutes).toBe(15);
+    expect(status.config.distribution.platforms.x.enabled).toBe(true);
+    expect(status.ticker.intervalMs).toBe(900000);
+  });
+
+  it("updates ticker getters when /api/run-cycle is triggered", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-run-cycle-ticker-"));
+    await ensureArtistWorkspace(root);
+    await patchResolvedConfig(root, {
+      artist: { workspaceRoot: root },
+      autopilot: { enabled: true, dryRun: true }
+    });
+
+    const registered = new Map<string, (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void>();
+    registerRoutes({
+      registerHttpRoute(definition: { path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void }) {
+        registered.set(definition.path, definition.handler);
+      }
+    });
+
+    const handler = registered.get("/plugins/artist-runtime/api/run-cycle");
+    expect(handler).toBeTruthy();
+
+    const response = createMockResponse();
+    await handler?.(
+      createMockRequest(
+        "POST",
+        "/plugins/artist-runtime/api/run-cycle",
+        JSON.stringify({
+          config: { artist: { workspaceRoot: root } }
+        }),
+        { "content-type": "application/json" }
+      ),
+      response.res
+    );
+
+    expect(response.readStatus()).toBe(200);
+    expect(JSON.parse(response.readBody())).toMatchObject({
+      tickerOutcome: "ran"
+    });
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+    expect(status.ticker.lastOutcome).toBe("ran");
+    expect(status.ticker.lastTickAt).toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
   it("registers a dry-run simulate-reply route and keeps replies blocked", async () => {
