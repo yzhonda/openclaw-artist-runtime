@@ -69,7 +69,7 @@ describe("distribution authority wiring", () => {
           enabled: false,
           liveGoArmed: true,
           platforms: {
-            instagram: { enabled: true, authority: "auto_publish_visuals" }
+            instagram: { enabled: true, liveGoArmed: true, authority: "auto_publish_visuals" }
           }
         }
       }
@@ -104,7 +104,7 @@ describe("distribution authority wiring", () => {
           enabled: true,
           liveGoArmed: true,
           platforms: {
-            instagram: { enabled: false, authority: "auto_publish_visuals" }
+            instagram: { enabled: false, liveGoArmed: true, authority: "auto_publish_visuals" }
           }
         }
       }
@@ -142,7 +142,7 @@ describe("distribution authority wiring", () => {
           enabled: true,
           liveGoArmed: true,
           platforms: {
-            instagram: { enabled: true, authority: "auto_publish_visuals" }
+            instagram: { enabled: true, liveGoArmed: true, authority: "auto_publish_visuals" }
           }
         }
       }
@@ -188,7 +188,7 @@ describe("distribution authority wiring", () => {
             enabled: true,
             liveGoArmed: false,
             platforms: {
-              x: { enabled: true, authority: "auto_publish" }
+              x: { enabled: true, liveGoArmed: true, authority: "auto_publish" }
             }
           }
         }
@@ -206,7 +206,7 @@ describe("distribution authority wiring", () => {
             enabled: true,
             liveGoArmed: false,
             platforms: {
-              instagram: { enabled: true, authority: "auto_publish_visuals" }
+              instagram: { enabled: true, liveGoArmed: true, authority: "auto_publish_visuals" }
             }
           }
         }
@@ -224,7 +224,7 @@ describe("distribution authority wiring", () => {
             enabled: true,
             liveGoArmed: false,
             platforms: {
-              tiktok: { enabled: true, authority: "auto_publish_clips" }
+              tiktok: { enabled: true, liveGoArmed: true, authority: "auto_publish_clips" }
             }
           }
         }
@@ -242,5 +242,110 @@ describe("distribution authority wiring", () => {
     expect(xPublishSpy).not.toHaveBeenCalled();
     expect(instagramPublishSpy).not.toHaveBeenCalled();
     expect(tiktokPublishSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps Instagram on dry-run when the global arm is on but the platform arm is off", async () => {
+    const root = makeWorkspace();
+    vi.stubEnv("OPENCLAW_INSTAGRAM_ACCESS_TOKEN", "ig-token");
+    allowInstagramVisualPublishing();
+    const publishSpy = vi.spyOn(InstagramConnector.prototype, "publish");
+
+    const { result, entry } = await publishSocialAction({
+      workspaceRoot: root,
+      songId: "song-001",
+      platform: "instagram",
+      postType: "lyric_card",
+      text: "cold halo on the overpass",
+      mediaPaths: ["https://example.com/card.png"],
+      config: {
+        autopilot: { dryRun: false },
+        distribution: {
+          enabled: true,
+          liveGoArmed: true,
+          platforms: {
+            instagram: { enabled: true, liveGoArmed: false, authority: "auto_publish_visuals" }
+          }
+        }
+      }
+    });
+
+    expect(result).toMatchObject({
+      accepted: false,
+      platform: "instagram",
+      dryRun: true,
+      reason: "dry-run blocks social publish"
+    });
+    expect(entry.dryRun).toBe(true);
+    expect(entry.policyDecision?.policyDecision).toBe("deny_dry_run");
+    expect(publishSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps X on dry-run when the global arm is on but the X platform arm is off", async () => {
+    const root = makeWorkspace();
+    const publishSpy = vi.spyOn(XBirdConnector.prototype, "publish");
+
+    const { result, entry } = await publishSocialAction({
+      workspaceRoot: root,
+      songId: "song-001",
+      platform: "x",
+      postType: "observation",
+      text: "rust over the antenna field",
+      config: {
+        autopilot: { dryRun: false },
+        distribution: {
+          enabled: true,
+          liveGoArmed: true,
+          platforms: {
+            x: { enabled: true, liveGoArmed: false, authority: "auto_publish" }
+          }
+        }
+      }
+    });
+
+    expect(result).toMatchObject({
+      accepted: false,
+      platform: "x",
+      dryRun: true,
+      reason: "dry-run blocks social publish"
+    });
+    expect(entry.dryRun).toBe(true);
+    expect(entry.policyDecision?.policyDecision).toBe("deny_dry_run");
+    expect(publishSpy).not.toHaveBeenCalled();
+  });
+
+  it("keeps Instagram on dry-run when the platform arm is on but the global arm is off", async () => {
+    const root = makeWorkspace();
+    vi.stubEnv("OPENCLAW_INSTAGRAM_ACCESS_TOKEN", "ig-token");
+    allowInstagramVisualPublishing();
+    const publishSpy = vi.spyOn(InstagramConnector.prototype, "publish");
+
+    const { result, entry } = await publishSocialAction({
+      workspaceRoot: root,
+      songId: "song-001",
+      platform: "instagram",
+      postType: "lyric_card",
+      text: "signal drowned in dusk",
+      mediaPaths: ["https://example.com/card.png"],
+      config: {
+        autopilot: { dryRun: false },
+        distribution: {
+          enabled: true,
+          liveGoArmed: false,
+          platforms: {
+            instagram: { enabled: true, liveGoArmed: true, authority: "auto_publish_visuals" }
+          }
+        }
+      }
+    });
+
+    expect(result).toMatchObject({
+      accepted: false,
+      platform: "instagram",
+      dryRun: true,
+      reason: "dry-run blocks social publish"
+    });
+    expect(entry.dryRun).toBe(true);
+    expect(entry.policyDecision?.policyDecision).toBe("deny_dry_run");
+    expect(publishSpy).not.toHaveBeenCalled();
   });
 });

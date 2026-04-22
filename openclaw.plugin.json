@@ -327,6 +327,10 @@
             "type": "boolean",
             "default": false
           },
+          "liveGoArmed": {
+            "type": "boolean",
+            "default": false
+          },
           "connector": {
             "type": "string",
             "const": "bird",
@@ -376,6 +380,10 @@
             "type": "boolean",
             "default": false
           },
+          "liveGoArmed": {
+            "type": "boolean",
+            "default": false
+          },
           "connector": {
             "type": "string",
             "const": "instagram_content_publishing",
@@ -413,6 +421,10 @@
         "additionalProperties": false,
         "properties": {
           "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "liveGoArmed": {
             "type": "boolean",
             "default": false
           },
@@ -490,13 +502,25 @@
       "label": "Live social publishing arm",
       "help": "Keep OFF by default. When false, every social publish path is forced back into dry-run before any connector publish call."
     },
+    "distribution.platforms.x.liveGoArmed": {
+      "label": "Arm X live lane",
+      "help": "Even if the global live arm is on, X stays forced into dry-run until this platform arm is also turned on."
+    },
     "distribution.platforms.x.enabled": {
       "label": "Enable X",
       "help": "Uses Bird as the X connector."
     },
+    "distribution.platforms.instagram.liveGoArmed": {
+      "label": "Arm Instagram live lane",
+      "help": "Even if the global live arm is on, Instagram stays forced into dry-run until this platform arm is also turned on."
+    },
     "distribution.platforms.instagram.enabled": {
       "label": "Enable Instagram",
       "help": "Uses Instagram Content Publishing API where available."
+    },
+    "distribution.platforms.tiktok.liveGoArmed": {
+      "label": "Arm TikTok live lane",
+      "help": "Even if the global live arm is on, TikTok stays forced into dry-run until this platform arm is also turned on."
     },
     "distribution.platforms.tiktok.enabled": {
       "label": "Enable TikTok",

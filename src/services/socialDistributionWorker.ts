@@ -9,15 +9,26 @@ function buildEffectiveDryRun(config: ArtistRuntimeConfig): Record<SocialPlatfor
     x: config.autopilot.dryRun
       || !config.distribution.enabled
       || !config.distribution.liveGoArmed
-      || !config.distribution.platforms.x.enabled,
+      || !config.distribution.platforms.x.enabled
+      || !config.distribution.platforms.x.liveGoArmed,
     instagram: config.autopilot.dryRun
       || !config.distribution.enabled
       || !config.distribution.liveGoArmed
-      || !config.distribution.platforms.instagram.enabled,
+      || !config.distribution.platforms.instagram.enabled
+      || !config.distribution.platforms.instagram.liveGoArmed,
     tiktok: config.autopilot.dryRun
       || !config.distribution.enabled
       || !config.distribution.liveGoArmed
       || !config.distribution.platforms.tiktok.enabled
+      || !config.distribution.platforms.tiktok.liveGoArmed
+  };
+}
+
+function buildPlatformLiveGoArmed(config: ArtistRuntimeConfig): Record<SocialPlatform, boolean> {
+  return {
+    x: config.distribution.platforms.x.liveGoArmed,
+    instagram: config.distribution.platforms.instagram.liveGoArmed,
+    tiktok: config.distribution.platforms.tiktok.liveGoArmed
   };
 }
 
@@ -34,6 +45,8 @@ export class SocialDistributionWorker {
     const postsToday = lastAction && lastAction.timestamp.slice(0, 10) === today && lastAction.action === "publish" ? 1 : 0;
     const repliesToday = lastAction && lastAction.timestamp.slice(0, 10) === today && lastAction.action === "reply" ? 1 : 0;
     const effectiveDryRun = buildEffectiveDryRun(resolved);
+    const platformLiveGoArmed = buildPlatformLiveGoArmed(resolved);
+    const enabledPlatformsArmed = enabledPlatforms.some((platform) => platformLiveGoArmed[platform]);
 
     let blockedReason: string | undefined;
     if (!resolved.distribution.enabled) {
@@ -44,12 +57,15 @@ export class SocialDistributionWorker {
       blockedReason = "dry-run prevents live distribution";
     } else if (!resolved.distribution.liveGoArmed) {
       blockedReason = "live-go arm is off";
+    } else if (!enabledPlatformsArmed) {
+      blockedReason = "no enabled platforms are armed";
     }
 
     return {
       enabled: resolved.distribution.enabled,
       dryRun: resolved.autopilot.dryRun,
       liveGoArmed: resolved.distribution.liveGoArmed,
+      platformLiveGoArmed,
       effectiveDryRun,
       lastSongId: recentSong?.songId,
       lastAction,

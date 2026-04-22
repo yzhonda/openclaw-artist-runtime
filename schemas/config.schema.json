@@ -252,14 +252,18 @@
     "xPlatform": {
       "type": "object",
       "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "connector": {
-          "type": "string",
-          "const": "bird",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "liveGoArmed": {
+            "type": "boolean",
+            "default": false
+          },
+          "connector": {
+            "type": "string",
+            "const": "bird",
           "default": "bird"
         },
         "authority": {
@@ -301,14 +305,18 @@
     "visualPlatform": {
       "type": "object",
       "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "connector": {
-          "type": "string",
-          "const": "instagram_content_publishing",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "liveGoArmed": {
+            "type": "boolean",
+            "default": false
+          },
+          "connector": {
+            "type": "string",
+            "const": "instagram_content_publishing",
           "default": "instagram_content_publishing"
         },
         "authority": {
@@ -341,14 +349,18 @@
     "videoPlatform": {
       "type": "object",
       "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "connector": {
-          "type": "string",
-          "const": "tiktok_content_posting",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "liveGoArmed": {
+            "type": "boolean",
+            "default": false
+          },
+          "connector": {
+            "type": "string",
+            "const": "tiktok_content_posting",
           "default": "tiktok_content_posting"
         },
         "authority": {

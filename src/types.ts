@@ -87,6 +87,7 @@ export interface MusicConfig {
 
 export interface XPlatformConfig {
   enabled: boolean;
+  liveGoArmed: boolean;
   connector: "bird";
   authority: XAuthority;
   maxPostsPerDay: number;
@@ -96,6 +97,7 @@ export interface XPlatformConfig {
 
 export interface InstagramPlatformConfig {
   enabled: boolean;
+  liveGoArmed: boolean;
   connector: "instagram_content_publishing";
   authority: InstagramAuthority;
   maxPostsPerDay: number;
@@ -104,6 +106,7 @@ export interface InstagramPlatformConfig {
 
 export interface TikTokPlatformConfig {
   enabled: boolean;
+  liveGoArmed: boolean;
   connector: "tiktok_content_posting";
   authority: TikTokAuthority;
   maxPostsPerDay: number;
@@ -296,6 +299,8 @@ export interface SocialAssetRecord {
 export interface PlatformStatus {
   connected: boolean;
   authority: string;
+  liveGoArmed?: boolean;
+  effectiveDryRun?: boolean;
   capabilitySummary: SocialCapability;
   accountLabel?: string;
   postsToday?: number;
@@ -338,6 +343,7 @@ export interface SocialDistributionWorkerStatus {
   enabled: boolean;
   dryRun: boolean;
   liveGoArmed: boolean;
+  platformLiveGoArmed: Record<SocialPlatform, boolean>;
   effectiveDryRun: Record<SocialPlatform, boolean>;
   lastSongId?: string;
   lastAction?: SocialPublishLedgerEntry;
