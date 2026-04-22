@@ -5,19 +5,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defaultArtistRuntimeConfig } from "../src/config/defaultConfig";
 import { SunoBrowserWorker, type SunoBrowserDriver } from "../src/services/sunoBrowserWorker";
 
-const { spawnMock, launchPersistentContextMock } = vi.hoisted(() => ({
+const { spawnMock, chromiumMock, launchPersistentContextMock, stealthPluginMock, stealthResult } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
-  launchPersistentContextMock: vi.fn()
+  chromiumMock: {
+    use: vi.fn(),
+    launchPersistentContext: vi.fn()
+  },
+  launchPersistentContextMock: vi.fn(),
+  stealthPluginMock: vi.fn(),
+  stealthResult: { name: "stealth-plugin" }
 }));
+
+chromiumMock.launchPersistentContext = launchPersistentContextMock;
 
 vi.mock("node:child_process", () => ({
   spawn: spawnMock
 }));
 
-vi.mock("playwright", () => ({
-  chromium: {
-    launchPersistentContext: launchPersistentContextMock
-  }
+vi.mock("playwright-extra", () => ({
+  chromium: chromiumMock
+}));
+
+vi.mock("puppeteer-extra-plugin-stealth", () => ({
+  default: stealthPluginMock
 }));
 
 function createProbeContext({
@@ -59,7 +69,10 @@ function connectedDriver(): SunoBrowserDriver {
 describe("Suno driver selection", () => {
   beforeEach(() => {
     spawnMock.mockReset();
+    chromiumMock.use.mockReset();
     launchPersistentContextMock.mockReset();
+    stealthPluginMock.mockReset();
+    stealthPluginMock.mockReturnValue(stealthResult);
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -98,8 +111,12 @@ describe("Suno driver selection", () => {
 
     expect(started.state).toBe("login_required");
     expect(launchPersistentContextMock).toHaveBeenCalledWith(".openclaw-browser-profiles/suno", {
-      headless: false
+      headless: false,
+      channel: "chrome",
+      args: ["--disable-blink-features=AutomationControlled"],
+      ignoreDefaultArgs: ["--enable-automation"]
     });
+    expect(chromiumMock.use).toHaveBeenCalledWith(stealthResult);
     expect(spawnMock).not.toHaveBeenCalled();
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

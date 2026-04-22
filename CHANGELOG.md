@@ -8,11 +8,15 @@
 - Added `docs/GATEWAY_AUTH.md` to document the current plugin-level gateway auth boundary for the HTTP route surface.
 - Added a dependency-free `PlaywrightSunoDriver` skeleton and `docs/SUNO_BROWSER_DRIVER.md` for the future operator-managed Suno browser lane.
 - Added real Playwright probe wiring plus `scripts/openclaw-suno-login.sh` / `scripts/openclaw-suno-login.mjs` for the manual first-login lane.
+- Added `playwright-extra` and `puppeteer-extra-plugin-stealth` so the Suno login lane can ride the Chrome/stealth path documented for operators.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
 - Suno worker selection now accepts `music.suno.driver`, defaulting to `mock` while reserving `playwright` for later operator-installed browser automation.
 - Added the `playwright` runtime dependency and documented the operator-side Chromium install boundary without enabling real create/import yet.
+
+### Fixed
+- Suno Google OAuth login now uses the stealth-plugin + Chrome-channel probe/login lane instead of the default automation markers that were getting blocked.
 
 ## 0.3.0 - 2026-04-22
 
