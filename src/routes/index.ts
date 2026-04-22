@@ -12,7 +12,7 @@ import { acknowledgeAlert } from "../services/alertAcks.js";
 import { collectAlerts } from "../services/alerts.js";
 import { listSongStates, readArtistMind, readSongState } from "../services/artistState.js";
 import { ArtistAutopilotService, pauseAutopilot, readAutopilotRunState, resumeAutopilot } from "../services/autopilotService.js";
-import { getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
+import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
 import { mergeResolvedConfig, patchResolvedConfig, readResolvedConfig } from "../services/runtimeConfig.js";
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
@@ -346,6 +346,13 @@ export async function buildAlertsResponse(config?: Partial<ArtistRuntimeConfig>)
 
 export async function buildConfigResponse(config?: Partial<ArtistRuntimeConfig>) {
   if (config) {
+    return resolveRuntimeConfig(config);
+  }
+  return readResolvedConfig(defaultArtistRuntimeConfig.artist.workspaceRoot);
+}
+
+async function resolveRuntimeConfig(config?: Partial<ArtistRuntimeConfig>): Promise<ArtistRuntimeConfig> {
+  if (config) {
     const mergedConfig = applyConfigDefaults(config);
     const persisted = await readResolvedConfig(mergedConfig.artist.workspaceRoot);
     return mergeResolvedConfig(persisted, config);
@@ -446,7 +453,7 @@ async function buildDistributionSummary(config: ArtistRuntimeConfig, platforms: 
 }
 
 export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>): Promise<StatusResponse> {
-  const mergedConfig = applyConfigDefaults(config);
+  const mergedConfig = await resolveRuntimeConfig(config);
   const autopilot = await new ArtistAutopilotService().status(
     mergedConfig.autopilot.enabled,
     mergedConfig.autopilot.dryRun,
@@ -492,7 +499,7 @@ export function registerRoutes(api: unknown): void {
   safeRegisterRoute(api, {
     method: "GET",
     path: "/plugins/artist-runtime/api/status",
-    handler: async () => buildStatusResponse(defaultArtistRuntimeConfig)
+    handler: async (input) => buildStatusResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
   });
 
   safeRegisterRoute(api, {
@@ -770,11 +777,13 @@ export function registerRoutes(api: unknown): void {
     path: "/plugins/artist-runtime/api/run-cycle",
     handler: async (input) => {
       const payload = payloadRecord(input);
-      const config = applyConfigDefaults(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      return new ArtistAutopilotService().runCycle({
-        workspaceRoot: config.artist.workspaceRoot,
-        config
-      });
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const result = await getAutopilotTicker().runNow(config);
+      return {
+        ...result.state,
+        tickerOutcome: result.outcome,
+        tickerLastTickAt: getLastTickAt()
+      };
     }
   });
 
