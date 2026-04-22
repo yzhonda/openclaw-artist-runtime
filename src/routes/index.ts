@@ -11,6 +11,7 @@ import { acknowledgeAlert } from "../services/alertAcks.js";
 import { collectAlerts } from "../services/alerts.js";
 import { listSongStates, readArtistMind, readSongState } from "../services/artistState.js";
 import { ArtistAutopilotService, pauseAutopilot, readAutopilotRunState, resumeAutopilot } from "../services/autopilotService.js";
+import { getSongPromptLedgerPath } from "../services/promptLedger.js";
 import { mergeResolvedConfig, patchResolvedConfig, readResolvedConfig } from "../services/runtimeConfig.js";
 import { readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
@@ -310,6 +311,22 @@ export async function buildSongLedgerResponse(songId: string, config?: Partial<A
   return readJsonlEntries<PromptLedgerEntry>(join(mergedConfig.artist.workspaceRoot, "songs", songId, "prompts", "prompt-ledger.jsonl"));
 }
 
+export async function buildPromptLedgerResponse(songId?: string, config?: Partial<ArtistRuntimeConfig>) {
+  const mergedConfig = applyConfigDefaults(config);
+  if (songId) {
+    return readJsonlEntries<PromptLedgerEntry>(getSongPromptLedgerPath(mergedConfig.artist.workspaceRoot, songId));
+  }
+
+  const songs = await listSongStates(mergedConfig.artist.workspaceRoot);
+  const ledgers = await Promise.all(
+    songs.map((song) =>
+      readJsonlEntries<PromptLedgerEntry>(getSongPromptLedgerPath(mergedConfig.artist.workspaceRoot, song.songId))
+        .then((entries) => entries.map((entry) => ({ ...entry, songId: entry.songId ?? song.songId })))
+    )
+  );
+  return ledgers.flat().sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+}
+
 export async function buildAlertsResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = applyConfigDefaults(config);
   const platforms = await buildPlatformStatuses(mergedConfig);
@@ -334,6 +351,29 @@ export async function buildArtistMindResponse(config?: Partial<ArtistRuntimeConf
 export async function buildAuditLogResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = applyConfigDefaults(config);
   return readAllAuditEvents(mergedConfig.artist.workspaceRoot);
+}
+
+export async function buildRecoveryResponse(config?: Partial<ArtistRuntimeConfig>) {
+  const mergedConfig = applyConfigDefaults(config);
+  const [status, audit] = await Promise.all([
+    buildStatusResponse(mergedConfig),
+    buildAuditLogResponse(mergedConfig)
+  ]);
+  return {
+    autopilot: status.autopilot,
+    sunoWorker: status.sunoWorker,
+    distributionWorker: status.distributionWorker,
+    alerts: status.alerts,
+    recentAudit: audit.slice(0, 10),
+    diagnostics: {
+      workspaceRoot: mergedConfig.artist.workspaceRoot,
+      dryRun: status.dryRun,
+      recentSongId: status.recentSong?.songId,
+      currentRunId: status.autopilot.currentRunId,
+      currentSongId: status.autopilot.currentSongId,
+      blockedReason: status.autopilot.blockedReason ?? status.distributionWorker.blockedReason ?? status.sunoWorker.hardStopReason
+    }
+  };
 }
 
 export async function buildPlatformsResponse(config?: Partial<ArtistRuntimeConfig>) {
@@ -462,6 +502,12 @@ export function registerRoutes(api: unknown): void {
   });
 
   safeRegisterRoute(api, {
+    method: "GET",
+    path: "/plugins/artist-runtime/api/recovery",
+    handler: async (input) => buildRecoveryResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
     method: "PATCH",
     path: "/plugins/artist-runtime/api/config",
     handler: async (input) => {
@@ -494,6 +540,18 @@ export function registerRoutes(api: unknown): void {
       const payload = payloadRecord(input);
       const songId = typeof payload.songId === "string" ? payload.songId : "song-001";
       return buildSongLedgerResponse(songId, payload.config as Partial<ArtistRuntimeConfig> | undefined);
+    }
+  });
+
+  safeRegisterRoute(api, {
+    method: "GET",
+    path: "/plugins/artist-runtime/api/prompt-ledger",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      return buildPromptLedgerResponse(
+        typeof payload.songId === "string" ? payload.songId : undefined,
+        payload.config as Partial<ArtistRuntimeConfig> | undefined
+      );
     }
   });
 
