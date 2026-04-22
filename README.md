@@ -112,6 +112,9 @@ npm run pack:verify
 `npm run build` builds both the runtime TypeScript output and the Producer Console bundle.
 The UI bundle is built from `ui/` and included in package verification.
 
+For a repo-local OpenClaw sandbox install that avoids `~/.openclaw`, see
+`docs/15_LOCAL_OPENCLAW_SANDBOX.md`.
+
 Before public distribution, update:
 
 - package scope/name;
