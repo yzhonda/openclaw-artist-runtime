@@ -3,6 +3,7 @@
 - `log/codex/` for implementation and handoff notes.
 - `ask/chatgpt/` and `ask/gemini/` for external AI discussion artifacts.
 - Add project-specific documentation under this tree as needed.
+- `15_LOCAL_OPENCLAW_SANDBOX.md` documents the repo-local OpenClaw install path used for safe local verification.
 - `../workspace-template/README.md` explains how workspace Markdown files are split between OpenClaw-standard files and Artist Runtime-specific files.
 - Short version:
   - `SOUL.md` = プロデューサーとどう話すか
