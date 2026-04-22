@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+source "${script_dir}/openclaw-local-env.sh"
+
+command="${1:-run}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+
+common_args=(
+  --allow-unconfigured
+  --bind loopback
+  --auth none
+  --port "${OPENCLAW_LOCAL_GATEWAY_PORT}"
+)
+
+ensure_gateway_config() {
+  node <<'EOF'
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const configPath = process.env.OPENCLAW_CONFIG_PATH;
+if (!configPath) {
+  process.exit(0);
+}
+
+let config = {};
+try {
+  config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+} catch {
+  config = {};
+}
+
+config.gateway ??= {};
+config.gateway.auth ??= {};
+if (typeof config.gateway.auth.mode !== "string" || config.gateway.auth.mode.trim().length === 0) {
+  config.gateway.auth.mode = "none";
+}
+if (typeof config.gateway.auth.token !== "string" || config.gateway.auth.token.trim().length === 0) {
+  config.gateway.auth.token = crypto.randomBytes(24).toString("hex");
+}
+
+fs.mkdirSync(path.dirname(configPath), { recursive: true });
+fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+EOF
+}
+
+read_gateway_token() {
+  node <<'EOF'
+const fs = require("node:fs");
+
+const configPath = process.env.OPENCLAW_CONFIG_PATH;
+if (!configPath) {
+  process.exit(0);
+}
+
+try {
+  const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+  const token = typeof config.gateway?.auth?.token === "string" ? config.gateway.auth.token.trim() : "";
+  if (token) {
+    process.stdout.write(token);
+  }
+} catch {}
+EOF
+}
+
+case "${command}" in
+  run)
+    ensure_gateway_config
+    exec "${script_dir}/openclaw-local" gateway run "${common_args[@]}" "$@"
+    ;;
+  health)
+    gateway_token="$(read_gateway_token)"
+    if [[ -n "${gateway_token}" ]]; then
+      exec "${script_dir}/openclaw-local" gateway health --json --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" --token "${gateway_token}" "$@"
+    fi
+    exec "${script_dir}/openclaw-local" gateway health --json --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" "$@"
+    ;;
+  probe)
+    gateway_token="$(read_gateway_token)"
+    if [[ -n "${gateway_token}" ]]; then
+      exec "${script_dir}/openclaw-local" gateway probe --json --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" --token "${gateway_token}" "$@"
+    fi
+    exec "${script_dir}/openclaw-local" gateway probe --json --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" "$@"
+    ;;
+  status)
+    gateway_token="$(read_gateway_token)"
+    if [[ -n "${gateway_token}" ]]; then
+      exec "${script_dir}/openclaw-local" gateway status --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" --token "${gateway_token}" "$@"
+    fi
+    exec "${script_dir}/openclaw-local" gateway status --url "${OPENCLAW_LOCAL_GATEWAY_WS_URL}" "$@"
+    ;;
+  *)
+    echo "Usage: scripts/openclaw-local-gateway [run|health|probe|status] [args...]" >&2
+    exit 1
+    ;;
+esac

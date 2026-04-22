@@ -33,6 +33,12 @@ This layout is ignored by git through `.gitignore`.
   - Runs the repo-local OpenClaw binary with the isolated environment.
 - `scripts/openclaw-local-install.sh`
   - Fetches the official `install-cli.sh` installer and installs into `.local/openclaw/`.
+- `scripts/openclaw-local-gateway`
+  - Runs the repo-local Gateway on loopback only with `auth none` and a fixed repo-local port.
+- `scripts/openclaw-local-http-smoke.sh`
+  - Curls the main Artist Runtime Console/API routes against the repo-local Gateway.
+- `scripts/openclaw-local-write-smoke.sh`
+  - Exercises low-risk write routes against the repo-local workspace in dry-run-safe mode.
 
 ## Recommended flow
 
@@ -61,6 +67,20 @@ This layout is ignored by git through `.gitignore`.
    scripts/openclaw-local plugins list
    ```
 
+5. Run the Gateway in the foreground on loopback only:
+
+   ```bash
+   scripts/openclaw-local-gateway run
+   ```
+
+6. In another terminal, verify Gateway reachability and the plugin HTTP surface:
+
+   ```bash
+   scripts/openclaw-local-gateway health
+   scripts/openclaw-local-http-smoke.sh
+   scripts/openclaw-local-write-smoke.sh
+   ```
+
 ## Safety notes
 
 - These scripts are designed to isolate filesystem paths, not to grant fewer macOS permissions than the shell already has.
@@ -68,6 +88,7 @@ This layout is ignored by git through `.gitignore`.
 - Do not run `openclaw channels login`.
 - Do not install a daemon or LaunchAgent until plugin verification has passed in the local sandbox.
 - Keep `artist-runtime` in dry-run during first verification.
+- The local Gateway wrapper binds to loopback only and uses `auth none` for repo-local smoke checks. Do not reuse this shape outside the local sandbox.
 
 ## Official references
 

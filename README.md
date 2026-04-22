@@ -115,6 +115,13 @@ The UI bundle is built from `ui/` and included in package verification.
 For a repo-local OpenClaw sandbox install that avoids `~/.openclaw`, see
 `docs/15_LOCAL_OPENCLAW_SANDBOX.md`.
 
+For a repo-local Gateway smoke run after install, use:
+
+```bash
+scripts/openclaw-local-gateway run
+scripts/openclaw-local-http-smoke.sh
+```
+
 Before public distribution, update:
 
 - package scope/name;

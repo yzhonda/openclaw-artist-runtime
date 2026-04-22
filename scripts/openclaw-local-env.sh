@@ -12,6 +12,9 @@ openclaw_local_config_dir="${openclaw_local_root}/config"
 openclaw_local_config_path="${openclaw_local_config_dir}/openclaw.json"
 openclaw_local_workspace="${openclaw_local_root}/workspace"
 openclaw_local_logs="${openclaw_local_root}/logs"
+openclaw_local_gateway_port="${OPENCLAW_LOCAL_GATEWAY_PORT:-43134}"
+openclaw_local_gateway_http_url="http://127.0.0.1:${openclaw_local_gateway_port}"
+openclaw_local_gateway_ws_url="ws://127.0.0.1:${openclaw_local_gateway_port}"
 
 export OPENCLAW_LOCAL_ROOT="${openclaw_local_root}"
 export OPENCLAW_LOCAL_PREFIX="${openclaw_local_prefix}"
@@ -20,6 +23,9 @@ export OPENCLAW_STATE_DIR="${openclaw_local_state}"
 export OPENCLAW_CONFIG_PATH="${openclaw_local_config_path}"
 export OPENCLAW_LOCAL_WORKSPACE="${openclaw_local_workspace}"
 export OPENCLAW_LOCAL_LOGS="${openclaw_local_logs}"
+export OPENCLAW_LOCAL_GATEWAY_PORT="${openclaw_local_gateway_port}"
+export OPENCLAW_LOCAL_GATEWAY_HTTP_URL="${openclaw_local_gateway_http_url}"
+export OPENCLAW_LOCAL_GATEWAY_WS_URL="${openclaw_local_gateway_ws_url}"
 export PATH="${OPENCLAW_LOCAL_PREFIX}/bin:${PATH}"
 
 if [[ "${1:-}" == "print" ]]; then
@@ -31,5 +37,8 @@ OPENCLAW_STATE_DIR=${OPENCLAW_STATE_DIR}
 OPENCLAW_CONFIG_PATH=${OPENCLAW_CONFIG_PATH}
 OPENCLAW_LOCAL_WORKSPACE=${OPENCLAW_LOCAL_WORKSPACE}
 OPENCLAW_LOCAL_LOGS=${OPENCLAW_LOCAL_LOGS}
+OPENCLAW_LOCAL_GATEWAY_PORT=${OPENCLAW_LOCAL_GATEWAY_PORT}
+OPENCLAW_LOCAL_GATEWAY_HTTP_URL=${OPENCLAW_LOCAL_GATEWAY_HTTP_URL}
+OPENCLAW_LOCAL_GATEWAY_WS_URL=${OPENCLAW_LOCAL_GATEWAY_WS_URL}
 EOF
 fi

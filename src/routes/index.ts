@@ -474,6 +474,7 @@ export function registerRoutes(api: unknown): void {
   safeRegisterRoute(api, {
     method: "GET",
     path: "/plugins/artist-runtime",
+    contentType: "text/html; charset=utf-8",
     handler: async () => producerConsoleHtml()
   });
 
