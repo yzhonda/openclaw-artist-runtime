@@ -11,12 +11,17 @@ const SUNO_CREATE_URL = "https://suno.com/create";
 const profilePath = resolve(process.argv[2] ?? DEFAULT_SUNO_PROFILE_PATH);
 
 async function main() {
-  const { chromium } = await import("playwright");
+  const { chromium } = await import("playwright-extra");
+  const stealth = (await import("puppeteer-extra-plugin-stealth")).default;
+  chromium.use(stealth());
 
   await mkdir(profilePath, { recursive: true });
 
   const context = await chromium.launchPersistentContext(profilePath, {
-    headless: false
+    headless: false,
+    channel: "chrome",
+    args: ["--disable-blink-features=AutomationControlled"],
+    ignoreDefaultArgs: ["--enable-automation"]
   });
   const page = context.pages()[0] ?? await context.newPage();
 
