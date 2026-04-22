@@ -40,6 +40,34 @@ When enabled and configured, this plugin can:
 - publish to TikTok through TikTok APIs;
 - store local prompt ledgers, audit logs, and creative assets.
 
+## Connector contracts
+
+### X (Bird)
+
+- Requires the `bird` CLI to be installed and available on `PATH`.
+- Connection checks use `bird --help` and `bird whoami --plain`.
+- Bird authentication is expected to come from the Bird CLI's own config/cookie store.
+- If the CLI is missing or auth is expired, the connector fails closed and reports
+  `bird_cli_not_installed` or `bird_auth_expired`.
+
+### Instagram
+
+- Current dry-run skeleton checks for one of:
+  - `OPENCLAW_INSTAGRAM_AUTH`
+  - `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`
+- If neither variable is present, the connector reports
+  `instagram_auth_not_configured`.
+- Publish/reply remain fail-closed until an official API adapter is implemented.
+
+### TikTok
+
+- Current dry-run skeleton checks for one of:
+  - `OPENCLAW_TIKTOK_AUTH`
+  - `OPENCLAW_TIKTOK_ACCESS_TOKEN`
+- If neither variable is present, the connector reports
+  `tiktok_auth_not_configured`.
+- Publish/reply remain fail-closed until an official API adapter is implemented.
+
 ## Hard stops
 
 The plugin must stop and surface an alert on:

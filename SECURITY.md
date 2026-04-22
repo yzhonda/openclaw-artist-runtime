@@ -21,6 +21,23 @@ Therefore all external side effects must pass authority checks and audit logging
 - Store connector secrets only in OpenClaw-approved secret/runtime storage or the platform's dedicated browser profile.
 - Redact secrets from logs and error messages.
 
+### Connector secret contract
+
+- `XBirdConnector` does not read passwords from plugin config. It depends on the
+  local `bird` CLI and that CLI's own authenticated cookie/token store.
+- `InstagramConnector` currently checks only these environment variables:
+  - `OPENCLAW_INSTAGRAM_AUTH`
+  - `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`
+- `TikTokConnector` currently checks only these environment variables:
+  - `OPENCLAW_TIKTOK_AUTH`
+  - `OPENCLAW_TIKTOK_ACCESS_TOKEN`
+- These values must be treated as secrets:
+  - do not commit them
+  - do not place them in `workspace-template/**`
+  - do not echo them in shell history, screenshots, Prompt Ledger entries, audit logs, or error text
+- Missing or expired connector credentials must fail closed. The plugin should
+  surface a diagnostic reason rather than attempting a best-effort publish.
+
 ## Browser profile handling
 
 The Suno Browser Worker uses a dedicated browser profile. It must not read the operator's ordinary browser profile.
