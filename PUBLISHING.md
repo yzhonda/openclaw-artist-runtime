@@ -14,6 +14,13 @@ Before publishing:
 - Ensure no secrets, local profiles, songs, or runtime files are included.
 - Ensure `SECURITY.md`, `PRIVACY.md`, `CAPABILITIES.md`, and `MARKETPLACE.md` are current.
 - Ensure `ui/node_modules` is not included in the tarball.
+- If connector verification is part of the release check, ensure operator-local
+  auth prerequisites are present before testing:
+  - X uses the `bird` CLI plus its authenticated local cookie/token store.
+  - Instagram uses `OPENCLAW_INSTAGRAM_AUTH` or `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`.
+  - TikTok uses `OPENCLAW_TIKTOK_AUTH` or `OPENCLAW_TIKTOK_ACCESS_TOKEN`.
+- Ensure those credentials remain local-only (shell profile / env injection) and
+  are not written into logs, package files, or committed `.env` files.
 
 ## Local verification
 
@@ -72,6 +79,7 @@ Then open the Producer Console route and confirm dry-run mode blocks external si
 - [ ] Marketplace screenshots updated.
 - [ ] Security disclosures reviewed.
 - [ ] Privacy disclosures reviewed.
+- [ ] Connector env / CLI prerequisites verified locally and excluded from package output.
 - [ ] Package dry-run clean.
 - [ ] ClawHub dry-run clean.
 - [ ] Fresh workspace install tested.
