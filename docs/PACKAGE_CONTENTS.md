@@ -152,8 +152,9 @@ refresh guide, with direct links back into the platform test route anchors in
 
 `docs/SUNO_BROWSER_DRIVER.md` now captures the separate local-browser lane for
 Suno, including the dedicated profile path, the operator-managed Playwright
-installation requirement, and the current Chrome-channel + stealth-plugin login
-workaround.
+installation requirement, the current Chrome-channel + stealth-plugin login
+workaround, and the operator recovery runbook for profile corruption,
+reauthentication, migration, and budget exhaustion.
 
 ### Repo-local OpenClaw sandbox scripts
 
