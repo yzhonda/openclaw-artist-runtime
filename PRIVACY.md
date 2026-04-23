@@ -63,6 +63,23 @@ See `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh flow.
 - Artist Runtime may index imported file paths and lightweight metadata, but it
   does not treat raw browser cookies as exportable runtime data.
 
+## Suno artifact retention & deletion
+
+- Artist Runtime does not auto-delete imported Suno artifacts under
+  `runtime/suno/<runId>/`. The runtime keeps them in local operator storage
+  until the operator decides otherwise.
+- The same local-only boundary from `Suno artifact locality` still applies:
+  `runtime/suno/<runId>/` remains on the operator machine unless the operator
+  deliberately exports or backs it up.
+- Before any sharing, export, or upload, the operator should manually review
+  the retained artifacts for lyrics, metadata, and audio quality.
+- If the operator decides to delete a run, the expected path is manual removal
+  of `runtime/suno/<runId>/`. This package does not add an automatic script, UI
+  button, or scheduled deletion flow for that action.
+- Backups are an operator responsibility. If retained artifacts are copied to
+  another disk or service, the operator must preserve the same local-only /
+  controlled-access privacy boundary.
+
 ## Data not intentionally stored
 
 - Passwords.

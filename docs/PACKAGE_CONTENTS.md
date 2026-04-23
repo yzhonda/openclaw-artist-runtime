@@ -154,7 +154,8 @@ refresh guide, with direct links back into the platform test route anchors in
 Suno, including the dedicated profile path, the operator-managed Playwright
 installation requirement, the current Chrome-channel + stealth-plugin login
 workaround, and the operator recovery runbook for profile corruption,
-reauthentication, migration, and budget exhaustion.
+reauthentication, migration, budget exhaustion, and artifact retention /
+deletion guidance.
 
 ### Repo-local OpenClaw sandbox scripts
 

@@ -272,6 +272,21 @@ Use this when a live create attempt returns `accepted: false` with
 4. After the UTC boundary or config change, re-check the status surface and
    confirm `remaining` has reopened before attempting another live create.
 
+## Artifact retention
+
+- Imported artifacts under `runtime/suno/<runId>/` are kept indefinitely by
+  default. The runtime does not auto-delete completed mp3/m4a imports or their
+  lightweight metadata.
+- The operator should treat artifact cleanup as a manual maintenance task and
+  review older `runId` directories on a monthly or half-year cadence.
+- Before sharing, exporting, or uploading retained artifacts, the operator
+  should manually review the audio, lyrics alignment, and lightweight metadata.
+- Artifact deletion and budget state are separate layers. Removing
+  `runtime/suno/<runId>/` does not reset or lower the UTC-day credit counter.
+- If the operator intentionally needs to alter the current budget counter, that
+  is a separate manual decision against `runtime/suno/budget.json`; deleting an
+  imported run directory alone does not change the Round 51/52 budget state.
+
 ## Troubleshooting
 
 - Login probe says `login_required`: follow Scenario B.
