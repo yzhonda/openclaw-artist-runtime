@@ -16,6 +16,7 @@ import { mergeResolvedConfig, patchResolvedConfig, resolveRuntimeConfig } from "
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
+import { SunoBudgetTracker } from "../services/sunoBudget.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
 import { generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services/sunoRuns.js";
 import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
@@ -511,6 +512,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   const workspaceStatus = await buildWorkspaceSummaries(mergedConfig.artist.workspaceRoot);
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
+  const sunoBudget = await new SunoBudgetTracker(mergedConfig.artist.workspaceRoot).getState(mergedConfig.music.suno.dailyCreditLimit);
   const [musicSummary, distributionSummary] = await Promise.all([
     buildMusicSummary(mergedConfig),
     buildDistributionSummary(mergedConfig, platforms)
@@ -522,6 +524,9 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     dryRun: mergedConfig.autopilot.dryRun,
     autopilot,
     ticker: buildTickerStatus(mergedConfig),
+    suno: {
+      budget: sunoBudget
+    },
     sunoWorker,
     distributionWorker,
     platforms,

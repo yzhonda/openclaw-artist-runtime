@@ -27,6 +27,12 @@ export type SunoOutcomeCardProps = {
   lastImportedRunId?: string;
   lastCreateOutcome?: SunoOutcome;
   lastImportOutcome?: SunoOutcome;
+  budget?: {
+    date: string;
+    consumed: number;
+    limit: number;
+    remaining: number;
+  };
 };
 
 export function buildImportedAssetRows(outcome?: SunoOutcome): ImportedAsset[] {
@@ -93,6 +99,16 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const importOutcome = formatOutcome("Last Import", props.lastImportOutcome);
   const importedAssets = buildImportedAssetRows(props.lastImportOutcome);
   const importedAssetsEmpty = importedAssetsPlaceholder(props.lastImportOutcome);
+  const budgetRatio = props.budget && props.budget.limit > 0
+    ? Math.min(props.budget.consumed / props.budget.limit, 1)
+    : 0;
+  const budgetTone = !props.budget || props.budget.limit <= 0
+    ? "idle"
+    : budgetRatio >= 1
+      ? "error"
+      : budgetRatio >= 0.8
+        ? "warning"
+        : "ok";
 
   return (
     <div className="list">
@@ -109,6 +125,22 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
         <div className="eyebrow">Last Imported</div>
         <strong>{props.lastImportedRunId ?? "-"}</strong>
         <div className="muted">{props.lastImportOutcome?.at ?? "No import recorded yet."}</div>
+      </div>
+      <div className={`item budget-item budget-${budgetTone}`}>
+        <div className="eyebrow">Daily Credit Budget</div>
+        {props.budget ? (
+          <>
+            <strong>{props.budget.remaining} remaining</strong>
+            <div className="muted">
+              {props.budget.consumed}/{props.budget.limit} consumed · UTC {props.budget.date}
+            </div>
+            <div className="budget-progress" aria-hidden="true">
+              <div className={`budget-progress-bar budget-progress-${budgetTone}`} style={{ width: `${budgetRatio * 100}%` }} />
+            </div>
+          </>
+        ) : (
+          <div className="muted">No budget state yet.</div>
+        )}
       </div>
       <div className={`item outcome-item outcome-${createOutcome.tone}`}>
         <div className="outcome-heading">

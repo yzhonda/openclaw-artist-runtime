@@ -196,6 +196,15 @@ Round 51 adds a hard UTC-day credit gate in front of the live Create click:
 - if the reservation would exceed the limit, the run fails closed with
   `budget_exhausted` and the Playwright submit path is never entered
 
+Round 52 exposes that same counter back to the operator without mutating it:
+
+- `/api/status` now returns `suno.budget = { date, consumed, limit, remaining }`
+- Producer Console renders a read-only budget card with the UTC date and a
+  progress bar
+- the bar turns warning at `80%` consumed and error at `100%`
+- read-only views call `getState()` only, so they never reset or reserve budget
+  by side effect
+
 ## Rollback
 
 Set `music.suno.driver` back to `mock` to return immediately to the built-in

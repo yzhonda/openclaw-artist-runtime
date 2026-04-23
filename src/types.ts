@@ -318,6 +318,13 @@ export interface MusicSummary {
   latestPromptPackMetadata?: Record<string, unknown>;
 }
 
+export interface SunoBudgetStatus {
+  date: string;
+  consumed: number;
+  limit: number;
+  remaining: number;
+}
+
 export interface DistributionSummary {
   postsToday: number;
   repliesToday: number;
@@ -592,6 +599,9 @@ export interface StatusResponse {
   dryRun: boolean;
   autopilot: AutopilotStatus;
   ticker: AutopilotTickerStatus;
+  suno: {
+    budget: SunoBudgetStatus;
+  };
   sunoWorker: SunoWorkerStatus;
   distributionWorker: SocialDistributionWorkerStatus;
   platforms: Record<SocialPlatform, PlatformStatus>;

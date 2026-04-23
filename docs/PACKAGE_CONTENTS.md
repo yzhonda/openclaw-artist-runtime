@@ -87,6 +87,9 @@ Producer Console status surfaces. In practice that means:
 - `src/services/sunoBudget.ts` now persists the UTC-day credit counter for live
   Suno submits under `runtime/suno/budget.json` and blocks the create lane with
   `budget_exhausted` before the Playwright submit path can fire.
+  It also exposes a read-only `getState()` view so `/api/status` and the
+  Producer Console can render the current `consumed / limit / remaining`
+  credits without mutating the counter.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -218,6 +221,10 @@ workaround.
 - `tests/suno-budget.test.ts`
   This suite fixes the Round 51 credit gate boundary: reserve success,
   over-limit live submit block before connector.create, and UTC-day reset.
+- `tests/status-ticker.test.ts`
+  This suite now also locks the Round 52 Suno budget surface: `/api/status`
+  returns a read-only `{ date, consumed, limit, remaining }` budget object and
+  stale persisted dates are normalized back to a zero-consumed UTC-day view.
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`

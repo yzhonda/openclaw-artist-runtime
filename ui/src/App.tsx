@@ -31,6 +31,14 @@ type StatusResponse = {
     lastTickAt?: string;
     intervalMs: number;
   };
+  suno: {
+    budget: {
+      date: string;
+      consumed: number;
+      limit: number;
+      remaining: number;
+    };
+  };
   sunoWorker: {
     state: string;
     hardStopReason?: string;
@@ -754,6 +762,7 @@ export function App() {
         lastImportedRunId={sunoStatus?.lastImportedRunId ?? sunoStatus?.worker.lastImportedRunId}
         lastCreateOutcome={sunoStatus?.lastCreateOutcome ?? sunoStatus?.worker.lastCreateOutcome}
         lastImportOutcome={sunoStatus?.lastImportOutcome ?? sunoStatus?.worker.lastImportOutcome}
+        budget={status?.suno.budget}
       />
       <div className="list">
         <div className="inline-actions">
