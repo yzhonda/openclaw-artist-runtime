@@ -16,6 +16,13 @@ type ReserveResult = {
   limit: number;
 };
 
+export type SunoBudgetState = {
+  date: string;
+  consumed: number;
+  limit: number;
+  remaining: number;
+};
+
 function utcDate(clock: () => Date): string {
   return clock().toISOString().slice(0, 10);
 }
@@ -82,6 +89,24 @@ export class SunoBudgetTracker {
       ok: true,
       consumed: next.consumed,
       limit
+    };
+  }
+
+  async getState(limit = DEFAULT_SUNO_DAILY_CREDIT_LIMIT): Promise<SunoBudgetState> {
+    const today = utcDate(this.clock);
+    const current = await this.readState();
+    const normalized = current.date === today
+      ? current
+      : {
+          date: today,
+          consumed: 0
+        };
+
+    return {
+      date: normalized.date,
+      consumed: normalized.consumed,
+      limit,
+      remaining: Math.max(limit - normalized.consumed, 0)
     };
   }
 }

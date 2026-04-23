@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { mkdtempSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Readable } from "node:stream";
@@ -323,5 +324,41 @@ describe("status ticker and reply simulation routes", () => {
         }
       ]
     });
+  });
+
+  it("surfaces Suno budget state through /api/status", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-budget-"));
+    await ensureArtistWorkspace(root);
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.suno.budget).toMatchObject({
+      date: expect.stringMatching(/\d{4}-\d{2}-\d{2}/),
+      consumed: 0,
+      limit: 60,
+      remaining: 60
+    });
+  });
+
+  it("resets stale Suno budget state on read-only status views", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-budget-reset-"));
+    await ensureArtistWorkspace(root);
+    await mkdir(join(root, "runtime", "suno"), { recursive: true });
+    await writeFile(
+      join(root, "runtime", "suno", "budget.json"),
+      `${JSON.stringify({ date: "2000-01-01", consumed: 60 }, null, 2)}\n`,
+      "utf8"
+    );
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.suno.budget.consumed).toBe(0);
+    expect(status.suno.budget.remaining).toBe(60);
+    expect(status.suno.budget.limit).toBe(60);
+    expect(status.suno.budget.date).not.toBe("2000-01-01");
   });
 });

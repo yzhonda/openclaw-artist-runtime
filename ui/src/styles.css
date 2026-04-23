@@ -191,6 +191,56 @@ textarea {
   border-left: 4px solid var(--line);
 }
 
+.budget-item {
+  display: grid;
+  gap: 8px;
+}
+
+.budget-ok {
+  border-left: 4px solid #1d6a45;
+}
+
+.budget-warning {
+  border-left: 4px solid var(--warning);
+}
+
+.budget-error {
+  border-left: 4px solid var(--critical);
+}
+
+.budget-idle {
+  border-left: 4px solid var(--line);
+}
+
+.budget-progress {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(29, 26, 23, 0.08);
+}
+
+.budget-progress-bar {
+  height: 100%;
+  transition: width 180ms ease;
+}
+
+.budget-progress-ok {
+  background: #1d6a45;
+}
+
+.budget-progress-warning {
+  background: #c18a00;
+}
+
+.budget-progress-error {
+  background: var(--critical);
+}
+
+.budget-progress-idle {
+  background: var(--line);
+}
+
 .outcome-heading {
   display: flex;
   align-items: center;

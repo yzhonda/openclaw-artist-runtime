@@ -24,6 +24,7 @@
 - Added Round 49 cheap boundary tests for Suno import format handling, locking `.mp3`, `.m4a`, and 404-empty outcomes without touching the driver.
 - Added Round 50 local-only credential notes for the Suno browser profile and imported Suno artifacts in `SECURITY.md` / `PRIVACY.md`.
 - Added Round 51 Suno daily credit budgeting so live Create attempts fail closed with `budget_exhausted` once the UTC-day counter reaches the configured limit.
+- Added Round 52 Suno budget surfacing so `/api/status` and the Producer Console now show the UTC-day credit date, consumed amount, limit, and remaining credits.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
