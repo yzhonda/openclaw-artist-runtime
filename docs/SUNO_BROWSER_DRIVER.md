@@ -234,6 +234,8 @@ Tracker behavior is intentionally simple and defensive:
   `reserve()` both normalize the view back to `consumed: 0` on today's date
 - if the file contains invalid JSON, the tracker falls back to an empty state
   for today with `consumed: 0`; the next successful write restores valid JSON
+- writes go through a `.tmp` file and `rename(...)`, so a partial write should
+  not replace the last valid `budget.json` with a half-written file
 
 Recommended operator edit flow:
 
