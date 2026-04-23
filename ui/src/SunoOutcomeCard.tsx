@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 type SunoOutcome = {
   runId: string;
   accepted?: boolean;
@@ -66,10 +68,6 @@ function formatDuration(durationSec?: number): string | null {
   return `${minutes}:${seconds}`;
 }
 
-function assetHref(path: string): string {
-  return path.startsWith("/") ? `file://${path}` : path;
-}
-
 function formatOutcome(
   label: string,
   outcome?: SunoOutcome
@@ -99,6 +97,8 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const importOutcome = formatOutcome("Last Import", props.lastImportOutcome);
   const importedAssets = buildImportedAssetRows(props.lastImportOutcome);
   const importedAssetsEmpty = importedAssetsPlaceholder(props.lastImportOutcome);
+  const [copyFeedback, setCopyFeedback] = useState<Record<string, "copied" | "failed">>({});
+  const copyTimers = useRef<Record<string, number>>({});
   const budgetRatio = props.budget && props.budget.limit > 0
     ? Math.min(props.budget.consumed / props.budget.limit, 1)
     : 0;
@@ -106,9 +106,34 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
     ? "idle"
     : budgetRatio >= 1
       ? "error"
-      : budgetRatio >= 0.8
+        : budgetRatio >= 0.8
         ? "warning"
         : "ok";
+
+  useEffect(() => () => {
+    Object.values(copyTimers.current).forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  async function copyAssetPath(path: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(path);
+      setCopyFeedback((current) => ({ ...current, [path]: "copied" }));
+    } catch {
+      setCopyFeedback((current) => ({ ...current, [path]: "failed" }));
+    }
+
+    if (copyTimers.current[path]) {
+      window.clearTimeout(copyTimers.current[path]);
+    }
+    copyTimers.current[path] = window.setTimeout(() => {
+      setCopyFeedback((current) => {
+        const next = { ...current };
+        delete next[path];
+        return next;
+      });
+      delete copyTimers.current[path];
+    }, 1500);
+  }
 
   return (
     <div className="list">
@@ -169,9 +194,21 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
           <div className="asset-list">
             {importedAssets.map((asset) => (
               <div className="asset-row" key={`${asset.path}-${asset.url}`}>
-                <a className="asset-link" href={assetHref(asset.path)} target="_blank" rel="noreferrer">
-                  {asset.title ?? asset.path.split("/").at(-1) ?? asset.path}
-                </a>
+                <div className="asset-row-header">
+                  <strong className="asset-link">{asset.title ?? asset.path.split("/").at(-1) ?? asset.path}</strong>
+                  <button
+                    type="button"
+                    className={`asset-copy-button${copyFeedback[asset.path] ? ` is-${copyFeedback[asset.path]}` : ""}`}
+                    aria-label={`copy path for ${asset.title ?? asset.path.split("/").at(-1) ?? asset.path}`}
+                    onClick={() => void copyAssetPath(asset.path)}
+                  >
+                    {copyFeedback[asset.path] === "copied"
+                      ? "copied"
+                      : copyFeedback[asset.path] === "failed"
+                        ? "copy failed"
+                        : "copy path"}
+                  </button>
+                </div>
                 <div className="muted">
                   {asset.format}
                   {formatDuration(asset.durationSec) ? ` · ${formatDuration(asset.durationSec)}` : ""}
