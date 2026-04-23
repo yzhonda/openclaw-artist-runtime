@@ -140,4 +140,34 @@ describe("SunoBudgetTracker", () => {
       consumed: 10
     });
   });
+
+  it("falls back to an empty state when budget.json contains invalid JSON", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-budget-invalid-json-"));
+    await mkdir(join(root, "runtime", "suno"), { recursive: true });
+    await writeFile(join(root, "runtime", "suno", "budget.json"), "{not-valid-json", "utf8");
+    const tracker = new SunoBudgetTracker(root, () => new Date("2026-04-23T00:00:00.000Z"));
+
+    const state = await tracker.getState(DEFAULT_SUNO_DAILY_CREDIT_LIMIT);
+    const reserve = await tracker.reserve(10, DEFAULT_SUNO_DAILY_CREDIT_LIMIT);
+    const persisted = JSON.parse(await readFile(join(root, "runtime", "suno", "budget.json"), "utf8")) as {
+      date: string;
+      consumed: number;
+    };
+
+    expect(state).toEqual({
+      date: "2026-04-23",
+      consumed: 0,
+      limit: DEFAULT_SUNO_DAILY_CREDIT_LIMIT,
+      remaining: DEFAULT_SUNO_DAILY_CREDIT_LIMIT
+    });
+    expect(reserve).toEqual({
+      ok: true,
+      consumed: 10,
+      limit: DEFAULT_SUNO_DAILY_CREDIT_LIMIT
+    });
+    expect(persisted).toEqual({
+      date: "2026-04-23",
+      consumed: 10
+    });
+  });
 });

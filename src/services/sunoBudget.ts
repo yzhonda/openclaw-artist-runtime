@@ -50,7 +50,12 @@ export class SunoBudgetTracker {
       return this.emptyState();
     }
 
-    const parsed = JSON.parse(contents) as Partial<BudgetState>;
+    let parsed: Partial<BudgetState>;
+    try {
+      parsed = JSON.parse(contents) as Partial<BudgetState>;
+    } catch {
+      return this.emptyState();
+    }
     return {
       date: typeof parsed.date === "string" ? parsed.date : utcDate(this.clock),
       consumed: Number.isFinite(parsed.consumed) ? Number(parsed.consumed) : 0

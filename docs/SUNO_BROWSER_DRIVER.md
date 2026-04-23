@@ -232,8 +232,8 @@ Tracker behavior is intentionally simple and defensive:
   back to `0`
 - if the stored `date` does not match the current UTC date, `getState()` and
   `reserve()` both normalize the view back to `consumed: 0` on today's date
-- if the file contains invalid JSON, `JSON.parse(...)` throws and the runtime
-  does not silently recover
+- if the file contains invalid JSON, the tracker falls back to an empty state
+  for today with `consumed: 0`; the next successful write restores valid JSON
 
 Recommended operator edit flow:
 
