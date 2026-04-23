@@ -205,6 +205,82 @@ Round 52 exposes that same counter back to the operator without mutating it:
 - read-only views call `getState()` only, so they never reset or reserve budget
   by side effect
 
+## Operator recovery
+
+Use these flows when the dedicated Suno browser profile needs operator recovery.
+Every action here is operator-run on the local machine. Keep the same security
+boundary as `SECURITY.md` / `PRIVACY.md`: do not paste profile contents,
+cookies, session tokens, screenshots, or chat transcripts into PRs, logs, or
+shared threads.
+
+### Scenario A: profile corruption
+
+Use this when the browser lane starts failing at launch, the profile directory
+is unreadable, or repeated login probes keep failing after ordinary retry.
+
+1. Stop the local Gateway/runtime before touching the profile directory.
+2. Rename `.openclaw-browser-profiles/suno/` to a backup path such as
+   `.openclaw-browser-profiles/suno.bak-YYYYMMDD-HHMMSS` instead of deleting it.
+3. Create a fresh empty `.openclaw-browser-profiles/suno/` directory.
+4. Rerun `scripts/openclaw-suno-login.sh` so the driver launches the fresh
+   persistent profile with the existing stealth-plugin + `channel: "chrome"`
+   lane.
+5. Complete Google OAuth manually as the operator, then close the browser.
+6. Re-run the login probe and confirm it returns `connected: true` before
+   resuming normal use.
+
+### Scenario B: Google OAuth reauthentication required
+
+Use this when the probe starts returning `login_required`, the Suno session
+expires, or another machine/logout invalidates the current cookie state.
+
+1. Treat `login_required` as a manual-operator handoff, not an automation bug.
+2. Re-run `scripts/openclaw-suno-login.sh`.
+3. Complete the Google OAuth flow manually in the Chrome-channel browser window.
+   The runtime must not auto-script this step.
+4. Close the browser once the operator reaches the authenticated Suno surface.
+5. Re-run the probe and confirm it returns `connected: true`.
+
+### Scenario C: profile migration
+
+Use this when the operator moves the Suno lane to a different Mac or a different
+local user account.
+
+1. Stop the runtime on both source and destination machines before copying the
+   profile directory.
+2. Copy `.openclaw-browser-profiles/suno/` as a whole directory; do not cherry-
+   pick internal Chromium files because the exact layout can vary by version.
+3. After copy, verify filesystem ownership/permissions so the destination user
+   can read and write the profile.
+4. Expect Chrome / Chromium version differences and OS path differences to
+   invalidate the moved session; if that happens, fall back to Scenario B and
+   reauthenticate manually.
+5. Re-run the probe on the destination machine and require `connected: true`
+   before trusting the migrated profile.
+
+### Scenario D: credit budget exhausted
+
+Use this when a live create attempt returns `accepted: false` with
+`reason: "budget_exhausted"`.
+
+1. Inspect the current budget state through Producer Console or `/api/status`
+   rather than editing the persistence file directly.
+2. If the daily cap is too low for the operator's current lane, adjust
+   `music.suno.dailyCreditLimit` through the normal config workflow.
+3. If no config change is desired, wait for the next UTC day boundary; the
+   runtime resets the visible counter automatically when the date changes.
+4. After the UTC boundary or config change, re-check the status surface and
+   confirm `remaining` has reopened before attempting another live create.
+
+## Troubleshooting
+
+- Login probe says `login_required`: follow Scenario B.
+- Browser/profile fails to launch or repeated login probes collapse: follow
+  Scenario A.
+- Moving the Suno lane to another operator machine or account: follow
+  Scenario C.
+- Live create fails with `budget_exhausted`: follow Scenario D.
+
 ## Rollback
 
 Set `music.suno.driver` back to `mock` to return immediately to the built-in
