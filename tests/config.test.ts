@@ -57,6 +57,7 @@ describe("config schema", () => {
     const merged = applyConfigDefaults({ autopilot: { enabled: true } });
     expect(merged.autopilot.enabled).toBe(true);
     expect(merged.autopilot.dryRun).toBe(true);
+    expect(merged.music.suno.dailyCreditLimit).toBe(60);
     expect(merged.distribution.liveGoArmed).toBe(false);
     expect(merged.distribution.platforms.x.liveGoArmed).toBe(false);
     expect(merged.distribution.platforms.instagram.liveGoArmed).toBe(false);

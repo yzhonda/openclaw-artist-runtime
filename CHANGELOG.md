@@ -23,6 +23,7 @@
 - Added Round 48 Producer Console imported-asset surfacing for the latest Suno import, showing read-only links plus static metadata without introducing playback UI.
 - Added Round 49 cheap boundary tests for Suno import format handling, locking `.mp3`, `.m4a`, and 404-empty outcomes without touching the driver.
 - Added Round 50 local-only credential notes for the Suno browser profile and imported Suno artifacts in `SECURITY.md` / `PRIVACY.md`.
+- Added Round 51 Suno daily credit budgeting so live Create attempts fail closed with `budget_exhausted` once the UTC-day counter reaches the configured limit.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.

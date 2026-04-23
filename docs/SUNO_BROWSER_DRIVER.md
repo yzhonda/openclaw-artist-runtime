@@ -186,6 +186,16 @@ consumes real Suno credits and should only be enabled after explicit operator
 approval. Round 41 audio import/download does not create new generations on its
 own; it only pulls finished outputs from the returned song URLs.
 
+Round 51 adds a hard UTC-day credit gate in front of the live Create click:
+
+- `music.suno.dailyCreditLimit` defaults to `60`
+- each live submit reserves `10` credits before the Create click is allowed
+- the counter persists in `runtime/suno/budget.json`
+- the counter resets when `new Date().toISOString().slice(0, 10)` crosses into
+  the next UTC day
+- if the reservation would exceed the limit, the run fails closed with
+  `budget_exhausted` and the Playwright submit path is never entered
+
 ## Rollback
 
 Set `music.suno.driver` back to `mock` to return immediately to the built-in

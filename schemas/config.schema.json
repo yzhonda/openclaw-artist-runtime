@@ -120,6 +120,12 @@
               ],
               "default": "auto_create_and_select_take"
             },
+            "dailyCreditLimit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000,
+              "default": 60
+            },
             "monthlyGenerationBudget": {
               "type": "integer",
               "minimum": 0,

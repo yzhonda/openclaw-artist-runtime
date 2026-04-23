@@ -190,6 +190,12 @@
                 ],
                 "default": "auto_create_and_select_take"
               },
+              "dailyCreditLimit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000,
+                "default": 60
+              },
               "monthlyGenerationBudget": {
                 "type": "integer",
                 "minimum": 0,
@@ -489,6 +495,10 @@
     "music.suno.authority": {
       "label": "Suno authority",
       "help": "How far the artist can go with Suno generation without producer intervention."
+    },
+    "music.suno.dailyCreditLimit": {
+      "label": "Daily Suno credit limit",
+      "help": "Hard UTC-day cap for live Suno credit reservation before the Create click is allowed."
     },
     "music.suno.monthlyGenerationBudget": {
       "label": "Monthly Suno generation budget",

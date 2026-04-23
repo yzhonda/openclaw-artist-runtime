@@ -62,6 +62,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/socialPublishing.ts`
 - `src/services/sunoBrowserWorker.ts`
 - `src/services/sunoPlaywrightDriver.ts`
+- `src/services/sunoBudget.ts`
 - `src/services/sunoRuns.ts`
 - `src/services/sunoPromptPackFiles.ts`
 - `src/services/artistState.ts`
@@ -83,6 +84,9 @@ Producer Console status surfaces. In practice that means:
   through the same worker/status path.
   Live create polling now prefers `/create` generation-card song links before
   falling back to the older `/me` library-diff lane.
+- `src/services/sunoBudget.ts` now persists the UTC-day credit counter for live
+  Suno submits under `runtime/suno/budget.json` and blocks the create lane with
+  `budget_exhausted` before the Playwright submit path can fire.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -211,6 +215,9 @@ workaround.
   This suite fixes the Round 48 UI/status seam: imported Suno asset metadata is
   mirrored into `/api/status` and `/api/suno/status`, while the UI helper stays
   on read-only links plus the explicit empty placeholder.
+- `tests/suno-budget.test.ts`
+  This suite fixes the Round 51 credit gate boundary: reserve success,
+  over-limit live submit block before connector.create, and UTC-day reset.
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
