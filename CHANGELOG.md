@@ -28,6 +28,7 @@
 - Added Round 53 Suno browser recovery runbook docs so operators now have explicit profile-corruption, Google OAuth reauth, migration, and `budget_exhausted` recovery flows.
 - Added Round 54 Suno artifact retention/deletion docs so operator-local mp3/m4a handling, manual review, and non-automatic cleanup are now explicit.
 - Added Round 55 imported-asset path copy buttons in Producer Console so operators can copy absolute mp3/m4a paths without serving the runtime directory over HTTP.
+- Added Round 56 `budget.json` editing guidance so operators now have explicit docs for the Suno credit counter shape, fallback behavior, and safe manual reset flow.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
