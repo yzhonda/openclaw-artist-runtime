@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -169,5 +169,30 @@ describe("SunoBudgetTracker", () => {
       date: "2026-04-23",
       consumed: 10
     });
+  });
+
+  it("writes through a temporary file and leaves only the final budget.json behind", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-budget-atomic-"));
+    const tracker = new SunoBudgetTracker(root, () => new Date("2026-04-23T00:00:00.000Z"));
+
+    const result = await tracker.reserve(10, DEFAULT_SUNO_DAILY_CREDIT_LIMIT);
+    const finalPath = join(root, "runtime", "suno", "budget.json");
+    const tmpPath = `${finalPath}.tmp`;
+    const finalContents = JSON.parse(await readFile(finalPath, "utf8")) as {
+      date: string;
+      consumed: number;
+    };
+    const tmpExists = await access(tmpPath).then(() => true).catch(() => false);
+
+    expect(result).toEqual({
+      ok: true,
+      consumed: 10,
+      limit: DEFAULT_SUNO_DAILY_CREDIT_LIMIT
+    });
+    expect(finalContents).toEqual({
+      date: "2026-04-23",
+      consumed: 10
+    });
+    expect(tmpExists).toBe(false);
   });
 });

@@ -30,6 +30,7 @@
 - Added Round 55 imported-asset path copy buttons in Producer Console so operators can copy absolute mp3/m4a paths without serving the runtime directory over HTTP.
 - Added Round 56 `budget.json` editing guidance so operators now have explicit docs for the Suno credit counter shape, fallback behavior, and safe manual reset flow.
 - Added Round 57 invalid-JSON recovery for `runtime/suno/budget.json`, so the budget tracker now falls back to an empty UTC-day state instead of crashing on parse failure.
+- Added Round 58 atomic `budget.json` writes, so the Suno budget tracker now writes through a temp file plus `rename(...)` before replacing the final counter file.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.

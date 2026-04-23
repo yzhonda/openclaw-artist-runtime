@@ -89,8 +89,9 @@ Producer Console status surfaces. In practice that means:
   `budget_exhausted` before the Playwright submit path can fire.
   It also exposes a read-only `getState()` view so `/api/status` and the
   Producer Console can render the current `consumed / limit / remaining`
-  credits without mutating the counter, and it now falls back to an empty
-  UTC-day state when `budget.json` contains invalid JSON.
+  credits without mutating the counter, now falls back to an empty UTC-day
+  state when `budget.json` contains invalid JSON, and now replaces the final
+  file through a `.tmp` write plus `rename(...)`.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 

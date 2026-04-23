@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 export const DEFAULT_SUNO_DAILY_CREDIT_LIMIT = 60;
@@ -63,8 +63,11 @@ export class SunoBudgetTracker {
   }
 
   private async writeState(state: BudgetState): Promise<void> {
-    await mkdir(dirname(this.statePath()), { recursive: true });
-    await writeFile(this.statePath(), `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    const finalPath = this.statePath();
+    const tmpPath = `${finalPath}.tmp`;
+    await mkdir(dirname(finalPath), { recursive: true });
+    await writeFile(tmpPath, `${JSON.stringify(state, null, 2)}\n`, "utf8");
+    await rename(tmpPath, finalPath);
   }
 
   async reserve(credits: number, limit = DEFAULT_SUNO_DAILY_CREDIT_LIMIT): Promise<ReserveResult> {
