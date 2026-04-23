@@ -22,6 +22,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
       driver: "mock",
       submitMode: "skip",
       authority: "auto_create_and_select_take",
+      dailyCreditLimit: 60,
       monthlyGenerationBudget: 50,
       maxGenerationsPerDay: 4,
       minMinutesBetweenCreates: 20,

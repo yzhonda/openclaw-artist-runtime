@@ -71,6 +71,7 @@ export interface SunoMusicConfig {
   driver: SunoDriverMode;
   submitMode: SunoSubmitMode;
   authority: SunoAuthority;
+  dailyCreditLimit: number;
   monthlyGenerationBudget: number;
   maxGenerationsPerDay: number;
   minMinutesBetweenCreates: number;

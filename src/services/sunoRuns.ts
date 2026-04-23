@@ -7,6 +7,11 @@ import type { ArtistRuntimeConfig, PromptLedgerEntry, SunoRunRecord, SunoRunStat
 import { updateSongState } from "./artistState.js";
 import { appendPromptLedger, createPromptLedgerEntry, getSongPromptLedgerPath, inspectJsonlFile } from "./promptLedger.js";
 import { decideMusicAuthority } from "./musicAuthority.js";
+import {
+  DEFAULT_SUNO_LIVE_CREATE_CREDIT_COST,
+  SUNO_BUDGET_EXHAUSTED_REASON,
+  SunoBudgetTracker
+} from "./sunoBudget.js";
 
 export interface GenerateSunoRunInput {
   workspaceRoot: string;
@@ -118,12 +123,27 @@ export async function generateSunoRun(input: GenerateSunoRunInput): Promise<Suno
 
   const createdAt = new Date().toISOString();
   const provisionalRunId = runId();
+  const shouldReserveDailyCredits = !config.autopilot.dryRun && config.music.suno.submitMode === "live";
+  const dailyBudget = authorityDecision.allowed && shouldReserveDailyCredits
+    ? await new SunoBudgetTracker(input.workspaceRoot).reserve(
+        DEFAULT_SUNO_LIVE_CREATE_CREDIT_COST,
+        config.music.suno.dailyCreditLimit
+      )
+    : undefined;
   const createResult = authorityDecision.allowed
-    ? await connector.create({
-        dryRun: config.autopilot.dryRun,
-        authority: config.music.suno.authority,
-        payload
-      })
+    ? dailyBudget?.ok === false
+      ? {
+          accepted: false,
+          runId: provisionalRunId,
+          reason: SUNO_BUDGET_EXHAUSTED_REASON,
+          urls: [],
+          dryRun: config.autopilot.dryRun
+        }
+      : await connector.create({
+          dryRun: config.autopilot.dryRun,
+          authority: config.music.suno.authority,
+          payload
+        })
     : undefined;
   const finalRunId = createResult?.runId ?? provisionalRunId;
   const record: SunoRunRecord = {
