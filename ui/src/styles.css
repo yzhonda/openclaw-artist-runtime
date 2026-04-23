@@ -241,6 +241,40 @@ textarea {
   background: var(--line);
 }
 
+.asset-row {
+  display: grid;
+  gap: 4px;
+}
+
+.asset-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.asset-link {
+  word-break: break-word;
+}
+
+.asset-copy-button {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.asset-copy-button.is-copied {
+  background: rgba(29, 106, 69, 0.12);
+  border-color: rgba(29, 106, 69, 0.35);
+  color: #1d6a45;
+}
+
+.asset-copy-button.is-failed {
+  background: rgba(143, 32, 22, 0.1);
+  border-color: rgba(143, 32, 22, 0.28);
+  color: var(--critical);
+}
+
 .outcome-heading {
   display: flex;
   align-items: center;

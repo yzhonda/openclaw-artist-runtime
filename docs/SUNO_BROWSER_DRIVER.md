@@ -176,6 +176,9 @@ Round 49 now locks the cheap boundary cases in mock-only tests:
 - Imported assets are shown as read-only links plus static metadata (`title`,
   `durationSec`, `format`, `path`). There is no inline player, playback widget,
   or metadata editor in this lane.
+- Each imported asset row also provides a copy-path button so the operator can
+  hand the absolute path off to Finder, a local player, or another local tool
+  without exposing the runtime directory over HTTP.
 - If no imported files have been recorded yet, the Console keeps the explicit
   placeholder `No imported assets yet.`
 

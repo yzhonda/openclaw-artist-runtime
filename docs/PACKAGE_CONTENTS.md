@@ -124,7 +124,8 @@ The Console source now includes:
 - ticker and recent X dry-run status
 - Suno lifecycle plus create/import outcome cards rendered from `/api/suno/status`
 - imported asset summaries mirrored from the latest Suno import outcome, with
-  read-only links and static metadata only
+  copy-path buttons plus static metadata only, without serving `runtime/suno/`
+  over HTTP
 - the same Suno/status markers mirrored in the fallback inline Console shell
 
 The config editor source now owns both:
