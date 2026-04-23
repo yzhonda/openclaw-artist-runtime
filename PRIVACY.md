@@ -51,6 +51,18 @@ See `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh flow.
   human-readable artifacts.
 - See `docs/SUNO_BROWSER_DRIVER.md` for the operator setup path.
 
+## Suno artifact locality
+
+- Imported Suno artifacts under `runtime/suno/<runId>/<trackId>.mp3|m4a` stay on
+  the operator machine by default.
+- Those files should not be shared, synced, or exported until the operator has
+  explicitly reviewed them for the intended destination.
+- The browser-profile cookie state under `.openclaw-browser-profiles/suno/`
+  remains local-only as well, even when Chromium is launched through the Chrome
+  channel for operator-managed login.
+- Artist Runtime may index imported file paths and lightweight metadata, but it
+  does not treat raw browser cookies as exportable runtime data.
+
 ## Data not intentionally stored
 
 - Passwords.

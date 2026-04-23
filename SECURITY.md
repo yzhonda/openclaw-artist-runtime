@@ -68,6 +68,20 @@ It must stop on login challenge, CAPTCHA, payment prompt, or unexpected UI.
   secrets the plugin may read or persist.
 - For operator setup flow, see `docs/SUNO_BROWSER_DRIVER.md`.
 
+## Suno browser credentials
+
+- `.openclaw-browser-profiles/suno/` is local-only credential state on the
+  operator machine; it is never part of the repository, CI artifacts, or npm /
+  ClawHub package tarballs.
+- Profile cookies and session tokens inside that directory are secrets. Do not
+  paste them into PRs, logs, screenshots, chat transcripts, shell history, or
+  incident notes.
+- The Playwright Suno lane uses `launchPersistentContext` against that profile
+  instead of copying cookies into config or ledgers.
+- `.gitignore` already excludes the browser-profile directory. That exclusion is
+  part of the security boundary and must remain in place for operator-managed
+  login sessions.
+
 ## Public side effects
 
 Public actions include Suno generation, X posts, Instagram posts, TikTok posts, replies, quote posts, and release announcements.
