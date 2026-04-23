@@ -208,6 +208,59 @@ Round 52 exposes that same counter back to the operator without mutating it:
 - read-only views call `getState()` only, so they never reset or reserve budget
   by side effect
 
+### Editing budget.json
+
+The live credit counter is stored at `runtime/suno/budget.json` relative to the
+active workspace root.
+
+Current on-disk shape:
+
+```json
+{
+  "date": "YYYY-MM-DD",
+  "consumed": 10
+}
+```
+
+Tracker behavior is intentionally simple and defensive:
+
+- if the file is missing, the tracker falls back to an empty state for today
+  with `consumed: 0`
+- if `date` is missing or not a string, the tracker falls back to the current
+  UTC date
+- if `consumed` is missing or not `Number.isFinite(...)`, the tracker falls
+  back to `0`
+- if the stored `date` does not match the current UTC date, `getState()` and
+  `reserve()` both normalize the view back to `consumed: 0` on today's date
+- if the file contains invalid JSON, `JSON.parse(...)` throws and the runtime
+  does not silently recover
+
+Recommended operator edit flow:
+
+1. stop the local Gateway/runtime first when practical, to avoid editing during
+   an active write
+2. create a backup copy such as
+   `cp runtime/suno/budget.json runtime/suno/budget.json.bak`
+3. edit the JSON carefully
+4. validate the file shape before resuming, for example with
+   `jq . runtime/suno/budget.json`
+5. restart the Gateway/runtime and let the next `getState()` / `reserve()` read
+   the updated values
+
+Common manual edits:
+
+- early daily reset: set `consumed` back to `0`
+- testing or operator verification: adjust `consumed` to a known finite number
+- changing `date`: generally not recommended, because the tracker already
+  normalizes stale dates automatically
+
+Avoid these edits:
+
+- saving invalid JSON
+- writing `consumed` as a negative value, string, `NaN`, or any other non-finite
+  value
+- editing the file while another process may be writing to it
+
 ## Operator recovery
 
 Use these flows when the dedicated Suno browser profile needs operator recovery.
@@ -274,6 +327,8 @@ Use this when a live create attempt returns `accepted: false` with
    runtime resets the visible counter automatically when the date changes.
 4. After the UTC boundary or config change, re-check the status surface and
    confirm `remaining` has reopened before attempting another live create.
+5. If the operator must override the current day manually, use the
+   `Editing budget.json` guidance above and keep the file valid JSON.
 
 ## Artifact retention
 
