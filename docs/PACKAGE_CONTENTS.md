@@ -267,6 +267,10 @@ global + per-platform `liveGoArmed` guards, and the fact that Round 42-45 still
 block live posting with an upstream dry-run hold plus
 `requires_explicit_live_go` at the connector edge.
 
+`SECURITY.md` and `PRIVACY.md` also document the Suno browser-profile boundary:
+`.openclaw-browser-profiles/suno/` stays local-only, and imported audio under
+`runtime/suno/<runId>/` remains operator-reviewed local storage by default.
+
 Also keep the built UI bundle and its source provenance together:
 
 - `ui/dist/**`
