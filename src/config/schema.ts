@@ -100,8 +100,9 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
 
 export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeConfig> {
   const errors: string[] = [];
+  const warnings: string[] = [];
   if (!isRecord(config)) {
-    return { ok: false, errors: ["config must be an object"] };
+    return { ok: false, errors: ["config must be an object"], warnings };
   }
 
   validateKnownKeys("config", config, ["artist", "autopilot", "music", "distribution", "safety"], errors);
@@ -299,10 +300,24 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
   }
 
   if (errors.length > 0) {
-    return { ok: false, errors };
+    return { ok: false, errors, warnings };
   }
 
-  return { ok: true, errors: [], value: applyConfigDefaults(config as PartialDeep<ArtistRuntimeConfig>) };
+  const value = applyConfigDefaults(config as PartialDeep<ArtistRuntimeConfig>);
+  appendConfigWarnings(value, warnings);
+  return { ok: true, errors: [], warnings, value };
+}
+
+function appendConfigWarnings(config: ArtistRuntimeConfig, warnings: string[]): void {
+  for (const platform of ["x", "instagram", "tiktok"] as const) {
+    const platformConfig = config.distribution.platforms[platform];
+    if (platformConfig.liveGoArmed && !config.distribution.liveGoArmed) {
+      warnings.push(`config.distribution.platforms.${platform}.liveGoArmed is true while config.distribution.liveGoArmed is false`);
+    }
+    if (platformConfig.maxPostsPerDay > 0 && !platformConfig.enabled) {
+      warnings.push(`config.distribution.platforms.${platform}.maxPostsPerDay is positive while platform is disabled`);
+    }
+  }
 }
 
 function validateXPlatform(value: unknown, errors: string[]): void {

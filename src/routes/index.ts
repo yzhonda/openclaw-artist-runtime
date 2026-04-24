@@ -15,6 +15,7 @@ import { getSongPromptLedgerPath } from "../services/promptLedger.js";
 import { mergeResolvedConfig, patchResolvedConfig, resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
+import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../services/socialDryRunResolver.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
 import { SunoBudgetTracker } from "../services/sunoBudget.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
@@ -141,11 +142,7 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
       connected: xConnection.connected,
       authority: config.distribution.platforms.x.authority,
       liveGoArmed: config.distribution.platforms.x.liveGoArmed,
-      effectiveDryRun: config.autopilot.dryRun
-        || !config.distribution.enabled
-        || !config.distribution.liveGoArmed
-        || !config.distribution.platforms.x.enabled
-        || !config.distribution.platforms.x.liveGoArmed,
+      effectiveDryRun: resolvePlatformSocialDryRun(config, "x"),
       capabilitySummary: await xConnector.checkCapabilities(),
       accountLabel: xConnection.accountLabel,
       reason: xConnection.reason,
@@ -157,11 +154,7 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
       connected: instagramConnection.connected,
       authority: config.distribution.platforms.instagram.authority,
       liveGoArmed: config.distribution.platforms.instagram.liveGoArmed,
-      effectiveDryRun: config.autopilot.dryRun
-        || !config.distribution.enabled
-        || !config.distribution.liveGoArmed
-        || !config.distribution.platforms.instagram.enabled
-        || !config.distribution.platforms.instagram.liveGoArmed,
+      effectiveDryRun: resolvePlatformSocialDryRun(config, "instagram"),
       capabilitySummary: await instagramConnector.checkCapabilities(),
       accountLabel: instagramConnection.accountLabel,
       reason: instagramConnection.reason,
@@ -173,11 +166,7 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
       connected: tiktokConnection.connected,
       authority: config.distribution.platforms.tiktok.authority,
       liveGoArmed: config.distribution.platforms.tiktok.liveGoArmed,
-      effectiveDryRun: config.autopilot.dryRun
-        || !config.distribution.enabled
-        || !config.distribution.liveGoArmed
-        || !config.distribution.platforms.tiktok.enabled
-        || !config.distribution.platforms.tiktok.liveGoArmed,
+      effectiveDryRun: resolvePlatformSocialDryRun(config, "tiktok"),
       capabilitySummary: await tiktokConnector.checkCapabilities(),
       accountLabel: tiktokConnection.accountLabel,
       reason: tiktokConnection.reason,
@@ -521,10 +510,15 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     buildDistributionSummary(mergedConfig, platforms)
   ]);
   const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
+  const effectiveDryRunMap = buildEffectiveDryRunMap(mergedConfig);
 
   return {
     config: mergedConfig,
     dryRun: mergedConfig.autopilot.dryRun,
+    summary: {
+      allPlatformsEffectivelyDryRun: Object.values(effectiveDryRunMap).every(Boolean),
+      effectiveDryRunMap
+    },
     autopilot,
     ticker: buildTickerStatus(mergedConfig),
     suno: {

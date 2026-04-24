@@ -2,26 +2,11 @@ import type { ArtistRuntimeConfig } from "../types.js";
 import { applyConfigDefaults } from "../config/schema.js";
 import { listSongStates } from "./artistState.js";
 import { readLatestSocialAction } from "./socialPublishing.js";
+import { buildEffectiveDryRunMap } from "./socialDryRunResolver.js";
 import type { SocialPlatform } from "../types.js";
 
 function buildEffectiveDryRun(config: ArtistRuntimeConfig): Record<SocialPlatform, boolean> {
-  return {
-    x: config.autopilot.dryRun
-      || !config.distribution.enabled
-      || !config.distribution.liveGoArmed
-      || !config.distribution.platforms.x.enabled
-      || !config.distribution.platforms.x.liveGoArmed,
-    instagram: config.autopilot.dryRun
-      || !config.distribution.enabled
-      || !config.distribution.liveGoArmed
-      || !config.distribution.platforms.instagram.enabled
-      || !config.distribution.platforms.instagram.liveGoArmed,
-    tiktok: config.autopilot.dryRun
-      || !config.distribution.enabled
-      || !config.distribution.liveGoArmed
-      || !config.distribution.platforms.tiktok.enabled
-      || !config.distribution.platforms.tiktok.liveGoArmed
-  };
+  return buildEffectiveDryRunMap(config);
 }
 
 function buildPlatformLiveGoArmed(config: ArtistRuntimeConfig): Record<SocialPlatform, boolean> {

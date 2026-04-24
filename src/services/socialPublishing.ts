@@ -10,6 +10,7 @@ import type { ArtistRuntimeConfig, SocialCapability, SocialPlatform, SocialPubli
 import { updateSongState } from "./artistState.js";
 import { appendAuditLog, createAuditEvent, inspectAuditLog } from "./auditLog.js";
 import { decideSocialAuthority } from "./socialAuthority.js";
+import { resolvePlatformSocialDryRun } from "./socialDryRunResolver.js";
 
 export interface SocialActionInput {
   workspaceRoot: string;
@@ -39,14 +40,6 @@ function getConnector(platform: SocialPlatform): SocialConnector {
 
 function getPlatformAuthority(config: ArtistRuntimeConfig, platform: SocialPlatform) {
   return config.distribution.platforms[platform].authority;
-}
-
-function resolveSocialDryRun(config: ArtistRuntimeConfig, platform: SocialPlatform): boolean {
-  return config.autopilot.dryRun
-    || !config.distribution.enabled
-    || !config.distribution.liveGoArmed
-    || !config.distribution.platforms[platform].enabled
-    || !config.distribution.platforms[platform].liveGoArmed;
 }
 
 function getSocialLedgerPath(root: string, songId: string): string {
@@ -106,7 +99,7 @@ export async function readLatestSocialAction(root: string, songId: string): Prom
 export async function publishSocialAction(input: SocialActionInput): Promise<{ result: SocialPublishResult; entry: SocialPublishLedgerEntry }> {
   const action = input.action ?? "publish";
   const config = applyConfigDefaults(input.config);
-  const effectiveDryRun = resolveSocialDryRun(config, input.platform);
+  const effectiveDryRun = resolvePlatformSocialDryRun(config, input.platform);
   const connector = getConnector(input.platform);
   const capabilitySummary = await connector.checkCapabilities();
   const capabilityAvailable = capabilityForPostType(capabilitySummary, input.postType, action);
