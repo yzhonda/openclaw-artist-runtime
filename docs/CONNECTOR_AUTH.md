@@ -75,6 +75,26 @@ the usual reaction is to issue a fresh Graph API access token with the same
 Page / Business Account linkage and restart the OpenClaw process that owns the
 environment.
 
+## Social publish ledger rotation
+
+Social publish attempts are written under each song at
+`songs/<song-id>/social/social-publish.jsonl`. The writer now rewrites this file
+through a temporary file plus `rename(...)`, so an interrupted write should
+leave either the previous complete ledger or the next complete ledger, not a
+half-written line.
+
+- Entries older than 90 days are moved to
+  `songs/<song-id>/social/social-publish.archive.jsonl` the next time the
+  writer appends a social publish event for that song.
+- The archive is still local workspace state and may contain public URLs,
+  dry-run decisions, platform ids, and reason strings. Review it before sharing
+  a workspace bundle.
+- Operators may delete old archive files manually if they no longer need the
+  operational history, but should stop the gateway first to avoid racing an
+  active append.
+- The status reader uses active ledgers by default and can opt into archive
+  reads for historical summaries.
+
 ## X (Bird)
 
 ### Contract

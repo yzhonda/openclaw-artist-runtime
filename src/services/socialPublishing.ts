@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import { InstagramConnector } from "../connectors/social/instagramConnector.js";
 import type { SocialConnector } from "../connectors/social/SocialConnector.js";
@@ -8,8 +7,9 @@ import { TikTokConnector } from "../connectors/social/tiktokConnector.js";
 import { XBirdConnector } from "../connectors/social/xBirdConnector.js";
 import type { ArtistRuntimeConfig, SocialCapability, SocialPlatform, SocialPublishLedgerEntry, SocialPublishResult, SocialRiskLevel } from "../types.js";
 import { updateSongState } from "./artistState.js";
-import { appendAuditLog, createAuditEvent, inspectAuditLog } from "./auditLog.js";
+import { appendAuditLog, createAuditEvent } from "./auditLog.js";
 import { decideSocialAuthority } from "./socialAuthority.js";
+import { appendSocialPublishLedgerEntry, readLatestSocialPublishLedgerEntry } from "./socialPublishLedger.js";
 import { resolvePlatformSocialDryRun } from "./socialDryRunResolver.js";
 
 export interface SocialActionInput {
@@ -42,22 +42,8 @@ function getPlatformAuthority(config: ArtistRuntimeConfig, platform: SocialPlatf
   return config.distribution.platforms[platform].authority;
 }
 
-function getSocialLedgerPath(root: string, songId: string): string {
-  return join(root, "songs", songId, "social", "social-publish.jsonl");
-}
-
 function getAuditPath(root: string, songId: string): string {
   return join(root, "songs", songId, "audit", "actions.jsonl");
-}
-
-async function appendJsonl<T>(path: string, value: T): Promise<T> {
-  const health = await inspectAuditLog(path);
-  if (!health.healthy) {
-    throw new Error(`jsonl file is unhealthy: ${health.errors.join("; ")}`);
-  }
-  await mkdir(dirname(path), { recursive: true });
-  await appendFile(path, `${JSON.stringify(value)}\n`, "utf8");
-  return value;
 }
 
 function hashText(value?: string): string | undefined {
@@ -83,17 +69,8 @@ function capabilityForPostType(capability: SocialCapability, postType: string, a
   return capability.textPost;
 }
 
-async function readLastJsonlEntry<T>(path: string): Promise<T | undefined> {
-  const contents = await readFile(path, "utf8").catch(() => "");
-  const lines = contents.split("\n").filter(Boolean);
-  if (lines.length === 0) {
-    return undefined;
-  }
-  return JSON.parse(lines.at(-1) as string) as T;
-}
-
 export async function readLatestSocialAction(root: string, songId: string): Promise<SocialPublishLedgerEntry | undefined> {
-  return readLastJsonlEntry<SocialPublishLedgerEntry>(getSocialLedgerPath(root, songId));
+  return readLatestSocialPublishLedgerEntry(root, songId);
 }
 
 export async function publishSocialAction(input: SocialActionInput): Promise<{ result: SocialPublishResult; entry: SocialPublishLedgerEntry }> {
@@ -183,7 +160,7 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
       }
     })
   );
-  await appendJsonl(getSocialLedgerPath(input.workspaceRoot, input.songId), entry);
+  await appendSocialPublishLedgerEntry(input.workspaceRoot, input.songId, entry);
 
   if (action === "publish") {
     await updateSongState(input.workspaceRoot, input.songId, {
