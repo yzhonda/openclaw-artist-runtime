@@ -8,6 +8,11 @@ import {
 } from "../../src/types";
 
 export type ConfigEditorSource = {
+  music: {
+    suno: {
+      dailyCreditLimit: number;
+    };
+  };
   autopilot: {
     enabled: boolean;
     dryRun: boolean;
@@ -25,6 +30,7 @@ export type ConfigEditorSource = {
 };
 
 export type ConfigDraft = {
+  dailyCreditLimit: string;
   autopilotEnabled: boolean;
   dryRun: boolean;
   songsPerWeek: string;
@@ -42,6 +48,11 @@ export type ConfigDraft = {
 };
 
 export type ConfigUpdatePatch = {
+  music: {
+    suno: {
+      dailyCreditLimit: number;
+    };
+  };
   autopilot: {
     enabled: boolean;
     dryRun: boolean;
@@ -68,6 +79,7 @@ function parseWholeNumber(value: string, label: string): number {
 
 export function buildConfigDraft(source: ConfigEditorSource): ConfigDraft {
   return {
+    dailyCreditLimit: String(source.music.suno.dailyCreditLimit),
     autopilotEnabled: source.autopilot.enabled,
     dryRun: source.autopilot.dryRun,
     songsPerWeek: String(source.autopilot.songsPerWeek),
@@ -86,8 +98,13 @@ export function buildConfigDraft(source: ConfigEditorSource): ConfigDraft {
 }
 
 export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
+  const dailyCreditLimit = parseWholeNumber(draft.dailyCreditLimit, "dailyCreditLimit");
   const songsPerWeek = parseWholeNumber(draft.songsPerWeek, "songsPerWeek");
   const cycleIntervalMinutes = parseWholeNumber(draft.cycleIntervalMinutes, "cycleIntervalMinutes");
+
+  if (dailyCreditLimit < 1 || dailyCreditLimit > 1000) {
+    throw new Error("dailyCreditLimit must be between 1 and 1000");
+  }
 
   if (songsPerWeek < 0 || songsPerWeek > 21) {
     throw new Error("songsPerWeek must be between 0 and 21");
@@ -110,6 +127,11 @@ export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
   }
 
   return {
+    music: {
+      suno: {
+        dailyCreditLimit
+      }
+    },
     autopilot: {
       enabled: draft.autopilotEnabled,
       dryRun: draft.dryRun,

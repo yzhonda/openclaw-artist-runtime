@@ -204,6 +204,9 @@ Round 52 exposes that same counter back to the operator without mutating it:
 - `/api/status` now returns `suno.budget = { date, consumed, limit, remaining }`
 - Producer Console renders a read-only budget card with the UTC date and a
   progress bar
+- Producer Console Config Editor can now update `music.suno.dailyCreditLimit`
+  directly, so operators usually do not need to touch `budget.json` just to
+  raise or lower the daily ceiling
 - the bar turns warning at `80%` consumed and error at `100%`
 - read-only views call `getState()` only, so they never reset or reserve budget
   by side effect
