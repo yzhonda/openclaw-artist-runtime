@@ -402,6 +402,9 @@ export interface SunoWorkerStatus {
   connected: boolean;
   hardStopReason?: string;
   lastTransitionAt?: string;
+  sunoProfileStale?: boolean;
+  sunoProfileDetail?: string;
+  sunoProfileCheckedAt?: string;
   failureCount?: number;
   pendingAction?: string;
   loginHandoff?: SunoLoginHandoff;

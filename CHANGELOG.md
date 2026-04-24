@@ -38,6 +38,7 @@
 - Added Round 63 Suno runtime resilience with stale budget tmp cleanup, reset audit logging, optional monthly credit limits, classified Playwright create errors, and an operator-confirmed runtime cleanup script.
 - Added Round 64 social dry-run E2E hardening with shared effective-dry-run resolution, X/Instagram staging tests, status summaries, config warnings, and `docs/ERRORS.md`.
 - Added Round 65 Producer Console observability with recent distribution events, platform 7-day stats, all-platforms dry-run banner, stronger TikTok frozen styling, and budget reset/rollover details.
+- Added Round 67 Suno browser-profile lifecycle helpers for stale detection, daily local snapshots, and operator diagnose/backup scripts.
 - Added Round 66 atomic social publish ledger writes with 90-day archive rotation and archive-aware reader coverage.
 
 ### Changed

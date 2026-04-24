@@ -386,7 +386,7 @@ export async function buildPromptLedgerResponse(songId?: string, config?: Partia
 export async function buildAlertsResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = await resolveRuntimeConfig(config);
   const platforms = await buildPlatformStatuses(mergedConfig);
-  const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot).status();
+  const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot, { config: mergedConfig }).status();
   return collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
 }
 
@@ -441,7 +441,7 @@ export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConf
   const mergedConfig = await resolveRuntimeConfig(config);
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
   const recentSong = (await listSongStates(workspaceRoot))[0];
-  const worker = await new BrowserWorkerSunoConnector(workspaceRoot).status();
+  const worker = await new BrowserWorkerSunoConnector(workspaceRoot, { config: mergedConfig }).status();
   const latestPromptPack = recentSong ? await readLatestPromptPackMetadata(workspaceRoot, recentSong.songId) : undefined;
   return {
     worker,
@@ -497,7 +497,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     mergedConfig.autopilot.dryRun,
     mergedConfig.artist.workspaceRoot
   );
-  const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot).status();
+  const sunoWorker = await new BrowserWorkerSunoConnector(mergedConfig.artist.workspaceRoot, { config: mergedConfig }).status();
   const distributionWorker = await new SocialDistributionWorker().status(mergedConfig);
   const workspaceStatus = await buildWorkspaceSummaries(mergedConfig.artist.workspaceRoot);
   const platforms = await buildPlatformStatuses(mergedConfig);
