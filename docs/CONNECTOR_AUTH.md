@@ -53,6 +53,28 @@ Use it together with:
 - A raw password alone does **not** satisfy any connector. Each platform below
   still requires its own session or token.
 
+## Token expiry reaction
+
+Use this flow when a platform test route reports expired, missing, or failed
+auth.
+
+1. Freeze publish attempts for the affected platform and keep the lane in
+   dry-run until the platform probe is healthy again.
+2. Recreate the credential in the platform's native tool or developer console:
+   Bird for X, Meta for Instagram.
+3. Reload only the shell or Gateway process that provides the environment.
+4. Re-run the matching `POST /plugins/artist-runtime/api/platforms/{id}/test`
+   route and confirm the reason cleared.
+5. Record only the platform id, timestamp, and redacted reason in operator
+   notes. Do not paste token bodies, cookie values, raw Graph responses, or
+   CLI credential stores.
+
+For X/Bird, the usual reaction is to refresh Bird's own local authenticated
+session and confirm `bird whoami --plain` outside the plugin. For Instagram,
+the usual reaction is to issue a fresh Graph API access token with the same
+Page / Business Account linkage and restart the OpenClaw process that owns the
+environment.
+
 ## X (Bird)
 
 ### Contract
