@@ -512,7 +512,10 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   const workspaceStatus = await buildWorkspaceSummaries(mergedConfig.artist.workspaceRoot);
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
-  const sunoBudget = await new SunoBudgetTracker(mergedConfig.artist.workspaceRoot).getState(mergedConfig.music.suno.dailyCreditLimit);
+  const sunoBudget = await new SunoBudgetTracker(mergedConfig.artist.workspaceRoot).getState(
+    mergedConfig.music.suno.dailyCreditLimit,
+    mergedConfig.music.suno.monthlyCreditLimit
+  );
   const [musicSummary, distributionSummary] = await Promise.all([
     buildMusicSummary(mergedConfig),
     buildDistributionSummary(mergedConfig, platforms)
@@ -779,7 +782,10 @@ export function registerRoutes(api: unknown): void {
 
       if (method === "POST") {
         if (segments.length === 2 && segments[0] === "budget" && segments[1] === "reset") {
-          return new SunoBudgetTracker(config.artist.workspaceRoot).reset(config.music.suno.dailyCreditLimit);
+          return new SunoBudgetTracker(config.artist.workspaceRoot).reset(
+            config.music.suno.dailyCreditLimit,
+            config.music.suno.monthlyCreditLimit
+          );
         }
         if (segments.length === 1 && segments[0] === "connect") {
           return new SunoBrowserWorker(config.artist.workspaceRoot, { config }).connect();

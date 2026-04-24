@@ -87,7 +87,12 @@ describe("Suno budget reset route", () => {
     expect(JSON.parse(response.readBody())).toMatchObject({
       consumed: 0,
       limit: 120,
-      remaining: 120
+      remaining: 120,
+      lastResetAt: expect.any(String),
+      monthly: {
+        limit: 0,
+        unlimited: true
+      }
     });
     expect(persisted.consumed).toBe(0);
   });

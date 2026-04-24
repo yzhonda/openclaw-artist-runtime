@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PLAYWRIGHT_CREATE_CARD_REASON,
+  PLAYWRIGHT_CREATE_DOM_MISSING_REASON,
+  PLAYWRIGHT_CREATE_LOGIN_EXPIRED_REASON,
+  PLAYWRIGHT_CREATE_NETWORK_REASON,
+  PLAYWRIGHT_CREATE_RATE_LIMITED_REASON,
   PLAYWRIGHT_CREATE_SKIPPED_REASON,
+  PLAYWRIGHT_CREATE_TIMEOUT_REASON,
   PLAYWRIGHT_LIBRARY_DIFF_REASON,
   PLAYWRIGHT_LIVE_TIMEOUT_REASON,
   PlaywrightSunoDriver,
@@ -319,14 +324,89 @@ describe("PlaywrightSunoDriver create", () => {
     expect(page.goto.mock.calls.filter(([url]) => url === SUNO_LIBRARY_URL).length).toBeGreaterThan(1);
   });
 
-  it("fails closed when Playwright launch raises an error", async () => {
-    launchPersistentContextMock.mockRejectedValue(new Error("browser launch failed"));
+  it("classifies create timeouts as graceful timeout failures", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("Timeout 20000ms exceeded"));
     const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "skip");
 
     const result = await driver.create({
       dryRun: false,
       authority: "auto_create_and_select_take",
       runId: "run-005",
+      payload: {}
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain(PLAYWRIGHT_CREATE_TIMEOUT_REASON);
+  });
+
+  it("classifies network failures before returning create errors", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("net::ERR_CONNECTION_RESET"));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "skip");
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-006",
+      payload: {}
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain(PLAYWRIGHT_CREATE_NETWORK_REASON);
+  });
+
+  it("classifies DOM selector misses before returning create errors", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("locator selector not found"));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "skip");
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-007",
+      payload: {}
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain(PLAYWRIGHT_CREATE_DOM_MISSING_REASON);
+  });
+
+  it("classifies expired login failures before returning create errors", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("Suno login required"));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "skip");
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-008",
+      payload: {}
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain(PLAYWRIGHT_CREATE_LOGIN_EXPIRED_REASON);
+  });
+
+  it("classifies rate limits before returning create errors", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("HTTP 429 too many requests"));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "skip");
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-009",
+      payload: {}
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toContain(PLAYWRIGHT_CREATE_RATE_LIMITED_REASON);
+  });
+
+  it("fails closed when Playwright launch raises an uncategorized error", async () => {
+    launchPersistentContextMock.mockRejectedValue(new Error("browser launch failed"));
+    const driver = new PlaywrightSunoDriver(".openclaw-browser-profiles/suno", "skip");
+
+    const result = await driver.create({
+      dryRun: false,
+      authority: "auto_create_and_select_take",
+      runId: "run-010",
       payload: {}
     });
 
