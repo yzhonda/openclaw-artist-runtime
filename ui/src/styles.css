@@ -241,6 +241,15 @@ textarea {
   background: var(--line);
 }
 
+.budget-actions {
+  margin-top: 0.65rem;
+}
+
+.budget-reset-button {
+  border-color: rgba(200, 74, 43, 0.45);
+  color: #7a2818;
+}
+
 .asset-row {
   display: grid;
   gap: 4px;

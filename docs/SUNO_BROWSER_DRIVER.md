@@ -204,6 +204,9 @@ Round 52 exposes that same counter back to the operator without mutating it:
 - `/api/status` now returns `suno.budget = { date, consumed, limit, remaining }`
 - Producer Console renders a read-only budget card with the UTC date and a
   progress bar
+- Producer Console also provides a confirmed `Reset budget` action that writes
+  today's UTC date with `consumed: 0`, so the operator can reopen the daily
+  lane without waiting for the automatic UTC rollover
 - Producer Console Config Editor can now update `music.suno.dailyCreditLimit`
   directly, so operators usually do not need to touch `budget.json` just to
   raise or lower the daily ceiling
@@ -332,7 +335,9 @@ Use this when a live create attempt returns `accepted: false` with
    runtime resets the visible counter automatically when the date changes.
 4. After the UTC boundary or config change, re-check the status surface and
    confirm `remaining` has reopened before attempting another live create.
-5. If the operator must override the current day manually, use the
+5. If the operator needs to reopen the current day immediately, use the
+   Producer Console `Reset budget` action and confirm the prompt.
+6. If the operator must override the current day manually, use the
    `Editing budget.json` guidance above and keep the file valid JSON.
 
 ## Artifact retention

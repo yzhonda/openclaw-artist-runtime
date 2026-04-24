@@ -641,6 +641,19 @@ export function App() {
     }
   };
 
+  const resetSunoBudget = async () => {
+    setBusy("suno:budget-reset");
+    try {
+      await apiPost("/suno/budget/reset");
+      await refresh(selectedSongId);
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      throw caughtError;
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const simulateReply = async () => {
     if (!selectedSongId) {
       setError("select a song before simulating a reply");
@@ -768,6 +781,8 @@ export function App() {
         lastCreateOutcome={sunoStatus?.lastCreateOutcome ?? sunoStatus?.worker.lastCreateOutcome}
         lastImportOutcome={sunoStatus?.lastImportOutcome ?? sunoStatus?.worker.lastImportOutcome}
         budget={status?.suno.budget}
+        onResetBudget={resetSunoBudget}
+        budgetResetDisabled={busy !== null}
       />
       <div className="list">
         <div className="inline-actions">

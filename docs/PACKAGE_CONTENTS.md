@@ -91,7 +91,8 @@ Producer Console status surfaces. In practice that means:
   Producer Console can render the current `consumed / limit / remaining`
   credits without mutating the counter, now falls back to an empty UTC-day
   state when `budget.json` contains invalid JSON, and now replaces the final
-  file through a `.tmp` write plus `rename(...)`.
+  file through a `.tmp` write plus `rename(...)`. The same tracker now exposes
+  a manual `reset()` path used by the Producer Console budget reset action.
 - `src/services/autopilotTicker.ts` and `src/services/autopilotService.ts` drive
   the cycle/ticker status that the Console polls every 3 seconds.
 
@@ -128,6 +129,8 @@ The Console source now includes:
 - imported asset summaries mirrored from the latest Suno import outcome, with
   copy-path buttons plus static metadata only, without serving `runtime/suno/`
   over HTTP
+- a confirmed Suno daily budget reset button that calls the plugin API instead
+  of asking the operator to edit `runtime/suno/budget.json` directly
 - the same Suno/status markers mirrored in the fallback inline Console shell
 
 The config editor source now owns both:

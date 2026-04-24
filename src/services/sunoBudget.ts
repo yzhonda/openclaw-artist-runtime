@@ -117,4 +117,19 @@ export class SunoBudgetTracker {
       remaining: Math.max(limit - normalized.consumed, 0)
     };
   }
+
+  async reset(limit = DEFAULT_SUNO_DAILY_CREDIT_LIMIT): Promise<SunoBudgetState> {
+    const today = utcDate(this.clock);
+    const next = {
+      date: today,
+      consumed: 0
+    };
+    await this.writeState(next);
+    return {
+      date: today,
+      consumed: 0,
+      limit,
+      remaining: limit
+    };
+  }
 }

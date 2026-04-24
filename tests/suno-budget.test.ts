@@ -195,4 +195,32 @@ describe("SunoBudgetTracker", () => {
     });
     expect(tmpExists).toBe(false);
   });
+
+  it("resets the current UTC-day budget counter to zero", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-budget-manual-reset-"));
+    await mkdir(join(root, "runtime", "suno"), { recursive: true });
+    await writeFile(
+      join(root, "runtime", "suno", "budget.json"),
+      `${JSON.stringify({ date: "2026-04-23", consumed: 45 }, null, 2)}\n`,
+      "utf8"
+    );
+    const tracker = new SunoBudgetTracker(root, () => new Date("2026-04-23T12:00:00.000Z"));
+
+    const state = await tracker.reset(DEFAULT_SUNO_DAILY_CREDIT_LIMIT);
+    const persisted = JSON.parse(await readFile(join(root, "runtime", "suno", "budget.json"), "utf8")) as {
+      date: string;
+      consumed: number;
+    };
+
+    expect(state).toEqual({
+      date: "2026-04-23",
+      consumed: 0,
+      limit: DEFAULT_SUNO_DAILY_CREDIT_LIMIT,
+      remaining: DEFAULT_SUNO_DAILY_CREDIT_LIMIT
+    });
+    expect(persisted).toEqual({
+      date: "2026-04-23",
+      consumed: 0
+    });
+  });
 });
