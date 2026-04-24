@@ -80,6 +80,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/alertAcks.ts`
 - `src/services/runtimeConfig.ts`
 - `src/services/distributionLedgerReader.ts`
+- `src/services/socialPublishLedger.ts`
 - `src/services/socialDryRunResolver.ts`
 - `src/services/socialDistributionWorker.ts`
 - `src/services/socialPublishing.ts`
@@ -239,6 +240,11 @@ coverage provider.
 - `tests/routes/status-platform-stats.test.ts`
   This suite locks the Round 65 seven-day platform stats surface: counts,
   success rate, failed reason aggregation, and old-event exclusion.
+- `tests/social-publish-ledger-writer.test.ts`
+  This suite locks the Round 66 writer boundary: atomic rewrite, stale `.tmp`
+  cleanup, 90-day archive rotation, and latest active entry reads.
+- `tests/distribution-ledger-reader.test.ts`
+  This suite locks archive-aware distribution ledger reads and stats aggregation.
 - `tests/config-schema-warnings.test.ts`
   This suite keeps config validation accept-with-warning behavior visible for
   platform arms held by the global live-go flag and disabled platforms with
@@ -351,6 +357,9 @@ route (`/me/accounts -> /media -> /media_publish`), the required scopes, the
 global + per-platform `liveGoArmed` guards, and the fact that Round 42-45 still
 block live posting with an upstream dry-run hold plus
 `requires_explicit_live_go` at the connector edge.
+It also documents the social publish ledger rotation rule:
+`social-publish.jsonl` stays active, while entries older than 90 days move to
+`social-publish.archive.jsonl` during the next append.
 
 `docs/ERRORS.md` catalogs operator-facing reason codes across social staging,
 Suno budget/Playwright failures, and gateway boundary issues. Keep it aligned

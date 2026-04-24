@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { DistributionEvent, PlatformStat, SocialPlatform, SocialPublishLedgerEntry } from "../types.js";
 import { listSongStates } from "./artistState.js";
+import { getSocialLedgerArchivePath, getSocialLedgerPath } from "./socialPublishLedger.js";
 
 const PLATFORMS: SocialPlatform[] = ["x", "instagram", "tiktok"];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-function socialLedgerPath(root: string, songId: string): string {
-  return join(root, "songs", songId, "social", "social-publish.jsonl");
+export interface DistributionLedgerReadOptions {
+  includeArchive?: boolean;
 }
 
 async function readJsonlEntries<T>(path: string): Promise<T[]> {
@@ -32,11 +32,15 @@ function buildWindowKeys(now: Date): string[] {
   });
 }
 
-export async function readDistributionEvents(root: string, limit = 20): Promise<DistributionEvent[]> {
+export async function readDistributionEvents(root: string, limit = 20, options: DistributionLedgerReadOptions = {}): Promise<DistributionEvent[]> {
   const songs = await listSongStates(root);
   const all = await Promise.all(
     songs.map(async (song) => {
-      const entries = await readJsonlEntries<SocialPublishLedgerEntry>(socialLedgerPath(root, song.songId));
+      const active = await readJsonlEntries<SocialPublishLedgerEntry>(getSocialLedgerPath(root, song.songId));
+      const archive = options.includeArchive
+        ? await readJsonlEntries<SocialPublishLedgerEntry>(getSocialLedgerArchivePath(root, song.songId))
+        : [];
+      const entries = [...active, ...archive];
       return entries.map((entry) => ({
         ...entry,
         songId: entry.songId || song.songId
@@ -50,10 +54,10 @@ export async function readDistributionEvents(root: string, limit = 20): Promise<
     .slice(0, limit);
 }
 
-export async function buildPlatformStats(root: string, now = new Date()): Promise<Record<SocialPlatform, PlatformStat>> {
+export async function buildPlatformStats(root: string, now = new Date(), options: DistributionLedgerReadOptions = {}): Promise<Record<SocialPlatform, PlatformStat>> {
   const windowKeys = buildWindowKeys(now);
   const earliest = new Date(`${windowKeys[0]}T00:00:00.000Z`).getTime();
-  const events = (await readDistributionEvents(root, Number.MAX_SAFE_INTEGER))
+  const events = (await readDistributionEvents(root, Number.MAX_SAFE_INTEGER, options))
     .filter((event) => {
       const timestamp = Date.parse(event.timestamp);
       return Number.isFinite(timestamp) && timestamp >= earliest && timestamp <= now.getTime();
