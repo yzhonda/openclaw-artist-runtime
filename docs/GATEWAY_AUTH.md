@@ -52,6 +52,21 @@ Do not treat dry-run mode as a substitute for network or gateway access control.
 4. Before relying on Producer Console `Platforms` or `Status`, confirm the
    gateway boundary itself is already restricted to trusted operators.
 
+## Troubleshooting: token mismatch
+
+If the Producer Console appears to use one account while the shell or connector
+probe reports another, treat it as an environment or gateway-process mismatch.
+
+1. Confirm which Gateway process is serving the Producer Console.
+2. Confirm which shell or service manager started that Gateway process.
+3. Re-run the platform test route from the same Gateway surface instead of a
+   separate shell.
+4. Reload or restart only the Gateway process that owns the stale environment.
+5. Re-check `docs/CONNECTOR_AUTH.md` for the platform's refresh flow.
+
+Do not paste token bodies or cookie values into the Console, logs, PRs, or
+incident notes while debugging the mismatch.
+
 ## See also
 
 - `docs/API_ROUTES.md`

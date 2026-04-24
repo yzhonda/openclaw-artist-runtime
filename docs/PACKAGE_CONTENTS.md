@@ -24,6 +24,24 @@ Artist Runtime is not a simple tool plugin. It includes:
 A compact package would be easier to publish, but worse for Codex-driven implementation because the subtle product constraints would be lost. Keep the detailed docs until the implementation is mature.
 The package still needs curation: built UI assets belong in the tarball, while local `ui/node_modules/` does not.
 
+## Excluded paths for distribution
+
+These paths must stay out of npm / ClawHub package artifacts and public PR
+attachments:
+
+- `.local/`
+- `.env` and `.env.*`
+- `runtime/`
+- `.openclaw-browser-profiles/`
+- `.openclaw-browser-profiles/suno/`
+- `runtime/suno/*.tmp` and `runtime/suno/**/*.tmp`
+- `ui/node_modules/`
+- generated package tarballs such as `*.tgz`
+
+The package should contain source, docs, tests, manifest files, and the built UI
+bundle. It should not contain operator credentials, browser profiles, local
+runtime counters, imported Suno audio, or temporary budget write files.
+
 ## Important directories
 
 ```txt
@@ -43,6 +61,8 @@ The package still needs curation: built UI assets belong in the tarball, while l
 ├── docs/*.md                          # distribution-focused docs
 ├── docs/API_ROUTES.md                 # plugin HTTP route catalog for Console consumers
 ├── docs/CONNECTOR_AUTH.md             # operator-facing connector setup / refresh guide
+├── docs/THREAT_MODEL.md               # operator-facing threat model and mitigation map
+├── docs/INCIDENT_RESPONSE.md          # operator incident response runbook
 ├── docs/SUNO_BROWSER_DRIVER.md        # operator-facing Suno browser-profile lane guide
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates

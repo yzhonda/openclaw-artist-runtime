@@ -293,6 +293,17 @@ is unreadable, or repeated login probes keep failing after ordinary retry.
 6. Re-run the login probe and confirm it returns `connected: true` before
    resuming normal use.
 
+Backup and rebuild notes:
+
+- Keep the backup local to the operator machine. Do not attach it to an
+  incident, issue, PR, or package artifact.
+- Prefer rename-over-delete for the first recovery pass so the operator can
+  inspect filesystem permissions or copy mistakes later.
+- Do not cherry-pick individual Chromium cookie, storage, or cache files. The
+  browser profile layout is version-dependent.
+- Treat a rebuilt profile as untrusted until `POST /api/platforms` surfaces and
+  the Suno probe both show the expected operator-owned account state.
+
 ### Scenario B: Google OAuth reauthentication required
 
 Use this when the probe starts returning `login_required`, the Suno session

@@ -93,6 +93,29 @@ All public actions require:
 4. audit log event;
 5. Prompt Ledger link where applicable.
 
+## Audit log safe field list
+
+Audit logs may include operational metadata needed to explain what happened:
+
+- timestamp
+- route or tool name
+- platform id
+- song id, run id, take id, or audit event id
+- authority decision type
+- dry-run / accepted / blocked status
+- redacted public URL or platform post URL after publication
+- non-secret reason strings such as `budget_exhausted`,
+  `requires_explicit_live_go`, or `login_required`
+
+Audit logs must not include:
+
+- access tokens, OAuth refresh tokens, API keys, passwords, cookies, or browser
+  session headers
+- raw request or response bodies from Suno, Meta, Bird, or other platform tools
+- contents of `.local/`, `.env`, `.openclaw-browser-profiles/`, or connector
+  credential stores
+- screenshots or copied browser storage from signed-in sessions
+
 ## Marketplace note
 
 Because plugin marketplaces are sensitive surfaces, this package must not ask users to run arbitrary shell commands beyond standard install/build/test instructions. Avoid obfuscated scripts and lifecycle `postinstall` behavior.
