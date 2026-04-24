@@ -147,6 +147,7 @@ export interface ArtistRuntimeConfig {
 export interface ValidationResult<T = void> {
   ok: boolean;
   errors: string[];
+  warnings?: string[];
   value?: T;
 }
 
@@ -339,6 +340,11 @@ export interface DistributionSummary {
   repliesToday: number;
   lastPlatform?: SocialPlatform;
   lastPostUrl?: string;
+}
+
+export interface RuntimeStatusSummary {
+  allPlatformsEffectivelyDryRun: boolean;
+  effectiveDryRunMap: Record<SocialPlatform, boolean>;
 }
 
 export interface SetupChecklistItem {
@@ -606,6 +612,7 @@ export interface AlertRecord {
 export interface StatusResponse {
   config: ArtistRuntimeConfig;
   dryRun: boolean;
+  summary: RuntimeStatusSummary;
   autopilot: AutopilotStatus;
   ticker: AutopilotTickerStatus;
   suno: {

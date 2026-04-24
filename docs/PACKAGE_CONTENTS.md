@@ -61,6 +61,7 @@ runtime counters, imported Suno audio, or temporary budget write files.
 ├── docs/*.md                          # distribution-focused docs
 ├── docs/API_ROUTES.md                 # plugin HTTP route catalog for Console consumers
 ├── docs/CONNECTOR_AUTH.md             # operator-facing connector setup / refresh guide
+├── docs/ERRORS.md                     # operator-facing reason-code catalog
 ├── docs/THREAT_MODEL.md               # operator-facing threat model and mitigation map
 ├── docs/INCIDENT_RESPONSE.md          # operator incident response runbook
 ├── docs/SUNO_BROWSER_DRIVER.md        # operator-facing Suno browser-profile lane guide
@@ -78,6 +79,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/autopilotTicker.ts`
 - `src/services/alertAcks.ts`
 - `src/services/runtimeConfig.ts`
+- `src/services/socialDryRunResolver.ts`
 - `src/services/socialDistributionWorker.ts`
 - `src/services/socialPublishing.ts`
 - `src/services/sunoBrowserWorker.ts`
@@ -218,9 +220,19 @@ coverage provider.
 - `tests/authority.test.ts`
 - `tests/config.test.ts`
 - `tests/x-bird-connector.test.ts`
+- `tests/x-connector-dry-run-e2e.test.ts`
 - `tests/instagram-connector.test.ts`
+- `tests/instagram-connector-dry-run-e2e.test.ts`
   This suite now fixes the Round 42 Graph skeleton contract: auth missing,
   dry-run stage traversal, and non-dry-run `requires_explicit_live_go`.
+- `tests/social-dry-run-resolver.test.ts`
+  This suite locks the shared global/platform arm resolution used by
+  `socialPublishing`, `socialDistributionWorker`, platform status, and
+  `/api/status.summary`.
+- `tests/config-schema-warnings.test.ts`
+  This suite keeps config validation accept-with-warning behavior visible for
+  platform arms held by the global live-go flag and disabled platforms with
+  positive posting caps.
 - `tests/distribution-authority-wiring.test.ts`
   This suite fixes the Round 43 upstream boundary: disabled distribution or a
   disabled Instagram platform toggle must force social publish back into
@@ -330,6 +342,10 @@ global + per-platform `liveGoArmed` guards, and the fact that Round 42-45 still
 block live posting with an upstream dry-run hold plus
 `requires_explicit_live_go` at the connector edge.
 
+`docs/ERRORS.md` catalogs operator-facing reason codes across social staging,
+Suno budget/Playwright failures, and gateway boundary issues. Keep it aligned
+whenever connector or budget reason strings change.
+
 `SECURITY.md` and `PRIVACY.md` also document the Suno browser-profile boundary:
 `.openclaw-browser-profiles/suno/` stays local-only, and imported audio under
 `runtime/suno/<runId>/` remains operator-reviewed local storage by default.
@@ -388,8 +404,12 @@ ships one aligned dry-run contract across X, Instagram, and TikTok:
 - `src/connectors/social/xBirdConnector.ts`
 - `src/connectors/social/instagramConnector.ts`
 - `src/connectors/social/tiktokConnector.ts`
+- `src/services/socialDryRunResolver.ts`
 - `tests/x-bird-connector.test.ts`
+- `tests/x-connector-dry-run-e2e.test.ts`
 - `tests/instagram-connector.test.ts`
+- `tests/instagram-connector-dry-run-e2e.test.ts`
+- `tests/social-dry-run-resolver.test.ts`
 - `tests/tiktok-connector.test.ts`
 
 ## What may be slimmed later

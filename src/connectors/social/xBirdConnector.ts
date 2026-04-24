@@ -47,6 +47,7 @@ interface XBirdConnectorOptions {
   publishGuardState?: PublishGuardState;
   minPublishIntervalMs?: number;
   dedupeHistoryLimit?: number;
+  dryRunStageExecution?: boolean;
 }
 
 const DEFAULT_PUBLISH_GUARD_STATE: PublishGuardState = {
@@ -57,6 +58,9 @@ const BIRD_PROBE_TIMEOUT_MS = 750;
 const BIRD_PUBLISH_TIMEOUT_MS = 3000;
 const DEFAULT_MIN_PUBLISH_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_DEDUPE_HISTORY_LIMIT = 10;
+const DRY_RUN_BLOCK_REASON = "dry-run blocks publish";
+const DRY_RUN_REPLY_BLOCK_REASON = "dry-run blocks reply";
+const LIVE_GO_BLOCK_REASON = "requires_explicit_live_go";
 
 function runCommand(spawnImpl: SpawnImpl, command: string, args: string[], timeoutMs: number): Promise<CommandResult> {
   return new Promise((resolve) => {
@@ -258,12 +262,14 @@ export class XBirdConnector implements SocialConnector {
   private readonly publishGuardState: PublishGuardState;
   private readonly minPublishIntervalMs: number;
   private readonly dedupeHistoryLimit: number;
+  private readonly dryRunStageExecution: boolean;
 
   constructor(private readonly spawnImpl: SpawnImpl = spawn, options: XBirdConnectorOptions = {}) {
     this.now = options.now ?? Date.now;
     this.publishGuardState = options.publishGuardState ?? DEFAULT_PUBLISH_GUARD_STATE;
     this.minPublishIntervalMs = options.minPublishIntervalMs ?? DEFAULT_MIN_PUBLISH_INTERVAL_MS;
     this.dedupeHistoryLimit = options.dedupeHistoryLimit ?? DEFAULT_DEDUPE_HISTORY_LIMIT;
+    this.dryRunStageExecution = options.dryRunStageExecution ?? false;
   }
 
   id = "x" as const;
@@ -306,58 +312,23 @@ export class XBirdConnector implements SocialConnector {
 
   async publish(input: SocialPublishRequest): Promise<SocialPublishResult> {
     if (input.dryRun) {
+      if (this.dryRunStageExecution) {
+        return this.publishDryRunStages(input);
+      }
       return {
         accepted: false,
         platform: "x",
         dryRun: true,
-        reason: "dry-run blocks publish"
+        reason: DRY_RUN_BLOCK_REASON
       };
     }
 
-    if (input.mediaPaths?.length) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_text_only_publish_only"
-      };
-    }
-
-    const text = input.text?.trim() ?? "";
-    if (!text) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_text_required"
-      };
-    }
-
-    const nowMs = this.now();
-    const textDigest = hashText(text);
-    const recentPublishes = resolveRecentPublishes(this.publishGuardState, this.dedupeHistoryLimit);
-    const guardFailure = checkPublishGuards(recentPublishes, textDigest, nowMs, this.minPublishIntervalMs);
-    if (guardFailure) {
-      return guardFailure;
-    }
-
-    const publishResult = await runCommand(this.spawnImpl, "bird", ["--plain", "tweet", text], BIRD_PUBLISH_TIMEOUT_MS);
-    const combinedOutput = buildCombinedOutput(publishResult);
-
-    if (publishResult.code === 0) {
-      this.publishGuardState.recentPublishes = [...recentPublishes, { textHash: textDigest, publishedAtMs: nowMs }].slice(-this.dedupeHistoryLimit);
-      return {
-        accepted: true,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_publish_ok",
-        id: parseTweetId(combinedOutput),
-        url: parseTweetUrl(combinedOutput),
-        raw: combinedOutput || undefined
-      };
-    }
-
-    return buildPublishFailure(publishResult);
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: LIVE_GO_BLOCK_REASON
+    };
   }
 
   async reply(input: SocialPublishRequest): Promise<SocialPublishResult> {
@@ -366,66 +337,79 @@ export class XBirdConnector implements SocialConnector {
         accepted: false,
         platform: "x",
         dryRun: true,
-        reason: "dry-run blocks reply"
+        reason: DRY_RUN_REPLY_BLOCK_REASON
       };
     }
 
-    if (input.mediaPaths?.length) {
-      return {
-        accepted: false,
-        platform: "x",
-        dryRun: false,
-        reason: "bird_text_only_reply_only"
-      };
-    }
+    return {
+      accepted: false,
+      platform: "x",
+      dryRun: false,
+      reason: LIVE_GO_BLOCK_REASON
+    };
+  }
 
+  private async publishDryRunStages(input: SocialPublishRequest): Promise<SocialPublishResult> {
     const text = input.text?.trim() ?? "";
     if (!text) {
       return {
         accepted: false,
         platform: "x",
-        dryRun: false,
+        dryRun: true,
         reason: "bird_text_required"
       };
     }
 
-    const target = resolveReplyTarget(input);
-    if (!target) {
+    const authCheck = await runCommand(this.spawnImpl, "bird", ["whoami", "--plain"], BIRD_PROBE_TIMEOUT_MS);
+    if (authCheck.errorCode === "ENOENT") {
       return {
         accepted: false,
         platform: "x",
-        dryRun: false,
-        reason: "bird_reply_target_required"
+        dryRun: true,
+        reason: "bird_cli_not_installed"
       };
     }
-
-    const nowMs = this.now();
-    const textDigest = hashText(text);
-    const recentPublishes = resolveRecentPublishes(this.publishGuardState, this.dedupeHistoryLimit);
-    const guardFailure = checkPublishGuards(recentPublishes, textDigest, nowMs, this.minPublishIntervalMs);
-    if (guardFailure) {
-      return guardFailure;
-    }
-
-    const replyResult = await runCommand(this.spawnImpl, "bird", ["--plain", "reply", target, text], BIRD_PUBLISH_TIMEOUT_MS);
-    const combinedOutput = buildCombinedOutput(replyResult);
-    if (replyResult.code === 0) {
-      this.publishGuardState.recentPublishes = [...recentPublishes, { textHash: textDigest, publishedAtMs: nowMs }].slice(-this.dedupeHistoryLimit);
+    const authOutput = buildCombinedOutput(authCheck);
+    if (authCheck.code !== 0) {
       return {
-        accepted: true,
+        accepted: false,
         platform: "x",
-        dryRun: false,
-        reason: "bird_reply_ok",
-        id: parseTweetId(combinedOutput),
-        url: parseTweetUrl(combinedOutput),
-        raw: combinedOutput || undefined
+        dryRun: true,
+        reason: looksLikeAuthFailure(authOutput) ? "bird_auth_expired" : "bird_probe_failed"
       };
     }
 
-    const failure = buildPublishFailure(replyResult);
+    const compose = await runCommand(this.spawnImpl, "bird", ["--plain", "compose", text], BIRD_PUBLISH_TIMEOUT_MS);
+    if (compose.code !== 0) {
+      return {
+        accepted: false,
+        platform: "x",
+        dryRun: true,
+        reason: "bird_compose_failed"
+      };
+    }
+
+    const submit = await runCommand(this.spawnImpl, "bird", ["--plain", "tweet", "--dry-run", text], BIRD_PUBLISH_TIMEOUT_MS);
+    if (submit.code !== 0) {
+      const submitOutput = buildCombinedOutput(submit);
+      return {
+        accepted: false,
+        platform: "x",
+        dryRun: true,
+        reason: looksLikeRateLimitFailure(submitOutput) ? "bird_rate_limited" : "bird_dry_run_submit_failed"
+      };
+    }
+
     return {
-      ...failure,
-      reason: failure.reason === "bird_publish_failed" ? "bird_reply_failed" : failure.reason
+      accepted: false,
+      platform: "x",
+      dryRun: true,
+      reason: DRY_RUN_BLOCK_REASON,
+      raw: {
+        accountLabel: extractAccountLabel(authOutput),
+        stageOrder: ["auth_check", "compose", "submit"],
+        submitPreview: buildCombinedOutput(submit) || undefined
+      }
     };
   }
 }

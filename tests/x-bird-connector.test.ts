@@ -104,7 +104,7 @@ describe("XBirdConnector.publish", () => {
     });
   });
 
-  it("publishes text-only tweets and parses the returned URL", async () => {
+  it("rejects live publishes before invoking bird", async () => {
     const connector = new XBirdConnector(
       createSpawnMock([
         {
@@ -127,17 +127,14 @@ describe("XBirdConnector.publish", () => {
         text: "signal under frost"
       })
     ).resolves.toEqual({
-      accepted: true,
+      accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_publish_ok",
-      id: "1234567890123456789",
-      url: "https://x.com/ghost_station/status/1234567890123456789",
-      raw: "posted https://x.com/ghost_station/status/1234567890123456789"
+      reason: "requires_explicit_live_go"
     });
   });
 
-  it("returns auth expired when tweet publish reports auth failure", async () => {
+  it("keeps auth failures unreachable on live publish attempts", async () => {
     const connector = new XBirdConnector(
       createSpawnMock([
         {
@@ -161,11 +158,11 @@ describe("XBirdConnector.publish", () => {
       accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_auth_expired"
+      reason: "requires_explicit_live_go"
     });
   });
 
-  it("blocks duplicate text hashes before invoking bird", async () => {
+  it("keeps duplicate guards behind the live-go rejection", async () => {
     const guardState = {
       recentPublishes: [
         {
@@ -194,11 +191,11 @@ describe("XBirdConnector.publish", () => {
       accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_duplicate_text_blocked"
+      reason: "requires_explicit_live_go"
     });
   });
 
-  it("blocks posts inside the minimum publish interval", async () => {
+  it("keeps minimum interval guards behind the live-go rejection", async () => {
     const connector = new XBirdConnector(
       createSpawnMock([]),
       {
@@ -226,7 +223,7 @@ describe("XBirdConnector.publish", () => {
       accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_min_interval_blocked"
+      reason: "requires_explicit_live_go"
     });
   });
 });
@@ -251,7 +248,7 @@ describe("XBirdConnector.reply", () => {
     });
   });
 
-  it("replies to a target tweet and parses the returned URL", async () => {
+  it("rejects live replies before invoking bird", async () => {
     const connector = new XBirdConnector(
       createSpawnMock([
         {
@@ -275,17 +272,14 @@ describe("XBirdConnector.reply", () => {
         targetUrl: "https://x.com/ghost_station/status/1234567890123456789"
       })
     ).resolves.toEqual({
-      accepted: true,
+      accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_reply_ok",
-      id: "987654321098765432",
-      url: "https://x.com/ghost_station/status/987654321098765432",
-      raw: "reply posted https://x.com/ghost_station/status/987654321098765432"
+      reason: "requires_explicit_live_go"
     });
   });
 
-  it("returns auth expired when reply publish reports auth failure", async () => {
+  it("keeps reply auth failures unreachable on live attempts", async () => {
     const connector = new XBirdConnector(
       createSpawnMock([
         {
@@ -310,11 +304,11 @@ describe("XBirdConnector.reply", () => {
       accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_auth_expired"
+      reason: "requires_explicit_live_go"
     });
   });
 
-  it("fails closed when reply target is missing", async () => {
+  it("keeps reply target validation behind the live-go rejection", async () => {
     const connector = new XBirdConnector(createSpawnMock([]));
 
     await expect(
@@ -328,11 +322,11 @@ describe("XBirdConnector.reply", () => {
       accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_reply_target_required"
+      reason: "requires_explicit_live_go"
     });
   });
 
-  it("blocks replies inside the minimum publish interval", async () => {
+  it("keeps reply interval guards behind the live-go rejection", async () => {
     const connector = new XBirdConnector(
       createSpawnMock([]),
       {
@@ -361,7 +355,7 @@ describe("XBirdConnector.reply", () => {
       accepted: false,
       platform: "x",
       dryRun: false,
-      reason: "bird_min_interval_blocked"
+      reason: "requires_explicit_live_go"
     });
   });
 });

@@ -110,6 +110,12 @@ describe("status ticker and reply simulation routes", () => {
       instagram: true,
       tiktok: true
     });
+    expect(status.summary.allPlatformsEffectivelyDryRun).toBe(true);
+    expect(status.summary.effectiveDryRunMap).toMatchObject({
+      x: true,
+      instagram: true,
+      tiktok: true
+    });
     expect(status.distributionWorker.blockedReason).toContain("live-go arm");
     expect(status.platforms.x.liveGoArmed).toBe(true);
     expect(status.platforms.x.effectiveDryRun).toBe(true);
@@ -147,6 +153,12 @@ describe("status ticker and reply simulation routes", () => {
       tiktok: false
     });
     expect(status.distributionWorker.effectiveDryRun).toMatchObject({
+      x: false,
+      instagram: true,
+      tiktok: true
+    });
+    expect(status.summary.allPlatformsEffectivelyDryRun).toBe(false);
+    expect(status.summary.effectiveDryRunMap).toMatchObject({
       x: false,
       instagram: true,
       tiktok: true
