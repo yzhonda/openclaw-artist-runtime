@@ -35,6 +35,8 @@ import type {
   SocialPlatform,
   SocialPublishLedgerEntry,
   StatusResponse,
+  StatusExportResponse,
+  ObservabilityExportWindow,
   SunoStatusResponse,
   SunoRunRecord
 } from "../types.js";
@@ -94,6 +96,39 @@ function payloadPathSegments(payload: Record<string, unknown>, prefix: string): 
 
 function platformFromSegment(value: unknown): SocialPlatform | undefined {
   return value === "instagram" || value === "tiktok" || value === "x" ? value : undefined;
+}
+
+function exportWindowFromInput(value: unknown): ObservabilityExportWindow {
+  return value === "30d" || value === "all" ? value : "7d";
+}
+
+function exportWindowFromPayload(payload: Record<string, unknown>): ObservabilityExportWindow {
+  if (typeof payload.window === "string") {
+    return exportWindowFromInput(payload.window);
+  }
+  const requestPath = payloadRequestPath(payload, "/plugins/artist-runtime/api/status/export");
+  const queryIndex = requestPath.indexOf("?");
+  if (queryIndex < 0) {
+    return "7d";
+  }
+  return exportWindowFromInput(new URLSearchParams(requestPath.slice(queryIndex + 1)).get("window"));
+}
+
+function filterEventsByExportWindow<T extends { timestamp: string }>(
+  events: T[],
+  window: ObservabilityExportWindow,
+  now = new Date()
+): T[] {
+  if (window === "all") {
+    return events;
+  }
+
+  const days = window === "30d" ? 30 : 7;
+  const earliest = now.getTime() - days * 24 * 60 * 60 * 1000;
+  return events.filter((event) => {
+    const timestamp = Date.parse(event.timestamp);
+    return Number.isFinite(timestamp) && timestamp >= earliest && timestamp <= now.getTime();
+  });
 }
 
 async function readAllSocialActions(workspaceRoot: string): Promise<SocialPublishLedgerEntry[]> {
@@ -544,6 +579,30 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   };
 }
 
+export async function buildStatusExportResponse(
+  config?: Partial<ArtistRuntimeConfig>,
+  window: ObservabilityExportWindow = "7d",
+  now = new Date()
+): Promise<StatusExportResponse> {
+  const mergedConfig = await resolveRuntimeConfig(config);
+  const includeArchive = window === "all";
+  const [status, events, platformStats] = await Promise.all([
+    buildStatusResponse(mergedConfig),
+    readDistributionEvents(mergedConfig.artist.workspaceRoot, Number.MAX_SAFE_INTEGER, { includeArchive }),
+    buildPlatformStats(mergedConfig.artist.workspaceRoot, now, { includeArchive })
+  ]);
+
+  return {
+    window,
+    exportedAt: now.toISOString(),
+    status,
+    ledger: {
+      events: filterEventsByExportWindow(events, window, now),
+      platformStats
+    }
+  };
+}
+
 export function registerRoutes(api: unknown): void {
   safeRegisterRoute(api, {
     method: "GET",
@@ -556,6 +615,18 @@ export function registerRoutes(api: unknown): void {
     method: "GET",
     path: "/plugins/artist-runtime/api/status",
     handler: async (input) => buildStatusResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: "GET",
+    path: "/plugins/artist-runtime/api/status/export",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      return buildStatusExportResponse(
+        payload.config as Partial<ArtistRuntimeConfig> | undefined,
+        exportWindowFromPayload(payload)
+      );
+    }
   });
 
   safeRegisterRoute(api, {

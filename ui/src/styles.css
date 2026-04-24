@@ -153,6 +153,43 @@ textarea {
   backdrop-filter: blur(10px);
 }
 
+.observability-panel {
+  grid-column: 1 / -1;
+}
+
+.observability-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.observability-export {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: min(100%, 340px);
+}
+
+.observability-export label {
+  flex: 1 1 150px;
+}
+
+.observability-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.observability-body > .panel {
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.42);
+}
+
 .metric-card {
   min-height: 140px;
 }
