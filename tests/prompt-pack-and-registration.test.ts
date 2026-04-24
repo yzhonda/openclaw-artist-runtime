@@ -178,6 +178,7 @@ describe("registration shells", () => {
     expect(registered.hooks).toContain("agent:bootstrap");
     expect(registered.services).toContain("artistAutopilotService");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/status");
+    expect(registered.routes).toContain("/plugins/artist-runtime/api/status/export");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/run-cycle");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/config");
     expect(registered.routes).toContain("/plugins/artist-runtime/api/artist-mind");

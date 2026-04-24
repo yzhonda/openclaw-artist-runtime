@@ -2,8 +2,7 @@ import { startTransition, useEffect, useState } from "react";
 import "./styles.css";
 import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
 import { SunoOutcomeCard, type ImportedAsset } from "./SunoOutcomeCard";
-import { DistributionEventsCard } from "./DistributionEventsCard";
-import { PlatformUptimeCard } from "./PlatformUptimeCard";
+import { ObservabilityPanel } from "./ObservabilityPanel";
 import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
 
 type StatusResponse = {
@@ -785,9 +784,7 @@ export function App() {
     </article>
   );
 
-  const sunoPanel = (
-    <article className="panel">
-      <div className="section-title">Suno</div>
+  const sunoOutcomeCard = (
       <SunoOutcomeCard
         state={sunoStatus?.worker.state ?? "-"}
         pendingAction={sunoStatus?.worker.pendingAction}
@@ -801,6 +798,12 @@ export function App() {
         onResetBudget={resetSunoBudget}
         budgetResetDisabled={busy !== null}
       />
+  );
+
+  const sunoPanel = (
+    <article className="panel">
+      <div className="section-title">Suno</div>
+      {sunoOutcomeCard}
       <div className="list">
         <div className="inline-actions">
           <button disabled={busy !== null} onClick={() => void runSunoAction("connect")}>Connect</button>
@@ -817,6 +820,15 @@ export function App() {
         </div>
       </div>
     </article>
+  );
+
+  const observabilityPanel = (
+    <ObservabilityPanel
+      events={status?.recentDistributionEvents}
+      stats={status?.platformStats}
+      budgetCard={sunoOutcomeCard}
+      sunoCard={sunoPanel}
+    />
   );
 
   const configPanel = (
@@ -1194,10 +1206,10 @@ export function App() {
         ))}
       </nav>
 
-      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}<PlatformUptimeCard stats={status?.platformStats} /><DistributionEventsCard events={status?.recentDistributionEvents} />{recentXResultPanel}</section> : null}
+      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
-      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}<PlatformUptimeCard stats={status?.platformStats} /><DistributionEventsCard events={status?.recentDistributionEvents} />{replySimulationPanel}</section> : null}
+      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
       {activeView === "songs" ? <section className="two-column">{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}

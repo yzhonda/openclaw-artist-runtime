@@ -648,6 +648,18 @@ export interface StatusResponse {
   lastSocialAction?: SocialPublishLedgerEntry;
 }
 
+export type ObservabilityExportWindow = "7d" | "30d" | "all";
+
+export interface StatusExportResponse {
+  window: ObservabilityExportWindow;
+  exportedAt: string;
+  status: StatusResponse;
+  ledger: {
+    events: DistributionEvent[];
+    platformStats: Record<SocialPlatform, PlatformStat>;
+  };
+}
+
 export interface SunoStatusResponse {
   worker: SunoWorkerStatus;
   currentSongId?: string;

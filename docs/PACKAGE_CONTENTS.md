@@ -65,6 +65,7 @@ runtime counters, imported Suno audio, or temporary budget write files.
 ├── docs/THREAT_MODEL.md               # operator-facing threat model and mitigation map
 ├── docs/INCIDENT_RESPONSE.md          # operator incident response runbook
 ├── docs/SUNO_BROWSER_DRIVER.md        # operator-facing Suno browser-profile lane guide
+├── docs/PRODUCER_CONSOLE.md           # operator-facing console observability/export guide
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -414,11 +415,13 @@ Console parity:
 - `src/services/distributionLedgerReader.ts`
 - `src/services/sunoProfileLifecycle.ts`
 - `ui/src/App.tsx`
+- `ui/src/ObservabilityPanel.tsx`
 - `ui/src/DistributionEventsCard.tsx`
 - `ui/src/PlatformUptimeCard.tsx`
 - `ui/src/configEditor.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/suno-profile-lifecycle.test.ts`
+- `tests/routes/status-export.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
 
 Also keep the Suno browser-lane runtime dependencies with the package, because
