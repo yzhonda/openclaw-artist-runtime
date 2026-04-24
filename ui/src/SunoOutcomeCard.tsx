@@ -35,6 +35,8 @@ export type SunoOutcomeCardProps = {
     limit: number;
     remaining: number;
   };
+  onResetBudget?: () => Promise<void>;
+  budgetResetDisabled?: boolean;
 };
 
 export function buildImportedAssetRows(outcome?: SunoOutcome): ImportedAsset[] {
@@ -98,7 +100,9 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const importedAssets = buildImportedAssetRows(props.lastImportOutcome);
   const importedAssetsEmpty = importedAssetsPlaceholder(props.lastImportOutcome);
   const [copyFeedback, setCopyFeedback] = useState<Record<string, "copied" | "failed">>({});
+  const [resetFeedback, setResetFeedback] = useState<"failed" | null>(null);
   const copyTimers = useRef<Record<string, number>>({});
+  const resetTimer = useRef<number | null>(null);
   const budgetRatio = props.budget && props.budget.limit > 0
     ? Math.min(props.budget.consumed / props.budget.limit, 1)
     : 0;
@@ -112,7 +116,20 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
 
   useEffect(() => () => {
     Object.values(copyTimers.current).forEach((timer) => window.clearTimeout(timer));
+    if (resetTimer.current) {
+      window.clearTimeout(resetTimer.current);
+    }
   }, []);
+
+  function clearResetFeedbackSoon(): void {
+    if (resetTimer.current) {
+      window.clearTimeout(resetTimer.current);
+    }
+    resetTimer.current = window.setTimeout(() => {
+      setResetFeedback(null);
+      resetTimer.current = null;
+    }, 1500);
+  }
 
   async function copyAssetPath(path: string): Promise<void> {
     try {
@@ -133,6 +150,22 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
       });
       delete copyTimers.current[path];
     }, 1500);
+  }
+
+  async function resetBudget(): Promise<void> {
+    if (!props.onResetBudget) {
+      return;
+    }
+    if (!window.confirm("Reset the daily Suno credit budget to 0?")) {
+      return;
+    }
+    try {
+      await props.onResetBudget();
+      setResetFeedback(null);
+    } catch {
+      setResetFeedback("failed");
+      clearResetFeedbackSoon();
+    }
   }
 
   return (
@@ -161,6 +194,10 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
             </div>
             <div className="budget-progress" aria-hidden="true">
               <div className={`budget-progress-bar budget-progress-${budgetTone}`} style={{ width: `${budgetRatio * 100}%` }} />
+            </div>
+            <div className="inline-actions budget-actions">
+              <button type="button" className="budget-reset-button" disabled={props.budgetResetDisabled} onClick={() => void resetBudget()}>Reset budget</button>
+              {resetFeedback === "failed" ? <span className="field-error">reset failed</span> : null}
             </div>
           </>
         ) : (

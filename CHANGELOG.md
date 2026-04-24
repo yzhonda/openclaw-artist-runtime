@@ -32,6 +32,7 @@
 - Added Round 57 invalid-JSON recovery for `runtime/suno/budget.json`, so the budget tracker now falls back to an empty UTC-day state instead of crashing on parse failure.
 - Added Round 58 atomic `budget.json` writes, so the Suno budget tracker now writes through a temp file plus `rename(...)` before replacing the final counter file.
 - Added Round 59 Producer Console editing for `music.suno.dailyCreditLimit`, so the Suno daily credit ceiling can now be raised or lowered through the existing config patch flow.
+- Added Round 60 a confirmed Producer Console reset action for the Suno daily budget counter, backed by `POST /api/suno/budget/reset`.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.

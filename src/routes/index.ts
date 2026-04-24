@@ -778,6 +778,9 @@ export function registerRoutes(api: unknown): void {
       }
 
       if (method === "POST") {
+        if (segments.length === 2 && segments[0] === "budget" && segments[1] === "reset") {
+          return new SunoBudgetTracker(config.artist.workspaceRoot).reset(config.music.suno.dailyCreditLimit);
+        }
         if (segments.length === 1 && segments[0] === "connect") {
           return new SunoBrowserWorker(config.artist.workspaceRoot, { config }).connect();
         }
