@@ -197,4 +197,78 @@ describe("config/update behaviour", () => {
     expect(updated.distribution.platforms.instagram.liveGoArmed).toBe(true);
     expect(updated.distribution.platforms.tiktok.liveGoArmed).toBe(false);
   });
+
+  it("config/update route persists Suno daily credit limit edits", async () => {
+    const root = makeWorkspace();
+
+    const registered = new Map<string, (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void>();
+    registerRoutes({
+      registerHttpRoute(definition: { path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void }) {
+        registered.set(definition.path, definition.handler);
+      }
+    });
+
+    const handler = registered.get("/plugins/artist-runtime/api/config/update");
+    expect(handler).toBeTruthy();
+
+    const response = createMockResponse();
+    await handler?.(
+      createMockRequest(
+        "POST",
+        "/plugins/artist-runtime/api/config/update",
+        JSON.stringify({
+          config: { artist: { workspaceRoot: root } },
+          patch: {
+            music: {
+              suno: {
+                dailyCreditLimit: 120
+              }
+            }
+          }
+        }),
+        { "content-type": "application/json" }
+      ),
+      response.res
+    );
+
+    expect(response.readStatus()).toBe(200);
+
+    const updated = JSON.parse(response.readBody()) as Awaited<ReturnType<typeof readResolvedConfig>>;
+    expect(updated.music.suno.dailyCreditLimit).toBe(120);
+  });
+
+  it("config/update route rejects invalid Suno daily credit limits through schema validation", async () => {
+    const root = makeWorkspace();
+
+    const registered = new Map<string, (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void>();
+    registerRoutes({
+      registerHttpRoute(definition: { path: string; handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void }) {
+        registered.set(definition.path, definition.handler);
+      }
+    });
+
+    const handler = registered.get("/plugins/artist-runtime/api/config/update");
+    expect(handler).toBeTruthy();
+
+    await expect(
+      handler?.(
+        createMockRequest(
+          "POST",
+          "/plugins/artist-runtime/api/config/update",
+          JSON.stringify({
+            config: { artist: { workspaceRoot: root } },
+            patch: {
+              music: {
+                suno: {
+                  dailyCreditLimit: 0
+                }
+              }
+            }
+          }),
+          { "content-type": "application/json" }
+        ),
+        createMockResponse().res
+      )
+    ).rejects.toThrow("invalid config: config.music.suno.dailyCreditLimit must be an integer between 1 and 1000");
+  });
 });

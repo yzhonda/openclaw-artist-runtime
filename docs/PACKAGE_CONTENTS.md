@@ -136,6 +136,7 @@ The config editor source now owns both:
 - authority-mode payload shaping for `distribution.platforms.{x,instagram,tiktok}.authority`
 - global + per-platform live-go arm payload shaping, with TikTok forced back to
   `liveGoArmed: false` in the frozen UI lane
+- the Suno daily credit limit payload path under `music.suno.dailyCreditLimit`
 - the Suno browser-driver selector payload path under `music.suno.driver`
 
 ### API route catalog

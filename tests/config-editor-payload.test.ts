@@ -4,6 +4,11 @@ import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft } from ".
 describe("config editor payload builder", () => {
   it("builds a draft from config response shape", () => {
     expect(buildConfigDraft({
+      music: {
+        suno: {
+          dailyCreditLimit: 60
+        }
+      },
       autopilot: {
         enabled: true,
         dryRun: true,
@@ -19,6 +24,7 @@ describe("config editor payload builder", () => {
         }
       }
     })).toEqual({
+      dailyCreditLimit: "60",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "5",
@@ -38,6 +44,7 @@ describe("config editor payload builder", () => {
 
   it("builds the config/update patch payload", () => {
     expect(buildConfigUpdatePatch({
+      dailyCreditLimit: "120",
       autopilotEnabled: true,
       dryRun: false,
       songsPerWeek: "7",
@@ -53,6 +60,11 @@ describe("config editor payload builder", () => {
       tiktokLiveGoArmed: true,
       tiktokAuthority: "draft_only"
     })).toEqual({
+      music: {
+        suno: {
+          dailyCreditLimit: 120
+        }
+      },
       autopilot: {
         enabled: true,
         dryRun: false,
@@ -72,6 +84,7 @@ describe("config editor payload builder", () => {
 
   it("keeps the TikTok live-go arm frozen even when the draft flips it on", () => {
     expect(buildConfigUpdatePatch({
+      dailyCreditLimit: "120",
       autopilotEnabled: true,
       dryRun: false,
       songsPerWeek: "7",
@@ -91,6 +104,7 @@ describe("config editor payload builder", () => {
 
   it("rejects out-of-range numeric values", () => {
     expect(validateConfigDraft({
+      dailyCreditLimit: "0",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "24",
@@ -105,11 +119,12 @@ describe("config editor payload builder", () => {
       tiktokEnabled: false,
       tiktokLiveGoArmed: false,
       tiktokAuthority: "draft_only"
-    })).toBe("songsPerWeek must be between 0 and 21");
+    })).toBe("dailyCreditLimit must be between 1 and 1000");
   });
 
   it("rejects non-whole-number values", () => {
     expect(validateConfigDraft({
+      dailyCreditLimit: "sixty",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "2.5",
@@ -124,11 +139,12 @@ describe("config editor payload builder", () => {
       tiktokEnabled: false,
       tiktokLiveGoArmed: false,
       tiktokAuthority: "draft_only"
-    })).toBe("songsPerWeek must be a whole number");
+    })).toBe("dailyCreditLimit must be a whole number");
   });
 
   it("rejects unsupported authority values", () => {
     expect(validateConfigDraft({
+      dailyCreditLimit: "60",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "5",
@@ -144,5 +160,25 @@ describe("config editor payload builder", () => {
       tiktokLiveGoArmed: false,
       tiktokAuthority: "draft_only"
     })).toBe("xAuthority must be one of the supported X authority modes");
+  });
+
+  it("rejects Suno daily credit limits above the supported ceiling", () => {
+    expect(validateConfigDraft({
+      dailyCreditLimit: "1001",
+      autopilotEnabled: true,
+      dryRun: true,
+      songsPerWeek: "5",
+      cycleIntervalMinutes: "180",
+      distributionLiveGoArmed: false,
+      xEnabled: true,
+      xLiveGoArmed: false,
+      xAuthority: "draft_only",
+      instagramEnabled: false,
+      instagramLiveGoArmed: false,
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokLiveGoArmed: false,
+      tiktokAuthority: "draft_only"
+    })).toBe("dailyCreditLimit must be between 1 and 1000");
   });
 });

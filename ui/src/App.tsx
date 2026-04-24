@@ -130,6 +130,11 @@ type ConfigResponse = {
     artistId: string;
     workspaceRoot: string;
   };
+  music: {
+    suno: {
+      dailyCreditLimit: number;
+    };
+  };
   autopilot: {
     enabled: boolean;
     dryRun: boolean;
@@ -793,6 +798,10 @@ export function App() {
           {globalArmHeld ? <div className="warning-banner">Global live-go arm is OFF. Every platform arm stays held upstream even if its own toggle is on.</div> : null}
           {!configDraft.dryRun ? <div className="warning-banner">Dry-run is OFF. The runtime stays fail-closed, but this arm can permit live side effects if the connectors are ready.</div> : null}
           <div className="field-grid">
+            <label>
+              <div className="eyebrow">Daily credit limit (Suno)</div>
+              <input type="number" min={1} max={1000} step={1} value={configDraft.dailyCreditLimit} onChange={(event) => updateConfigDraft({ dailyCreditLimit: event.target.value })} />
+            </label>
             <label>
               <div className="eyebrow">Songs Per Week</div>
               <input type="number" min={0} max={21} value={configDraft.songsPerWeek} onChange={(event) => updateConfigDraft({ songsPerWeek: event.target.value })} />
