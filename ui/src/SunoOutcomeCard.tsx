@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { runbookHref } from "./errorRunbookMap";
 
 type SunoOutcome = {
   runId: string;
@@ -100,6 +101,22 @@ function formatOutcome(
     tone: accepted ? "ok" : "blocked",
     dryRun: Boolean(outcome.dryRun)
   };
+}
+
+function ReasonDetail(props: { detail: string; reason?: string }) {
+  const href = runbookHref(props.reason);
+  if (!href || !props.reason) {
+    return <div className="muted">{props.detail}</div>;
+  }
+
+  const parts = props.detail.split(props.reason);
+  return (
+    <div className="muted">
+      {parts[0]}
+      <a className="runbook-link" href={href} target="_blank" rel="noreferrer">{props.reason}</a>
+      {parts.slice(1).join(props.reason)}
+    </div>
+  );
 }
 
 function nextUtcRolloverLabel(now = new Date()): string {
@@ -252,7 +269,7 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
           {createOutcome.dryRun ? <span className="badge badge-dry-run">Dry-run</span> : null}
         </div>
         <strong>{createOutcome.title}</strong>
-        <div className="muted">{createOutcome.detail}</div>
+        <ReasonDetail detail={createOutcome.detail} reason={props.lastCreateOutcome?.reason} />
       </div>
       <div className={`item outcome-item outcome-${importOutcome.tone}`}>
         <div className="outcome-heading">
@@ -260,7 +277,7 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
           {importOutcome.dryRun ? <span className="badge badge-dry-run">Dry-run</span> : null}
         </div>
         <strong>{importOutcome.title}</strong>
-        <div className="muted">{importOutcome.detail}</div>
+        <ReasonDetail detail={importOutcome.detail} reason={props.lastImportOutcome?.reason} />
         <div className="muted">
           {props.lastImportOutcome?.pathCount ?? importedAssets.length} files
           {props.lastImportOutcome?.urlCount !== undefined ? ` · ${props.lastImportOutcome.urlCount} urls` : ""}

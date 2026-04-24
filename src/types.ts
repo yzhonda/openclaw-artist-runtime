@@ -137,6 +137,7 @@ export interface SafetyConfig {
 }
 
 export interface ArtistRuntimeConfig {
+  schemaVersion: number;
   artist: ArtistConfig;
   autopilot: AutopilotConfig;
   music: MusicConfig;

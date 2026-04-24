@@ -1,6 +1,7 @@
 import type { ArtistRuntimeConfig } from "../types.js";
 
 export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
+  schemaVersion: 1,
   artist: {
     mode: "public_artist",
     artistId: "artist",

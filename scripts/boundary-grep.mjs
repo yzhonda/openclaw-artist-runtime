@@ -6,10 +6,15 @@ import { pathToFileURL } from "node:url";
 
 export const forbiddenPatterns = [
   { id: "suno-password-assignment", pattern: /\bSUNO_PASSWORD\s*=/i },
+  { id: "suno-api-key-assignment", pattern: /\bSUNO_API_KEY\s*=/i },
   { id: "instagram-password-assignment", pattern: /\bINSTAGRAM_PASSWORD\s*=/i },
   { id: "tiktok-token-assignment", pattern: /\bTIKTOK_ACCESS_TOKEN\s*=/i },
+  { id: "openclaw-instagram-token-assignment", pattern: /\bOPENCLAW_INSTAGRAM_ACCESS_TOKEN\s*=/i },
+  { id: "openclaw-tiktok-token-assignment", pattern: /\bOPENCLAW_TIKTOK_ACCESS_TOKEN\s*=/i },
+  { id: "oauth-token-assignment", pattern: /\bOAUTH_TOKEN\s*=/i },
   { id: "oauth-token-literal", pattern: /\boauth_token_[A-Za-z0-9_-]+/i },
   { id: "bearer-header-literal", pattern: /\bauthorization\s*:\s*bearer\s+["'`]?[A-Za-z0-9._-]{12,}/i },
+  { id: "cookie-header-literal", pattern: /\bcookie\s*:\s*["'`][^"'`]{8,}/i },
   { id: "sensitive-console-dump", pattern: /\bconsole\.(?:log|warn|error)\([^)]*(?:token|secret|password|cookie|authorization)/i },
   { id: "hardcoded-env-fallback", pattern: /process\.env\.[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|COOKIE)\s*\|\|\s*["'`][^"'`\s]+/ },
   { id: "absolute-env-path", pattern: /\/Users\/[^"'`\s]+\/[^"'`\s]*\.env(?:\.[^"'`\s]+)?/ },
@@ -122,4 +127,3 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     process.exitCode = 1;
   });
 }
-

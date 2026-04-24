@@ -51,5 +51,31 @@ describe("boundary-grep", () => {
 
     expect(findings).toEqual([]);
   });
-});
 
+  it("detects expanded credential and header leak patterns", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-boundary-grep-expanded-"));
+    await writeFixture(
+      root,
+      "src/expanded-leaks.ts",
+      [
+        `const sunoApiKey = "${"SUNO_" + "API_KEY="}abc";`,
+        `const oauthToken = "${"OAUTH_" + "TOKEN="}abc";`,
+        `const igToken = "${"OPENCLAW_" + "INSTAGRAM_ACCESS_TOKEN="}abc";`,
+        `const ttToken = "${"OPENCLAW_" + "TIKTOK_" + "ACCESS_TOKEN="}abc";`,
+        `const legacyTtToken = "${"TIKTOK_" + "ACCESS_TOKEN="}abc";`,
+        `const headers = { ${"coo" + "kie"}: '${"sessionid=" + "abc123456789"}' };`
+      ].join("\n")
+    );
+
+    const findings = await scanBoundaryPatterns({ cwd: root, roots: ["src"] });
+
+    expect(findings.map((finding) => finding.rule)).toEqual([
+      "suno-api-key-assignment",
+      "oauth-token-assignment",
+      "openclaw-instagram-token-assignment",
+      "openclaw-tiktok-token-assignment",
+      "tiktok-token-assignment",
+      "cookie-header-literal"
+    ]);
+  });
+});

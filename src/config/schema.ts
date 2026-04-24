@@ -1,4 +1,5 @@
 import { defaultArtistRuntimeConfig } from "./defaultConfig.js";
+import { CURRENT_CONFIG_SCHEMA_VERSION, migrateConfig } from "./migrations.js";
 import {
   dailySharingModes,
   instagramAuthorityModes,
@@ -50,6 +51,10 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
   const merged = structuredClone(defaultArtistRuntimeConfig);
   if (!config) {
     return merged;
+  }
+
+  if (config.schemaVersion !== undefined) {
+    merged.schemaVersion = config.schemaVersion;
   }
 
   if (config.artist) {
@@ -105,7 +110,11 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     return { ok: false, errors: ["config must be an object"], warnings };
   }
 
-  validateKnownKeys("config", config, ["artist", "autopilot", "music", "distribution", "safety"], errors);
+  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "safety"], errors);
+
+  if ("schemaVersion" in config && !isIntegerInRange(config.schemaVersion, 1, CURRENT_CONFIG_SCHEMA_VERSION)) {
+    errors.push(`config.schemaVersion must be an integer between 1 and ${CURRENT_CONFIG_SCHEMA_VERSION}`);
+  }
 
   if ("artist" in config) {
     if (!isRecord(config.artist)) {
@@ -303,7 +312,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     return { ok: false, errors, warnings };
   }
 
-  const value = applyConfigDefaults(config as PartialDeep<ArtistRuntimeConfig>);
+  const value = applyConfigDefaults(migrateConfig(config) as PartialDeep<ArtistRuntimeConfig>);
   appendConfigWarnings(value, warnings);
   return { ok: true, errors: [], warnings, value };
 }
