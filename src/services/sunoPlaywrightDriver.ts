@@ -26,6 +26,11 @@ export const PLAYWRIGHT_POLL_TIMEOUT_MS = 10 * 60 * 1_000;
 export const PLAYWRIGHT_CREATE_CARD_TIMEOUT_MS = 3 * 60 * 1_000;
 export const PLAYWRIGHT_CREATE_CARD_REASON = "submitted_via_create_card";
 export const PLAYWRIGHT_LIBRARY_DIFF_REASON = "submitted_via_library_diff";
+export const PLAYWRIGHT_CREATE_TIMEOUT_REASON = "playwright_create_timeout";
+export const PLAYWRIGHT_CREATE_NETWORK_REASON = "playwright_create_network_error";
+export const PLAYWRIGHT_CREATE_DOM_MISSING_REASON = "playwright_create_dom_missing";
+export const PLAYWRIGHT_CREATE_LOGIN_EXPIRED_REASON = "playwright_create_login_expired";
+export const PLAYWRIGHT_CREATE_RATE_LIMITED_REASON = "playwright_create_rate_limited";
 
 /**
  * Round 38 adds probe automation.
@@ -175,10 +180,11 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
         };
       }
 
+      const classifiedReason = this.classifyCreateFailure(error);
       return {
         accepted: false,
         runId,
-        reason: `playwright_create_failed: ${this.errorMessage(error)}`,
+        reason: `${classifiedReason}: ${this.errorMessage(error)}`,
         urls: [],
         dryRun: request.dryRun
       };
@@ -531,6 +537,26 @@ export class PlaywrightSunoDriver implements SunoBrowserDriver {
   private isModuleNotInstalled(error: unknown): boolean {
     const message = this.errorMessage(error);
     return message.includes("Cannot find package 'playwright'") || message.includes("Cannot find module 'playwright'");
+  }
+
+  private classifyCreateFailure(error: unknown): string {
+    const message = this.errorMessage(error);
+    if (/(rate limit|too many requests|http 429|\b429\b)/i.test(message)) {
+      return PLAYWRIGHT_CREATE_RATE_LIMITED_REASON;
+    }
+    if (/(login|required|expired|sign[-_ ]?in|auth)/i.test(message)) {
+      return PLAYWRIGHT_CREATE_LOGIN_EXPIRED_REASON;
+    }
+    if (/(selector|locator|not found|strict mode violation|no element|element.*missing)/i.test(message)) {
+      return PLAYWRIGHT_CREATE_DOM_MISSING_REASON;
+    }
+    if (/(timeout|timed out)/i.test(message)) {
+      return PLAYWRIGHT_CREATE_TIMEOUT_REASON;
+    }
+    if (/(network|net::|econn|enotfound|socket|navigation failed)/i.test(message)) {
+      return PLAYWRIGHT_CREATE_NETWORK_REASON;
+    }
+    return "playwright_create_failed";
   }
 
   private errorMessage(error: unknown): string {

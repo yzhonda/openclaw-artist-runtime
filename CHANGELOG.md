@@ -35,6 +35,7 @@
 - Added Round 60 a confirmed Producer Console reset action for the Suno daily budget counter, backed by `POST /api/suno/budget/reset`.
 - Added Round 61 operator security docs for threat modeling, incident response, token expiry, audit redaction, package exclusions, profile recovery, and gateway token-mismatch troubleshooting.
 - Added Round 62 CI hardening with boundary-grep, Vitest v8 coverage gating, Node 20/22 matrix jobs, and timeout configuration.
+- Added Round 63 Suno runtime resilience with stale budget tmp cleanup, reset audit logging, optional monthly credit limits, classified Playwright create errors, and an operator-confirmed runtime cleanup script.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.

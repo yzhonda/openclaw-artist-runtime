@@ -37,6 +37,14 @@ type StatusResponse = {
       consumed: number;
       limit: number;
       remaining: number;
+      lastResetAt?: string;
+      monthly?: {
+        month: string;
+        consumed: number;
+        limit: number;
+        remaining: number;
+        unlimited: boolean;
+      };
     };
   };
   sunoWorker: {
@@ -133,6 +141,7 @@ type ConfigResponse = {
   music: {
     suno: {
       dailyCreditLimit: number;
+      monthlyCreditLimit: number;
     };
   };
   autopilot: {
@@ -816,6 +825,11 @@ export function App() {
             <label>
               <div className="eyebrow">Daily credit limit (Suno)</div>
               <input type="number" min={1} max={1000} step={1} value={configDraft.dailyCreditLimit} onChange={(event) => updateConfigDraft({ dailyCreditLimit: event.target.value })} />
+            </label>
+            <label>
+              <div className="eyebrow">Monthly credit limit (Suno)</div>
+              <input type="number" min={0} max={50000} step={1} value={configDraft.monthlyCreditLimit} onChange={(event) => updateConfigDraft({ monthlyCreditLimit: event.target.value })} />
+              <div className="muted">0 means unlimited.</div>
             </label>
             <label>
               <div className="eyebrow">Songs Per Week</div>

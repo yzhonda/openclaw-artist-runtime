@@ -34,6 +34,14 @@ export type SunoOutcomeCardProps = {
     consumed: number;
     limit: number;
     remaining: number;
+    lastResetAt?: string;
+    monthly?: {
+      month: string;
+      consumed: number;
+      limit: number;
+      remaining: number;
+      unlimited: boolean;
+    };
   };
   onResetBudget?: () => Promise<void>;
   budgetResetDisabled?: boolean;
@@ -106,6 +114,16 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const budgetRatio = props.budget && props.budget.limit > 0
     ? Math.min(props.budget.consumed / props.budget.limit, 1)
     : 0;
+  const monthlyBudgetRatio = props.budget?.monthly && props.budget.monthly.limit > 0
+    ? Math.min(props.budget.monthly.consumed / props.budget.monthly.limit, 1)
+    : 0;
+  const monthlyBudgetTone = !props.budget?.monthly || props.budget.monthly.unlimited
+    ? "idle"
+    : monthlyBudgetRatio >= 1
+      ? "error"
+        : monthlyBudgetRatio >= 0.8
+        ? "warning"
+        : "ok";
   const budgetTone = !props.budget || props.budget.limit <= 0
     ? "idle"
     : budgetRatio >= 1
@@ -192,9 +210,22 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
             <div className="muted">
               {props.budget.consumed}/{props.budget.limit} consumed · UTC {props.budget.date}
             </div>
+            {props.budget.lastResetAt ? <div className="muted">last reset {props.budget.lastResetAt}</div> : null}
             <div className="budget-progress" aria-hidden="true">
               <div className={`budget-progress-bar budget-progress-${budgetTone}`} style={{ width: `${budgetRatio * 100}%` }} />
             </div>
+            {props.budget.monthly ? (
+              <div className={`budget-monthly budget-${monthlyBudgetTone}`}>
+                <div className="muted">
+                  Monthly {props.budget.monthly.unlimited
+                    ? `${props.budget.monthly.consumed} consumed · unlimited · UTC ${props.budget.monthly.month}`
+                    : `${props.budget.monthly.consumed}/${props.budget.monthly.limit} consumed · UTC ${props.budget.monthly.month}`}
+                </div>
+                <div className="budget-progress" aria-hidden="true">
+                  <div className={`budget-progress-bar budget-progress-${monthlyBudgetTone}`} style={{ width: `${monthlyBudgetRatio * 100}%` }} />
+                </div>
+              </div>
+            ) : null}
             <div className="inline-actions budget-actions">
               <button type="button" className="budget-reset-button" disabled={props.budgetResetDisabled} onClick={() => void resetBudget()}>Reset budget</button>
               {resetFeedback === "failed" ? <span className="field-error">reset failed</span> : null}

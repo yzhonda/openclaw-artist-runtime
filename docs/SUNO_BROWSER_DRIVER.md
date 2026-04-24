@@ -198,18 +198,28 @@ Round 51 adds a hard UTC-day credit gate in front of the live Create click:
   the next UTC day
 - if the reservation would exceed the limit, the run fails closed with
   `budget_exhausted` and the Playwright submit path is never entered
+- `music.suno.monthlyCreditLimit` defaults to `0`, which means the UTC-month
+  gate is unlimited until the operator opts in
+- when `monthlyCreditLimit > 0`, the same pre-click reservation also checks the
+  UTC-month counter and fails closed with `budget_exhausted_monthly` before
+  Playwright can submit
 
 Round 52 exposes that same counter back to the operator without mutating it:
 
-- `/api/status` now returns `suno.budget = { date, consumed, limit, remaining }`
+- `/api/status` now returns `suno.budget = { date, consumed, limit, remaining,
+  lastResetAt, monthly }`
 - Producer Console renders a read-only budget card with the UTC date and a
   progress bar
+- Producer Console also renders a monthly progress skeleton. If
+  `monthlyCreditLimit` is `0`, the monthly lane is labeled unlimited.
 - Producer Console also provides a confirmed `Reset budget` action that writes
   today's UTC date with `consumed: 0`, so the operator can reopen the daily
   lane without waiting for the automatic UTC rollover
 - Producer Console Config Editor can now update `music.suno.dailyCreditLimit`
   directly, so operators usually do not need to touch `budget.json` just to
   raise or lower the daily ceiling
+- Producer Console Config Editor can also update `music.suno.monthlyCreditLimit`
+  as an opt-in monthly hard stop
 - the bar turns warning at `80%` consumed and error at `100%`
 - read-only views call `getState()` only, so they never reset or reserve budget
   by side effect
@@ -224,7 +234,10 @@ Current on-disk shape:
 ```json
 {
   "date": "YYYY-MM-DD",
-  "consumed": 10
+  "consumed": 10,
+  "month": "YYYY-MM",
+  "monthlyConsumed": 10,
+  "lastResetAt": "YYYY-MM-DDTHH:mm:ss.sssZ"
 }
 ```
 
@@ -238,10 +251,15 @@ Tracker behavior is intentionally simple and defensive:
   back to `0`
 - if the stored `date` does not match the current UTC date, `getState()` and
   `reserve()` both normalize the view back to `consumed: 0` on today's date
+- if the stored `month` does not match the current UTC month, `getState()` and
+  `reserve()` normalize the monthly view back to `monthlyConsumed: 0`
 - if the file contains invalid JSON, the tracker falls back to an empty state
   for today with `consumed: 0`; the next successful write restores valid JSON
 - writes go through a `.tmp` file and `rename(...)`, so a partial write should
   not replace the last valid `budget.json` with a half-written file
+- after a successful write, stale `budget.json.tmp` leftovers are removed
+- manual resets append a local audit line to `runtime/suno/budget-reset.jsonl`
+  with `{ timestamp, consumedBefore, reason }`
 
 Recommended operator edit flow:
 
@@ -259,6 +277,7 @@ Common manual edits:
 
 - early daily reset: set `consumed` back to `0`
 - testing or operator verification: adjust `consumed` to a known finite number
+- monthly opt-in verification: adjust `monthlyConsumed` to a known finite number
 - changing `date`: generally not recommended, because the tracker already
   normalizes stale dates automatically
 
@@ -336,19 +355,22 @@ local user account.
 ### Scenario D: credit budget exhausted
 
 Use this when a live create attempt returns `accepted: false` with
-`reason: "budget_exhausted"`.
+`reason: "budget_exhausted"` or `reason: "budget_exhausted_monthly"`.
 
 1. Inspect the current budget state through Producer Console or `/api/status`
    rather than editing the persistence file directly.
 2. If the daily cap is too low for the operator's current lane, adjust
    `music.suno.dailyCreditLimit` through the normal config workflow.
-3. If no config change is desired, wait for the next UTC day boundary; the
+3. If the monthly cap is too low for the operator's current lane, adjust
+   `music.suno.monthlyCreditLimit`; keep it at `0` to disable the monthly hard
+   stop.
+4. If no config change is desired, wait for the next UTC day boundary; the
    runtime resets the visible counter automatically when the date changes.
-4. After the UTC boundary or config change, re-check the status surface and
+5. After the UTC boundary or config change, re-check the status surface and
    confirm `remaining` has reopened before attempting another live create.
-5. If the operator needs to reopen the current day immediately, use the
+6. If the operator needs to reopen the current day immediately, use the
    Producer Console `Reset budget` action and confirm the prompt.
-6. If the operator must override the current day manually, use the
+7. If the operator must override the current day manually, use the
    `Editing budget.json` guidance above and keep the file valid JSON.
 
 ## Artifact retention
@@ -365,6 +387,9 @@ Use this when a live create attempt returns `accepted: false` with
 - If the operator intentionally needs to alter the current budget counter, that
   is a separate manual decision against `runtime/suno/budget.json`; deleting an
   imported run directory alone does not change the Round 51/52 budget state.
+- Operators can run `scripts/cleanup-runtime.sh` to list and remove
+  `runtime/suno/<runId>/` directories older than 30 days. Without `-y`, the
+  script asks for confirmation before deleting anything.
 
 ## Troubleshooting
 

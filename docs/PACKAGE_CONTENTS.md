@@ -160,6 +160,8 @@ The config editor source now owns both:
 - global + per-platform live-go arm payload shaping, with TikTok forced back to
   `liveGoArmed: false` in the frozen UI lane
 - the Suno daily credit limit payload path under `music.suno.dailyCreditLimit`
+- the optional Suno monthly credit limit payload path under
+  `music.suno.monthlyCreditLimit`
 - the Suno browser-driver selector payload path under `music.suno.driver`
 
 ### API route catalog
@@ -195,6 +197,7 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `scripts/openclaw-suno-login.sh`
 - `scripts/openclaw-suno-login.mjs`
 - `scripts/boundary-grep.mjs`
+- `scripts/cleanup-runtime.sh`
 
 ### CI / regression gate
 
@@ -257,11 +260,16 @@ coverage provider.
   on read-only links plus the explicit empty placeholder.
 - `tests/suno-budget.test.ts`
   This suite fixes the Round 51 credit gate boundary: reserve success,
-  over-limit live submit block before connector.create, and UTC-day reset.
+  over-limit live submit block before connector.create, UTC-day reset,
+  manual reset audit logging, stale `.tmp` cleanup, and monthly-limit blocking.
+- `tests/suno-budget-monthly.test.ts`
+  This suite isolates the Round 63 monthly credit gate: default `0` remains
+  unlimited, while an opted-in monthly cap fails closed without mutating state.
 - `tests/status-ticker.test.ts`
   This suite now also locks the Round 52 Suno budget surface: `/api/status`
-  returns a read-only `{ date, consumed, limit, remaining }` budget object and
-  stale persisted dates are normalized back to a zero-consumed UTC-day view.
+  returns a read-only `{ date, consumed, limit, remaining, monthly }` budget
+  object and stale persisted dates are normalized back to a zero-consumed
+  UTC-day view.
 - `tests/boundary-grep.test.ts`
   This suite fixes the boundary-grep script itself: forbidden credential
   assignment patterns are detected, clean files pass, and safe env var names do

@@ -338,7 +338,14 @@ describe("status ticker and reply simulation routes", () => {
       date: expect.stringMatching(/\d{4}-\d{2}-\d{2}/),
       consumed: 0,
       limit: 60,
-      remaining: 60
+      remaining: 60,
+      monthly: {
+        month: expect.stringMatching(/\d{4}-\d{2}/),
+        consumed: 0,
+        limit: 0,
+        remaining: 0,
+        unlimited: true
+      }
     });
   });
 
@@ -360,5 +367,6 @@ describe("status ticker and reply simulation routes", () => {
     expect(status.suno.budget.remaining).toBe(60);
     expect(status.suno.budget.limit).toBe(60);
     expect(status.suno.budget.date).not.toBe("2000-01-01");
+    expect(status.suno.budget.monthly.consumed).toBe(0);
   });
 });

@@ -196,6 +196,12 @@
                 "maximum": 1000,
                 "default": 60
               },
+              "monthlyCreditLimit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 50000,
+                "default": 0
+              },
               "monthlyGenerationBudget": {
                 "type": "integer",
                 "minimum": 0,
@@ -499,6 +505,10 @@
     "music.suno.dailyCreditLimit": {
       "label": "Daily Suno credit limit",
       "help": "Hard UTC-day cap for live Suno credit reservation before the Create click is allowed."
+    },
+    "music.suno.monthlyCreditLimit": {
+      "label": "Monthly Suno credit limit",
+      "help": "Optional UTC-month cap for live Suno credit reservations. 0 keeps the monthly gate unlimited."
     },
     "music.suno.monthlyGenerationBudget": {
       "label": "Monthly Suno generation budget",

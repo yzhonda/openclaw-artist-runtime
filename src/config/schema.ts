@@ -173,6 +173,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
               "submitMode",
               "authority",
               "dailyCreditLimit",
+              "monthlyCreditLimit",
               "monthlyGenerationBudget",
               "maxGenerationsPerDay",
               "minMinutesBetweenCreates",
@@ -200,6 +201,9 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
           }
           if ("dailyCreditLimit" in config.music.suno && !isIntegerInRange(config.music.suno.dailyCreditLimit, 1, 1000)) {
             errors.push("config.music.suno.dailyCreditLimit must be an integer between 1 and 1000");
+          }
+          if ("monthlyCreditLimit" in config.music.suno && !isIntegerInRange(config.music.suno.monthlyCreditLimit, 0, 50000)) {
+            errors.push("config.music.suno.monthlyCreditLimit must be an integer between 0 and 50000");
           }
           if ("monthlyGenerationBudget" in config.music.suno && !isIntegerInRange(config.music.suno.monthlyGenerationBudget, 0, 1000)) {
             errors.push("config.music.suno.monthlyGenerationBudget must be an integer between 0 and 1000");

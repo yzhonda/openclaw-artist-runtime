@@ -72,6 +72,7 @@ export interface SunoMusicConfig {
   submitMode: SunoSubmitMode;
   authority: SunoAuthority;
   dailyCreditLimit: number;
+  monthlyCreditLimit: number;
   monthlyGenerationBudget: number;
   maxGenerationsPerDay: number;
   minMinutesBetweenCreates: number;
@@ -323,6 +324,14 @@ export interface SunoBudgetStatus {
   consumed: number;
   limit: number;
   remaining: number;
+  lastResetAt?: string;
+  monthly: {
+    month: string;
+    consumed: number;
+    limit: number;
+    remaining: number;
+    unlimited: boolean;
+  };
 }
 
 export interface DistributionSummary {
