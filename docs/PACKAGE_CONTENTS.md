@@ -66,6 +66,7 @@ runtime counters, imported Suno audio, or temporary budget write files.
 ├── docs/INCIDENT_RESPONSE.md          # operator incident response runbook
 ├── docs/SUNO_BROWSER_DRIVER.md        # operator-facing Suno browser-profile lane guide
 ├── docs/PRODUCER_CONSOLE.md           # operator-facing console observability/export guide
+├── docs/RUNTIME_CLEANUP.md            # operator-facing runtime retention and cleanup guide
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -80,6 +81,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/autopilotTicker.ts`
 - `src/services/alertAcks.ts`
 - `src/services/runtimeConfig.ts`
+- `src/config/migrations.ts`
 - `src/services/distributionLedgerReader.ts`
 - `src/services/socialPublishLedger.ts`
 - `src/services/socialDryRunResolver.ts`
@@ -97,7 +99,9 @@ These services now share one runtime-config resolution path and feed the same
 Producer Console status surfaces. In practice that means:
 
 - `src/services/runtimeConfig.ts` owns the persisted-config resolver now used by
-  read routes, mutating routes, and `/api/config/update`.
+  read routes, mutating routes, and `/api/config/update`; it now runs persisted
+  overrides through `src/config/migrations.ts` so legacy JSON can be normalized
+  before defaults and schema validation apply.
 - `src/services/socialPublishing.ts` now enforces a two-level social live arm:
   `distribution.liveGoArmed` plus `distribution.platforms.{x,instagram,tiktok}.liveGoArmed`
   must both be `true` before upstream dry-run can release.
@@ -210,6 +214,9 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `scripts/openclaw-suno-login.mjs`
 - `scripts/boundary-grep.mjs`
 - `scripts/cleanup-runtime.sh`
+- `scripts/reset-config.sh`
+- `scripts/runtime-disk-usage.sh`
+- `scripts/runtime-retention-enforce.sh`
 - `scripts/suno-profile-diagnose.sh`
 - `scripts/suno-profile-backup.sh`
 
@@ -223,6 +230,9 @@ The typecheck/test/build jobs run on Node 20 and 22. `boundary-grep` scans
 `src/` and `tests/` for credential-like literals and sensitive console dumps,
 while `test:coverage` enforces a 70% line coverage floor through Vitest's v8
 coverage provider.
+The boundary-grep rule set now includes additional Suno, OAuth, OpenClaw social
+token, bearer, cookie, and profile-copy patterns so credential-shaped literals
+fail before they reach CI artifacts.
 
 ### Notable test coverage
 
@@ -308,7 +318,24 @@ coverage provider.
 - `tests/boundary-grep.test.ts`
   This suite fixes the boundary-grep script itself: forbidden credential
   assignment patterns are detected, clean files pass, and safe env var names do
-  not trip the gate.
+  not trip the gate. It now also covers the expanded Suno API key, OAuth token,
+  OpenClaw social token, legacy TikTok token, and cookie-header leak patterns.
+- `tests/config-migrations.test.ts`
+  This suite locks the schema-version contract, persisted override migration,
+  future-version rejection, mock migration skeleton helpers, and
+  `scripts/reset-config.sh` backup/restore behavior.
+- `tests/runtime-cleanup-scripts.test.ts`
+  This suite backs the operator cleanup scripts: dry-run JSON candidate output,
+  runtime disk-usage JSON, and retention-policy candidate listing without
+  deleting artifacts.
+- `tests/threat-model-validation.test.ts`
+  This suite binds the five operator threat-model rows to executable checks:
+  Prompt Ledger non-exposure, invalid config override rejection, credential
+  non-exfiltration in status, song-scoped artifact paths, and social dry-run
+  fail-closed behavior while live-go is unarmed.
+- `tests/error-runbook-map.test.ts`
+  This suite keeps Producer Console reason-code links aligned with
+  `docs/ERRORS.md` headings.
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
@@ -351,6 +378,7 @@ Always keep:
 - `NOTICE.md`
 - `openclaw.plugin.json`
 - `package.json`
+- `config.default.json`
 
 `CAPABILITIES.md` and `SECURITY.md` now also carry the connector auth contract
 for distribution operators:
@@ -399,6 +427,13 @@ Also keep the repo-local verification scripts because they are the documented sa
 - `scripts/openclaw-local-ticker-observe.sh`
 - `scripts/openclaw-suno-login.sh`
 - `scripts/openclaw-suno-login.mjs`
+- `scripts/boundary-grep.mjs`
+- `scripts/reset-config.sh`
+- `scripts/cleanup-runtime.sh`
+- `scripts/runtime-disk-usage.sh`
+- `scripts/runtime-retention-enforce.sh`
+- `scripts/suno-profile-diagnose.sh`
+- `scripts/suno-profile-backup.sh`
 
 Also keep the CI workflow and tracked workspace template files because they now form part of the package's regression discipline and bootstrap contract:
 

@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { defaultArtistRuntimeConfig } from "../config/defaultConfig.js";
+import { migrateConfig } from "../config/migrations.js";
 import { applyConfigDefaults, validateConfig } from "../config/schema.js";
 import type { ArtistRuntimeConfig } from "../types.js";
 
@@ -29,7 +30,7 @@ export async function readConfigOverrides(root: string): Promise<Partial<ArtistR
   if (!contents) {
     return {};
   }
-  return JSON.parse(contents) as Partial<ArtistRuntimeConfig>;
+  return migrateConfig(JSON.parse(contents));
 }
 
 export async function readResolvedConfig(root: string): Promise<ArtistRuntimeConfig> {
@@ -49,6 +50,7 @@ export function mergeResolvedConfig(current: ArtistRuntimeConfig, patch: Partial
   return enforceFrozenPlatformBoundaries(applyConfigDefaults({
     ...current,
     ...patch,
+    schemaVersion: patch.schemaVersion ?? current.schemaVersion,
     artist: { ...current.artist, ...patch.artist },
     autopilot: { ...current.autopilot, ...patch.autopilot },
     music: {

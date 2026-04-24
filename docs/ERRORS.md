@@ -4,6 +4,92 @@ Artist Runtime uses short reason codes so operators can trace a fail-closed
 decision back to the source subsystem without exposing credentials or raw
 platform responses.
 
+## Runbook anchors
+
+These headings exist so Producer Console reason-code links can deep-link into
+the catalog without relying on table-row rendering.
+
+### requires_explicit_live_go
+See the social distribution table entry for `requires_explicit_live_go`.
+
+### dry-run-blocks-publish
+See the social distribution table entry for `dry-run blocks publish`.
+
+### dry-run-blocks-social-publish
+See the social distribution table entry for `dry-run blocks social publish`.
+
+### bird_cli_not_installed
+See the social distribution table entry for `bird_cli_not_installed`.
+
+### bird_auth_expired
+See the social distribution table entry for `bird_auth_expired`.
+
+### bird_probe_failed
+See the social distribution table entry for `bird_probe_failed`.
+
+### bird_rate_limited
+See the social distribution table entry for `bird_rate_limited`.
+
+### bird_compose_failed
+See the social distribution table entry for `bird_compose_failed`.
+
+### bird_dry_run_submit_failed
+See the social distribution table entry for `bird_dry_run_submit_failed`.
+
+### instagram_auth_not_configured
+See the social distribution table entry for `instagram_auth_not_configured`.
+
+### instagram_media_invalid
+See the social distribution table entry for `instagram_media_invalid`.
+
+### instagram_business_account_not_found
+See the social distribution table entry for `instagram_business_account_not_found`.
+
+### instagram_graph_accounts_failed_401
+See the social distribution table entry for `instagram_graph_accounts_failed_401`.
+
+### instagram_graph_accounts_failed_403
+See the social distribution table entry for `instagram_graph_accounts_failed_403`.
+
+### instagram_graph_accounts_failed_429
+See the social distribution table entry for `instagram_graph_accounts_failed_429`.
+
+### instagram_graph_media_failed_429
+See the social distribution table entry for `instagram_graph_media_failed_429`.
+
+### instagram_graph_publish_failed_500
+See the social distribution table entry for `instagram_graph_publish_failed_500`.
+
+### tiktok_account_not_created
+See the social distribution table entry for `tiktok_account_not_created`.
+
+### account_not_created
+See the gateway and auth boundary table entry for `account_not_created`.
+
+### budget_exhausted
+See the Suno and budget table entry for `budget_exhausted`.
+
+### budget_exhausted_monthly
+See the Suno and budget table entry for `budget_exhausted_monthly`.
+
+### playwright_create_timeout
+See the Suno and budget table entry for `playwright_create_timeout`.
+
+### playwright_create_network_error
+See the Suno and budget table entry for `playwright_create_network_error`.
+
+### playwright_create_dom_missing
+See the Suno and budget table entry for `playwright_create_dom_missing`.
+
+### playwright_create_login_expired
+See the Suno and budget table entry for `playwright_create_login_expired`.
+
+### playwright_create_rate_limited
+See the Suno and budget table entry for `playwright_create_rate_limited`.
+
+### gateway_token_mismatch
+See the gateway and auth boundary table entry for `gateway_token_mismatch`.
+
 ## Social distribution
 
 | Code | Source | Meaning | Operator recovery |

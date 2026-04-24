@@ -1,4 +1,5 @@
 import type { DistributionEvent } from "../../src/types";
+import { runbookHref } from "./errorRunbookMap";
 
 export function DistributionEventsCard(props: { events?: DistributionEvent[] }) {
   const events = props.events ?? [];
@@ -28,7 +29,11 @@ export function DistributionEventsCard(props: { events?: DistributionEvent[] }) 
                   {event.accepted ? "accepted" : event.dryRun ? "dry-run" : "blocked"}
                 </span>
               </span>
-              <span>{event.reason}</span>
+              <span>
+                {runbookHref(event.reason) ? (
+                  <a className="runbook-link" href={runbookHref(event.reason)} target="_blank" rel="noreferrer">{event.reason}</a>
+                ) : event.reason}
+              </span>
               <span>{event.url ?? "-"}</span>
             </div>
           ))}

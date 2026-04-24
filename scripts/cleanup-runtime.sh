@@ -2,12 +2,28 @@
 set -euo pipefail
 
 YES=0
+DRY_RUN=0
+JSON=0
+CRON=0
 ROOT="."
 DAYS=30
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -y|--yes)
+      YES=1
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
+    --json)
+      JSON=1
+      shift
+      ;;
+    --cron)
+      CRON=1
       YES=1
       shift
       ;;
@@ -36,19 +52,45 @@ done
 
 TARGET="${ROOT%/}/runtime/suno"
 if [[ ! -d "$TARGET" ]]; then
+  if [[ "$JSON" -eq 1 ]]; then
+    echo '{"target":"'"$TARGET"'","deleted":0,"candidates":[]}'
+    exit 0
+  fi
   echo "No runtime Suno directory found: $TARGET"
   exit 0
 fi
 
-mapfile -t CANDIDATES < <(find "$TARGET" -mindepth 1 -maxdepth 1 -type d -mtime +"$DAYS" -print | sort)
+CANDIDATES=()
+while IFS= read -r candidate; do
+  CANDIDATES+=("$candidate")
+done < <(find "$TARGET" -mindepth 1 -maxdepth 1 -type d -mtime +"$DAYS" -print | sort)
 
 if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+  if [[ "$JSON" -eq 1 ]]; then
+    echo '{"target":"'"$TARGET"'","deleted":0,"candidates":[]}'
+    exit 0
+  fi
   echo "No runtime Suno run directories older than $DAYS days."
   exit 0
 fi
 
-echo "Runtime Suno directories older than $DAYS days:"
-printf '  %s\n' "${CANDIDATES[@]}"
+if [[ "$JSON" -ne 1 ]]; then
+  echo "Runtime Suno directories older than $DAYS days:"
+  printf '  %s\n' "${CANDIDATES[@]}"
+fi
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{"target":"%s","dryRun":true,"cron":%s,"deleted":0,"candidates":[' "$TARGET" "$([[ "$CRON" -eq 1 ]] && echo true || echo false)"
+    for index in "${!CANDIDATES[@]}"; do
+      [[ "$index" -gt 0 ]] && printf ','
+      printf '"%s"' "${CANDIDATES[$index]}"
+    done
+    printf ']}\n'
+  fi
+  [[ "$JSON" -ne 1 ]] && echo "Dry-run only. No directories deleted."
+  exit 0
+fi
 
 if [[ "$YES" -ne 1 ]]; then
   printf "Delete these directories? Type yes to continue: "
@@ -60,4 +102,12 @@ if [[ "$YES" -ne 1 ]]; then
 fi
 
 rm -rf -- "${CANDIDATES[@]}"
-echo "Deleted ${#CANDIDATES[@]} runtime Suno director$( [[ ${#CANDIDATES[@]} -eq 1 ]] && echo 'y' || echo 'ies' )."
+if [[ "$JSON" -eq 1 ]]; then
+  printf '{"target":"%s","dryRun":false,"cron":%s,"deleted":%s,"candidates":[' "$TARGET" "$([[ "$CRON" -eq 1 ]] && echo true || echo false)" "${#CANDIDATES[@]}"
+  for index in "${!CANDIDATES[@]}"; do
+    [[ "$index" -gt 0 ]] && printf ','
+    printf '"%s"' "${CANDIDATES[$index]}"
+  done
+  printf ']}\n'
+fi
+[[ "$JSON" -ne 1 ]] && echo "Deleted ${#CANDIDATES[@]} runtime Suno director$( [[ ${#CANDIDATES[@]} -eq 1 ]] && echo 'y' || echo 'ies' )."
