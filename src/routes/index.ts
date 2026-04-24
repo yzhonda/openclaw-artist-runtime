@@ -11,6 +11,7 @@ import { collectAlerts } from "../services/alerts.js";
 import { listSongStates, readArtistMind, readSongState } from "../services/artistState.js";
 import { ArtistAutopilotService, pauseAutopilot, readAutopilotRunState, resumeAutopilot } from "../services/autopilotService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
+import { buildPlatformStats, readDistributionEvents } from "../services/distributionLedgerReader.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
 import { mergeResolvedConfig, patchResolvedConfig, resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
@@ -509,6 +510,10 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     buildMusicSummary(mergedConfig),
     buildDistributionSummary(mergedConfig, platforms)
   ]);
+  const [recentDistributionEvents, platformStats] = await Promise.all([
+    readDistributionEvents(mergedConfig.artist.workspaceRoot, 20),
+    buildPlatformStats(mergedConfig.artist.workspaceRoot)
+  ]);
   const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
   const effectiveDryRunMap = buildEffectiveDryRunMap(mergedConfig);
 
@@ -529,6 +534,8 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     platforms,
     musicSummary,
     distributionSummary,
+    recentDistributionEvents,
+    platformStats,
     setupReadiness,
     alerts,
     recentSong: workspaceStatus.recentSong,
