@@ -194,10 +194,18 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `scripts/openclaw-local-install.sh`
 - `scripts/openclaw-suno-login.sh`
 - `scripts/openclaw-suno-login.mjs`
+- `scripts/boundary-grep.mjs`
 
 ### CI / regression gate
 
 - `.github/workflows/ci.yml`
+- `vitest.config.ts`
+
+CI now runs separate typecheck, coverage test, build, and boundary-grep jobs.
+The typecheck/test/build jobs run on Node 20 and 22. `boundary-grep` scans
+`src/` and `tests/` for credential-like literals and sensitive console dumps,
+while `test:coverage` enforces a 70% line coverage floor through Vitest's v8
+coverage provider.
 
 ### Notable test coverage
 
@@ -254,6 +262,10 @@ and manual `runtime/suno/budget.json` editing guidance.
   This suite now also locks the Round 52 Suno budget surface: `/api/status`
   returns a read-only `{ date, consumed, limit, remaining }` budget object and
   stale persisted dates are normalized back to a zero-consumed UTC-day view.
+- `tests/boundary-grep.test.ts`
+  This suite fixes the boundary-grep script itself: forbidden credential
+  assignment patterns are detected, clean files pass, and safe env var names do
+  not trip the gate.
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`

@@ -44,6 +44,8 @@
     "build": "npm run build:runtime && npm run build:ui",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "boundary-grep": "node ./scripts/boundary-grep.mjs",
     "pack:verify": "node ./scripts/verify-package.mjs",
     "pack:dry-run": "npm pack --dry-run",
     "clawhub:dry-run": "clawhub package publish . --dry-run",
@@ -78,6 +80,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "typescript": "^5.9.3",
     "vitest": "^2.1.0"
   },
