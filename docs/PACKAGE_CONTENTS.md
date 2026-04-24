@@ -86,6 +86,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/socialPublishing.ts`
 - `src/services/sunoBrowserWorker.ts`
 - `src/services/sunoPlaywrightDriver.ts`
+- `src/services/sunoProfileLifecycle.ts`
 - `src/services/sunoBudget.ts`
 - `src/services/sunoRuns.ts`
 - `src/services/sunoPromptPackFiles.ts`
@@ -101,6 +102,9 @@ Producer Console status surfaces. In practice that means:
   must both be `true` before upstream dry-run can release.
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
+- `src/services/sunoProfileLifecycle.ts` owns the local-only Suno profile stale
+  detector, directory snapshot helper, and snapshot pruning helper used for
+  operator recovery without changing the live submit path.
 - `src/services/sunoPlaywrightDriver.ts` now owns the real Playwright-backed
   login probe, live create submit/polling lane, and the local mp3 import
   downloader under `runtime/suno/<runId>/`.
@@ -205,6 +209,8 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `scripts/openclaw-suno-login.mjs`
 - `scripts/boundary-grep.mjs`
 - `scripts/cleanup-runtime.sh`
+- `scripts/suno-profile-diagnose.sh`
+- `scripts/suno-profile-backup.sh`
 
 ### CI / regression gate
 
@@ -406,11 +412,13 @@ Console parity:
 - `src/pluginApi.ts`
 - `src/routes/index.ts`
 - `src/services/distributionLedgerReader.ts`
+- `src/services/sunoProfileLifecycle.ts`
 - `ui/src/App.tsx`
 - `ui/src/DistributionEventsCard.tsx`
 - `ui/src/PlatformUptimeCard.tsx`
 - `ui/src/configEditor.ts`
 - `tests/suno-worker-automation.test.ts`
+- `tests/suno-profile-lifecycle.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`
 
 Also keep the Suno browser-lane runtime dependencies with the package, because

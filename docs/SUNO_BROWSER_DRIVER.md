@@ -26,6 +26,29 @@ credit-safe rehearsals.
 - This path is excluded from git and must stay on the operator machine.
 - Do not copy the profile into ledgers, package artifacts, screenshots, or logs.
 
+## Profile lifecycle
+
+Round 67 adds local lifecycle checks around the dedicated browser profile
+without changing the submit path:
+
+- the runtime treats a missing profile or a profile with no recent filesystem
+  activity for 30 days as `sunoProfileStale: true` on the Suno worker status
+  surface;
+- stale detection is fail-open: it warns the operator but does not click
+  Create, block dry-run probes, or mutate `submitMode`;
+- `scripts/suno-profile-diagnose.sh` prints local-only diagnostics for the
+  profile path, cookie-like file count, latest touched file, and storage usage;
+- `scripts/suno-profile-backup.sh` writes a daily tar snapshot under
+  `.openclaw-browser-profiles/suno.backup/<YYYY-MM-DD>/suno-profile.tar.gz`
+  and keeps seven generations by default;
+- the TypeScript lifecycle helper can also create directory snapshots and prune
+  old generations for tests and future runtime wiring.
+
+When `sunoProfileStale` appears, first run the diagnose script, then either
+rerun `scripts/openclaw-suno-login.sh` for normal reauthentication or follow
+Scenario A below if the profile is corrupt. Keep all snapshots local to the
+operator machine.
+
 ## Dependency install (operator)
 
 Playwright is now a package dependency, but browser binaries are still an
@@ -316,6 +339,9 @@ Backup and rebuild notes:
 
 - Keep the backup local to the operator machine. Do not attach it to an
   incident, issue, PR, or package artifact.
+- Prefer the daily snapshot lane from `scripts/suno-profile-backup.sh` before
+  destructive recovery, then keep only the latest seven generations unless the
+  operator has a local retention reason.
 - Prefer rename-over-delete for the first recovery pass so the operator can
   inspect filesystem permissions or copy mistakes later.
 - Do not cherry-pick individual Chromium cookie, storage, or cache files. The

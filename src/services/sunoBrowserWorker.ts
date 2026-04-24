@@ -13,6 +13,7 @@ import type {
   SunoWorkerStatus
 } from "../types.js";
 import { DEFAULT_SUNO_PROFILE_PATH, PlaywrightSunoDriver } from "./sunoPlaywrightDriver.js";
+import { DEFAULT_SUNO_PROFILE_STALE_DAYS, detectStaleProfile } from "./sunoProfileLifecycle.js";
 
 type SunoWorkerProbeState = Extract<
   SunoWorkerState,
@@ -124,6 +125,42 @@ export class SunoBrowserWorker {
     return next;
   }
 
+  private profilePath(): string {
+    return this.options.profilePath ?? DEFAULT_SUNO_PROFILE_PATH;
+  }
+
+  private shouldCheckProfileLifecycle(): boolean {
+    return Boolean(
+      this.options.profilePath
+      || this.options.driverMode === "playwright"
+      || this.options.config?.music?.suno?.driver === "playwright"
+    );
+  }
+
+  private async withProfileLifecycleStatus(status: SunoWorkerStatus): Promise<SunoWorkerStatus> {
+    if (!this.shouldCheckProfileLifecycle()) {
+      return status;
+    }
+
+    const profile = await detectStaleProfile(this.profilePath(), DEFAULT_SUNO_PROFILE_STALE_DAYS).catch((error) => ({
+      profilePath: this.profilePath(),
+      checkedAt: now(),
+      stale: true,
+      reason: "missing" as const,
+      detail: `Suno profile lifecycle check failed: ${error instanceof Error ? error.message : String(error)}`
+    }));
+    if (profile.stale) {
+      console.warn(`[artist-runtime] ${profile.detail}`);
+    }
+
+    return {
+      ...status,
+      sunoProfileStale: profile.stale,
+      sunoProfileDetail: profile.detail,
+      sunoProfileCheckedAt: profile.checkedAt
+    };
+  }
+
   private async transition(next: Partial<SunoWorkerStatus>): Promise<SunoWorkerStatus> {
     const current = await this.readState();
     const resolved: SunoWorkerStatus = {
@@ -173,7 +210,7 @@ export class SunoBrowserWorker {
     const driverMode = this.options.driverMode ?? this.options.config?.music?.suno?.driver ?? "mock";
     if (driverMode === "playwright") {
       return new PlaywrightSunoDriver(
-        this.options.profilePath ?? DEFAULT_SUNO_PROFILE_PATH,
+        this.profilePath(),
         this.options.submitMode ?? this.options.config?.music?.suno?.submitMode ?? "skip",
         this.workspaceRoot
       );
@@ -288,7 +325,7 @@ export class SunoBrowserWorker {
   }
 
   async status(): Promise<SunoWorkerStatus> {
-    return this.readState();
+    return this.withProfileLifecycleStatus(await this.readState());
   }
 
   async startCreate(request: SunoCreateRequest, options: WorkerAutomationOptions = {}): Promise<SunoCreateResult> {
