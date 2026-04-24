@@ -290,6 +290,19 @@ export interface SocialPublishLedgerEntry {
   reason: string;
 }
 
+export interface DistributionEvent extends SocialPublishLedgerEntry {
+  songId: string;
+}
+
+export interface PlatformStat {
+  platform: SocialPlatform;
+  count7d: number;
+  accepted7d: number;
+  successRate: number;
+  failedReasons: Record<string, number>;
+  dailyCounts: number[];
+}
+
 export interface SocialAssetRecord {
   songId: string;
   platform: SocialPlatform;
@@ -623,6 +636,8 @@ export interface StatusResponse {
   platforms: Record<SocialPlatform, PlatformStatus>;
   musicSummary: MusicSummary;
   distributionSummary: DistributionSummary;
+  recentDistributionEvents: DistributionEvent[];
+  platformStats: Record<SocialPlatform, PlatformStat>;
   setupReadiness: SetupReadiness;
   alerts: AlertRecord[];
   recentSong?: SongState;

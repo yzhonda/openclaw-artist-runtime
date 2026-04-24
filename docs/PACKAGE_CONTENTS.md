@@ -79,6 +79,7 @@ These files are now part of the package because the plugin has moved beyond a th
 - `src/services/autopilotTicker.ts`
 - `src/services/alertAcks.ts`
 - `src/services/runtimeConfig.ts`
+- `src/services/distributionLedgerReader.ts`
 - `src/services/socialDryRunResolver.ts`
 - `src/services/socialDistributionWorker.ts`
 - `src/services/socialPublishing.ts`
@@ -153,6 +154,9 @@ The Console source now includes:
   over HTTP
 - a confirmed Suno daily budget reset button that calls the plugin API instead
   of asking the operator to edit `runtime/suno/budget.json` directly
+- recent distribution event and platform uptime cards sourced from
+  `/api/status.recentDistributionEvents` and `/api/status.platformStats`
+- an all-platforms effective dry-run banner sourced from `/api/status.summary`
 - the same Suno/status markers mirrored in the fallback inline Console shell
 
 The config editor source now owns both:
@@ -229,6 +233,12 @@ coverage provider.
   This suite locks the shared global/platform arm resolution used by
   `socialPublishing`, `socialDistributionWorker`, platform status, and
   `/api/status.summary`.
+- `tests/routes/status-distribution-events.test.ts`
+  This suite locks the Round 65 recent distribution event surface: empty
+  ledgers, 20-row truncation, and TikTok `account_not_created` visibility.
+- `tests/routes/status-platform-stats.test.ts`
+  This suite locks the Round 65 seven-day platform stats surface: counts,
+  success rate, failed reason aggregation, and old-event exclusion.
 - `tests/config-schema-warnings.test.ts`
   This suite keeps config validation accept-with-warning behavior visible for
   platform arms held by the global live-go flag and disabled platforms with
@@ -386,7 +396,10 @@ Console parity:
 
 - `src/pluginApi.ts`
 - `src/routes/index.ts`
+- `src/services/distributionLedgerReader.ts`
 - `ui/src/App.tsx`
+- `ui/src/DistributionEventsCard.tsx`
+- `ui/src/PlatformUptimeCard.tsx`
 - `ui/src/configEditor.ts`
 - `tests/suno-worker-automation.test.ts`
 - `tests/prompt-pack-and-registration.test.ts`

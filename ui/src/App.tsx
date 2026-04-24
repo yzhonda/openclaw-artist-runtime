@@ -2,10 +2,16 @@ import { startTransition, useEffect, useState } from "react";
 import "./styles.css";
 import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
 import { SunoOutcomeCard, type ImportedAsset } from "./SunoOutcomeCard";
-import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes } from "../../src/types";
+import { DistributionEventsCard } from "./DistributionEventsCard";
+import { PlatformUptimeCard } from "./PlatformUptimeCard";
+import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
 
 type StatusResponse = {
   dryRun: boolean;
+  summary?: {
+    allPlatformsEffectivelyDryRun: boolean;
+    effectiveDryRunMap: Record<string, boolean>;
+  };
   setupReadiness: {
     completeCount: number;
     totalCount: number;
@@ -94,6 +100,8 @@ type StatusResponse = {
     repliesToday: number;
     lastPlatform?: string;
   };
+  recentDistributionEvents?: DistributionEvent[];
+  platformStats?: Record<SocialPlatform, PlatformStat>;
   platforms: Record<string, {
     connected: boolean;
     authority: string;
@@ -1133,6 +1141,12 @@ export function App() {
       </header>
 
       {error ? <section className="panel error-banner">{error}</section> : null}
+      {status?.summary?.allPlatformsEffectivelyDryRun ? (
+        <section className="panel dry-run-banner">
+          <strong>All social platforms are effectively dry-run.</strong>
+          <div className="muted">Global/platform arms or setup toggles are holding X, Instagram, and TikTok before live publish.</div>
+        </section>
+      ) : null}
 
       <section className="card-grid">
         <MetricCard
@@ -1180,10 +1194,10 @@ export function App() {
         ))}
       </nav>
 
-      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{recentXResultPanel}</section> : null}
+      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}<PlatformUptimeCard stats={status?.platformStats} /><DistributionEventsCard events={status?.recentDistributionEvents} />{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
-      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{replySimulationPanel}</section> : null}
+      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}<PlatformUptimeCard stats={status?.platformStats} /><DistributionEventsCard events={status?.recentDistributionEvents} />{replySimulationPanel}</section> : null}
       {activeView === "songs" ? <section className="two-column">{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}

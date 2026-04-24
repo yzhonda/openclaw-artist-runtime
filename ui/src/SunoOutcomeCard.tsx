@@ -102,6 +102,14 @@ function formatOutcome(
   };
 }
 
+function nextUtcRolloverLabel(now = new Date()): string {
+  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+  const diffMs = Math.max(0, next.getTime() - now.getTime());
+  const hours = Math.floor(diffMs / (60 * 60 * 1000));
+  const minutes = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+  return `${hours}:${minutes.toString().padStart(2, "0")}`;
+}
+
 export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const createOutcome = formatOutcome("Last Create", props.lastCreateOutcome);
   const importOutcome = formatOutcome("Last Import", props.lastImportOutcome);
@@ -207,6 +215,9 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
         {props.budget ? (
           <>
             <strong>{props.budget.remaining} remaining</strong>
+            <div className="budget-tooltip">
+              Last reset: {props.budget.lastResetAt ?? "none"} · Next UTC rollover: {nextUtcRolloverLabel()}
+            </div>
             <div className="muted">
               {props.budget.consumed}/{props.budget.limit} consumed · UTC {props.budget.date}
             </div>
