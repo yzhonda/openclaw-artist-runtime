@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Added `scripts/import-obsidian-artist.mjs` to migrate an artist persona from an Obsidian-style vault into the runtime workspace. Backs up existing `ARTIST.md`, `artist/SOCIAL_VOICE.md`, and `artist/cover.png` before writing, supports `--dry-run` and `--force`, and ships parser-level unit tests.
 - Plan v7 (operator-ready in one shot): pinned a "Last Cycle Summary" card on the Producer Console Dashboard surfacing autopilot stage, ticker outcome, current song, last social action, and Suno artifact count from the existing `/api/status` payload. Skipped ticker outcomes (`skipped:concurrent` / `skipped:disabled`) now render an inline color-coded banner instead of being silently equivalent to a successful run.
 - Plan v7 (operator-ready in one shot): exposed `music.suno.driver` (mock / playwright) and `music.suno.submitMode` (skip / live) selects in the Producer Console Config Editor. Switching `submitMode` to `live` shows an inline warning that real Suno credits will be consumed.
 - Round 86 (Mega-X-Plus skeleton): added `xLiveGateState.evaluateGate()` returning `idle` for every input, `extractMediaMetadata()` that reads only `stat()` size and extension-based mime, and `mentionedHandles` / `tweetId` enrichment in dry-run reply audit ledger entries. Real publish, real upload, and real fetch paths remain blocked.
