@@ -205,6 +205,9 @@ and manual `runtime/suno/budget.json` editing guidance.
 ### Repo-local OpenClaw sandbox scripts
 
 - `scripts/openclaw-local-env.sh`
+  Sources `.local/social-credentials.env` when present and bridges
+  `BIRD_FIREFOX_PROFILE` into `OPENCLAW_X_FIREFOX_PROFILE` for the local X/Bird
+  probe lane.
 - `scripts/openclaw-local-gateway`
 - `scripts/openclaw-local-http-smoke.sh`
 - `scripts/openclaw-local-write-smoke.sh`
@@ -399,7 +402,9 @@ Always keep:
 `CAPABILITIES.md` and `SECURITY.md` now also carry the connector auth contract
 for distribution operators:
 
-- X requires the `bird` CLI plus its authenticated local session store
+- X requires the `bird` CLI plus its authenticated local session store, with an
+  optional `OPENCLAW_X_FIREFOX_PROFILE` override for dedicated artist Firefox
+  profiles
 - Instagram probes `OPENCLAW_INSTAGRAM_AUTH` / `OPENCLAW_INSTAGRAM_ACCESS_TOKEN`
 - TikTok probes `OPENCLAW_TIKTOK_AUTH` / `OPENCLAW_TIKTOK_ACCESS_TOKEN`
 

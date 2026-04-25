@@ -247,6 +247,11 @@ function buildPublishFailure(result: CommandResult): SocialPublishResult {
   };
 }
 
+function buildBirdArgs(args: string[]): string[] {
+  const firefoxProfile = process.env.OPENCLAW_X_FIREFOX_PROFILE?.trim();
+  return firefoxProfile ? ["--firefox-profile", firefoxProfile, ...args] : args;
+}
+
 export class XBirdConnector implements SocialConnector {
   private readonly now: () => number;
   private readonly publishGuardState: PublishGuardState;
@@ -272,7 +277,7 @@ export class XBirdConnector implements SocialConnector {
       return { connected: false, reason: "bird_cli_not_installed" };
     }
 
-    const whoamiProbe = await runCommand(this.spawnImpl, "bird", ["whoami", "--plain"], BIRD_PROBE_TIMEOUT_MS);
+    const whoamiProbe = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["whoami", "--plain"]), BIRD_PROBE_TIMEOUT_MS);
     if (whoamiProbe.errorCode === "ENOENT") {
       return { connected: false, reason: "bird_cli_not_installed" };
     }
@@ -375,7 +380,7 @@ export class XBirdConnector implements SocialConnector {
       };
     }
 
-    const authCheck = await runCommand(this.spawnImpl, "bird", ["whoami", "--plain"], BIRD_PROBE_TIMEOUT_MS);
+    const authCheck = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["whoami", "--plain"]), BIRD_PROBE_TIMEOUT_MS);
     if (authCheck.errorCode === "ENOENT") {
       return {
         accepted: false,
@@ -394,7 +399,7 @@ export class XBirdConnector implements SocialConnector {
       };
     }
 
-    const compose = await runCommand(this.spawnImpl, "bird", ["--plain", "compose", text], BIRD_PUBLISH_TIMEOUT_MS);
+    const compose = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["--plain", "compose", text]), BIRD_PUBLISH_TIMEOUT_MS);
     if (compose.code !== 0) {
       return {
         accepted: false,
@@ -404,7 +409,7 @@ export class XBirdConnector implements SocialConnector {
       };
     }
 
-    const submit = await runCommand(this.spawnImpl, "bird", ["--plain", "tweet", "--dry-run", text], BIRD_PUBLISH_TIMEOUT_MS);
+    const submit = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["--plain", "tweet", "--dry-run", text]), BIRD_PUBLISH_TIMEOUT_MS);
     if (submit.code !== 0) {
       const submitOutput = buildCombinedOutput(submit);
       return {

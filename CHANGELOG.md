@@ -43,6 +43,7 @@
 - Added Round 66 atomic social publish ledger writes with 90-day archive rotation and archive-aware reader coverage.
 - Added Mega-A backend/test hygiene: config schema migrations, runtime cleanup scripts/docs, threat-model validation tests, expanded boundary-grep patterns, and Producer Console reason-code runbook links.
 - Added Mega-B social-lane polish: X reply-target parsing/audit metadata, platform authStatus/tested-at persistence, Instagram token-expiry status, and a fail-closed Instagram live rehearsal skeleton.
+- Added Round 76 X/Bird Firefox profile wiring so `OPENCLAW_X_FIREFOX_PROFILE` can direct runtime probes and dry-run Bird calls at a dedicated artist Firefox profile.
 
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
