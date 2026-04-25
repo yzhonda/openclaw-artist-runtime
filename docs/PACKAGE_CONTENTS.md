@@ -263,6 +263,20 @@ CI artifacts.
 
 ### Notable test coverage
 
+- `tests/harness/inProcessGateway.ts`
+  This helper boots the registered plugin routes in process against a temporary
+  artist workspace, letting chain tests exercise route handlers without a real
+  HTTP server or external connector calls.
+- `tests/integration/gateway-x-probe-config-chain.test.ts`
+  This suite locks the X probe persistence chain: in-process gateway boot,
+  mocked Bird probe, `authStatus=tested` persistence, and config reload.
+- `tests/integration/x-dry-run-reply-audit-reader.test.ts`
+  This suite locks the X dry-run reply chain from route dispatch through
+  reply-target audit metadata into the distribution ledger reader.
+- `tests/integration/suno-mock-submit-import-archive-chain.test.ts`
+  This suite locks the Suno mock driver chain from worker create/import through
+  local artifact indexing, prompt-ledger import records, and archive-aware
+  distribution ledger reads.
 - `tests/hooks-heartbeat.test.ts`
 - `tests/autopilot-ticker.test.ts`
 - `tests/autopilot-full-cycle.test.ts`
