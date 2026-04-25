@@ -1,3 +1,6 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error -- importing a .mjs script is fine for vitest's runtime check.
@@ -6,6 +9,7 @@ import {
   buildSongMd,
   parseFrontmatter,
   parseSlidersTable,
+  readExistingSongStatus,
   splitTopSections
 } from "../scripts/import-obsidian-song.mjs";
 
@@ -93,5 +97,41 @@ describe("import-obsidian-song parser", () => {
     });
     expect(md).not.toMatch(/api[_-]?key/i);
     expect(md).not.toMatch(/access[_-]?token/i);
+  });
+
+  it("buildSongMd preserves an explicit status (e.g. published) for already-released catalog entries", () => {
+    const md = buildSongMd({ songId: "where-it-played", title: "Where It Played", status: "published" });
+    expect(md).toContain("- Status: published");
+    expect(md).toContain("- Song ID: where-it-played");
+  });
+
+  it("readExistingSongStatus reads the Status line from an existing song.md", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "song-status-"));
+    const path = join(dir, "song.md");
+    try {
+      await writeFile(
+        path,
+        [
+          "# Where It Played",
+          "",
+          "<!-- artist-runtime:song-state:start -->",
+          "- Song ID: where-it-played",
+          "- Status: published",
+          "- Run Count: 0",
+          "<!-- artist-runtime:song-state:end -->",
+          ""
+        ].join("\n"),
+        "utf8"
+      );
+      const status = await readExistingSongStatus(path);
+      expect(status).toBe("published");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("readExistingSongStatus returns null when the song.md does not exist", async () => {
+    const status = await readExistingSongStatus("/nonexistent/path/song.md");
+    expect(status).toBeNull();
   });
 });
