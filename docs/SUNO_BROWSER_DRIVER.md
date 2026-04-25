@@ -3,6 +3,11 @@
 This document tracks the operator-facing setup for the dedicated Suno browser
 lane.
 
+See also: [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md),
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md), [ERRORS.md](ERRORS.md),
+[OPERATOR_RUNBOOK.md](OPERATOR_RUNBOOK.md), and
+[RUNTIME_CLEANUP.md](RUNTIME_CLEANUP.md).
+
 ## Status
 
 Round 41 keeps the real Playwright probe plus manual first-login helper, allows
@@ -438,6 +443,9 @@ Use this when a live create attempt returns `accepted: false` with
 - Moving the Suno lane to another operator machine or account: follow
   Scenario C.
 - Live create fails with `budget_exhausted`: follow Scenario D.
+- For the symptom-first decision tree, see
+  [TROUBLESHOOTING.md#suno-profile-stale-or-corrupt](TROUBLESHOOTING.md#suno-profile-stale-or-corrupt)
+  and [TROUBLESHOOTING.md#suno-budget-exhausted](TROUBLESHOOTING.md#suno-budget-exhausted).
 
 ## Rollback
 
@@ -448,5 +456,8 @@ dry-run-safe skeleton.
 
 - `docs/CONNECTOR_AUTH.md`
 - `docs/GATEWAY_AUTH.md`
+- `docs/OPERATOR_QUICKSTART.md`
+- `docs/TROUBLESHOOTING.md`
+- `docs/ERRORS.md`
 - `SECURITY.md`
 - `PRIVACY.md`

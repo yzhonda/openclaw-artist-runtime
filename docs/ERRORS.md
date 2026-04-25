@@ -4,6 +4,11 @@ Artist Runtime uses short reason codes so operators can trace a fail-closed
 decision back to the source subsystem without exposing credentials or raw
 platform responses.
 
+See also: [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md),
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md), [API_ROUTES.md](API_ROUTES.md),
+[CONNECTOR_AUTH.md](CONNECTOR_AUTH.md), and
+[SUNO_BROWSER_DRIVER.md](SUNO_BROWSER_DRIVER.md).
+
 ## Runbook anchors
 
 These headings exist so Producer Console reason-code links can deep-link into
@@ -94,9 +99,9 @@ See the gateway and auth boundary table entry for `gateway_token_mismatch`.
 
 | Scenario | Primary reason codes | Runbook |
 | --- | --- | --- |
-| Credential exposure concern | `gateway_token_mismatch`, `bird_auth_expired`, credential-like boundary-grep hits | `PRIVACY.md` data-boundary sections and `docs/INCIDENT_RESPONSE.md` safe incident notes |
-| Disk space exhausted or runtime growth | `playwright_create_network_error`, failed artifact imports, cleanup warnings | `docs/RUNTIME_CLEANUP.md` retention policy and manual cleanup scripts |
-| Frozen-platform attempt | `account_not_created`, `tiktok_account_not_created`, `instagram_auth_not_configured` after operator freeze | Keep the lane frozen; use `docs/INCIDENT_RESPONSE.md` publish-stuck flow only for active platforms |
+| Credential exposure concern | `gateway_token_mismatch`, `bird_auth_expired`, credential-like boundary-grep hits | [TROUBLESHOOTING.md#credential-or-profile-exposure-concern](TROUBLESHOOTING.md#credential-or-profile-exposure-concern), `PRIVACY.md`, and [INCIDENT_RESPONSE.md#safe-incident-notes](INCIDENT_RESPONSE.md#safe-incident-notes) |
+| Disk space exhausted or runtime growth | `playwright_create_network_error`, failed artifact imports, cleanup warnings | [TROUBLESHOOTING.md#disk-usage-warning](TROUBLESHOOTING.md#disk-usage-warning) and [RUNTIME_CLEANUP.md](RUNTIME_CLEANUP.md) |
+| Frozen-platform attempt | `account_not_created`, `tiktok_account_not_created`, `instagram_auth_not_configured` after operator freeze | [TROUBLESHOOTING.md#igtiktok-frozen-attempt](TROUBLESHOOTING.md#igtiktok-frozen-attempt) and [INCIDENT_RESPONSE.md#scenario-3-publish-stuck-or-connector-blocked](INCIDENT_RESPONSE.md#scenario-3-publish-stuck-or-connector-blocked) for active platforms only |
 
 ## Social distribution
 

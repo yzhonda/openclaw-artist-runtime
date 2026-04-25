@@ -4,6 +4,10 @@ This runbook covers operator-run maintenance helpers. The scripts are manual
 tools: they do not install cron jobs, systemd timers, launch agents, or hidden
 background workers.
 
+See also: [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md),
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md), [ERRORS.md](ERRORS.md), and
+[RUNTIME_CLEANUP.md](RUNTIME_CLEANUP.md).
+
 ## Quick checks
 
 Run the doctor from the package root:
@@ -119,3 +123,5 @@ public PRs.
 - `docs/INCIDENT_RESPONSE.md`
 - `docs/ERRORS.md`
 - `docs/SUNO_BROWSER_DRIVER.md`
+- `docs/OPERATOR_QUICKSTART.md`
+- `docs/TROUBLESHOOTING.md`

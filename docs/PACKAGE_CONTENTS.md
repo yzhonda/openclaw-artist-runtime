@@ -68,6 +68,8 @@ runtime counters, imported Suno audio, or temporary budget write files.
 ├── docs/PRODUCER_CONSOLE.md           # operator-facing console observability/export guide
 ├── docs/RUNTIME_CLEANUP.md            # operator-facing runtime retention and cleanup guide
 ├── docs/OPERATOR_RUNBOOK.md           # operator-facing doctor/rotation/snapshot guide
+├── docs/OPERATOR_QUICKSTART.md        # end-to-end operator setup / probe / dry-run handoff
+├── docs/TROUBLESHOOTING.md            # symptom-first recovery decision tree
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -395,6 +397,10 @@ CI artifacts.
 - `tests/error-runbook-map.test.ts`
   This suite keeps Producer Console reason-code links aligned with
   `docs/ERRORS.md` headings.
+- `tests/docs/cross-link-coverage.test.ts`
+  This suite walks top-level Markdown docs and verifies local `.md` links plus
+  heading anchors, keeping the operator quickstart/troubleshooting cross-links
+  from drifting.
 - `tests/dependency-audit.test.ts`
   This suite keeps the Round 80 audit policy visible: Vitest stays on the 2.x
   framework line, root overrides pin vulnerable transitive packages, and CI
@@ -471,6 +477,13 @@ Instagram live rehearsal skeleton.
 `docs/ERRORS.md` catalogs operator-facing reason codes across social staging,
 Suno budget/Playwright failures, and gateway boundary issues. Keep it aligned
 whenever connector or budget reason strings change.
+
+`docs/OPERATOR_QUICKSTART.md` and `docs/TROUBLESHOOTING.md` now provide the
+operator-facing setup path and symptom-first decision tree. They cross-link
+back to `docs/API_ROUTES.md`, `docs/CONNECTOR_AUTH.md`,
+`docs/SUNO_BROWSER_DRIVER.md`, `docs/OPERATOR_RUNBOOK.md`, and
+`docs/ERRORS.md` so route, credential, Suno, maintenance, and reason-code
+surfaces stay discoverable.
 
 `SECURITY.md` and `PRIVACY.md` also document the Suno browser-profile boundary:
 `.openclaw-browser-profiles/suno/` stays local-only, and imported audio under
