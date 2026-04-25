@@ -45,6 +45,22 @@ describe("resolveRuntimeConfig env-aware workspace fallback", () => {
     expect(config.distribution.platforms.x.lastTestedAt).toBe(1700000000000);
   });
 
+  it("normalizes a relative persisted workspaceRoot to the resolved env workspace", async () => {
+    const workspace = mkdtempSync(join(tmpdir(), "runtime-config-relative-"));
+    mkdirSync(join(workspace, "runtime"), { recursive: true });
+    writeFileSync(
+      join(workspace, "runtime", "config-overrides.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        artist: { workspaceRoot: "." }
+      })
+    );
+    process.env[ENV_KEY] = workspace;
+
+    const config = await resolveRuntimeConfig();
+    expect(config.artist.workspaceRoot).toBe(workspace);
+  });
+
   it("falls back to defaultArtistRuntimeConfig workspaceRoot when env is unset", () => {
     expect(resolveDefaultWorkspaceRoot()).toBe(".");
   });
