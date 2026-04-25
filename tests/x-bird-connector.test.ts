@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { XBirdConnector } from "../src/connectors/social/xBirdConnector";
 
 interface SpawnStep {
@@ -9,14 +9,30 @@ interface SpawnStep {
   errorCode?: string;
 }
 
+interface SpawnCall {
+  command: string;
+  args: string[];
+}
+
 class FakeChildProcess extends EventEmitter {
   stdout = new EventEmitter();
   stderr = new EventEmitter();
 }
 
-function createSpawnMock(steps: SpawnStep[]) {
+const originalFirefoxProfile = process.env.OPENCLAW_X_FIREFOX_PROFILE;
+
+afterEach(() => {
+  if (originalFirefoxProfile === undefined) {
+    delete process.env.OPENCLAW_X_FIREFOX_PROFILE;
+  } else {
+    process.env.OPENCLAW_X_FIREFOX_PROFILE = originalFirefoxProfile;
+  }
+});
+
+function createSpawnMock(steps: SpawnStep[], calls: SpawnCall[] = []) {
   let index = 0;
-  return (() => {
+  return ((command: string, args: string[]) => {
+    calls.push({ command, args: [...args] });
     const step = steps[index++];
     const child = new FakeChildProcess();
 
@@ -82,6 +98,46 @@ describe("XBirdConnector.checkConnection", () => {
       connected: true,
       accountLabel: "@ghost_station"
     });
+  });
+
+  it("omits the Firefox profile flag when OPENCLAW_X_FIREFOX_PROFILE is unset", async () => {
+    delete process.env.OPENCLAW_X_FIREFOX_PROFILE;
+    const calls: SpawnCall[] = [];
+    const connector = new XBirdConnector(
+      createSpawnMock([
+        { code: 0, stdout: "bird help" },
+        { code: 0, stdout: "@ghost_station" }
+      ], calls)
+    );
+
+    await expect(connector.checkConnection()).resolves.toMatchObject({
+      connected: true,
+      accountLabel: "@ghost_station"
+    });
+    expect(calls.map((call) => call.args)).toEqual([
+      ["--help"],
+      ["whoami", "--plain"]
+    ]);
+  });
+
+  it("passes OPENCLAW_X_FIREFOX_PROFILE to bird whoami but not the help probe", async () => {
+    process.env.OPENCLAW_X_FIREFOX_PROFILE = "rlff0kyr.artist-x";
+    const calls: SpawnCall[] = [];
+    const connector = new XBirdConnector(
+      createSpawnMock([
+        { code: 0, stdout: "bird help" },
+        { code: 0, stdout: "@used00honda" }
+      ], calls)
+    );
+
+    await expect(connector.checkConnection()).resolves.toMatchObject({
+      connected: true,
+      accountLabel: "@used00honda"
+    });
+    expect(calls.map((call) => call.args)).toEqual([
+      ["--help"],
+      ["--firefox-profile", "rlff0kyr.artist-x", "whoami", "--plain"]
+    ]);
   });
 });
 
@@ -225,6 +281,38 @@ describe("XBirdConnector.publish", () => {
       dryRun: false,
       reason: "requires_explicit_live_go"
     });
+  });
+
+  it("passes OPENCLAW_X_FIREFOX_PROFILE to all dry-run stage bird calls", async () => {
+    process.env.OPENCLAW_X_FIREFOX_PROFILE = "rlff0kyr.artist-x";
+    const calls: SpawnCall[] = [];
+    const connector = new XBirdConnector(
+      createSpawnMock([
+        { code: 0, stdout: "@used00honda" },
+        { code: 0, stdout: "composed" },
+        { code: 0, stdout: "dry-run ok" }
+      ], calls),
+      { dryRunStageExecution: true }
+    );
+
+    await expect(
+      connector.publish({
+        dryRun: true,
+        authority: "auto_publish",
+        postType: "observation",
+        text: "artist signal under ash"
+      })
+    ).resolves.toMatchObject({
+      accepted: false,
+      platform: "x",
+      dryRun: true,
+      reason: "dry-run blocks publish"
+    });
+    expect(calls.map((call) => call.args)).toEqual([
+      ["--firefox-profile", "rlff0kyr.artist-x", "whoami", "--plain"],
+      ["--firefox-profile", "rlff0kyr.artist-x", "--plain", "compose", "artist signal under ash"],
+      ["--firefox-profile", "rlff0kyr.artist-x", "--plain", "tweet", "--dry-run", "artist signal under ash"]
+    ]);
   });
 });
 

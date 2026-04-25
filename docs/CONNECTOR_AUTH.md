@@ -105,6 +105,11 @@ half-written line.
 - Requires the `bird` CLI to be installed and available on `PATH`.
 - Auth is expected to live in Bird's own local cookie/token store.
 - The plugin probes Bird with `bird --help` and `bird whoami --plain`.
+- If the artist account lives in a dedicated Firefox profile, set
+  `BIRD_FIREFOX_PROFILE=<profile-dir-basename>` in `.local/social-credentials.env`
+  and load `scripts/openclaw-local-env.sh`; the script exports
+  `OPENCLAW_X_FIREFOX_PROFILE`, which makes runtime Bird calls add
+  `--firefox-profile <name>`.
 
 ### Refresh
 
@@ -112,10 +117,13 @@ half-written line.
    account from its configured browser profile (e.g. a dedicated Firefox
    profile); the operator must sign in there directly — runtime cannot script
    that login.
-2. Confirm `bird whoami --plain` returns the expected `@handle` outside the
-   plugin.
-3. Re-run [`POST /plugins/artist-runtime/api/platforms/x/test`](./API_ROUTES.md#post-apiplatformsxtest).
-4. If the route still returns `bird_cli_not_installed`, `bird_auth_expired`, or
+2. Confirm `bird --firefox-profile <name> whoami --plain` returns the expected
+   artist `@handle` outside the plugin when a dedicated profile is configured.
+   If no dedicated profile is configured, confirm `bird whoami --plain`.
+3. Source `scripts/openclaw-local-env.sh` before starting the local gateway so
+   `BIRD_FIREFOX_PROFILE` is bridged to `OPENCLAW_X_FIREFOX_PROFILE`.
+4. Re-run [`POST /plugins/artist-runtime/api/platforms/x/test`](./API_ROUTES.md#post-apiplatformsxtest).
+5. If the route still returns `bird_cli_not_installed`, `bird_auth_expired`, or
    `bird_probe_failed`, inspect the local Bird install/session outside the plugin
    before retrying distribution.
 
