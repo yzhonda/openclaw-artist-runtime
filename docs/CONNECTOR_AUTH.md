@@ -193,6 +193,28 @@ half-written line.
 - Producer Console splits the arm into global + Instagram-specific toggles, so
   operators can pre-arm Instagram without lifting X or TikTok.
 
+### Live rehearsal pre-GO review checklist
+
+Before the operator flips `liveRehearsalExplicitGo` (the final fourth gate),
+the following docs and tests must be re-reviewed. The Mega-B round shipped the
+fail-closed skeleton; flipping the gate without this review is forbidden.
+
+1. `liveRehearsalExplicitGo` operator hook surface — confirm where the runtime
+   reads the explicit signal, and verify no startup default sets it on.
+2. Treat the Graph API media container creation as an external side effect —
+   even though `media_publish` is never reached, container staging may already
+   touch Meta-side state. Re-review `tests/instagram-live-rehearsal.test.ts`
+   for non-publish side effects and add coverage as needed.
+3. Re-confirm `tests/platform-auth-status.test.ts` keeps Instagram
+   `authStatus="tested"` only on a clean probe, with no live publish branch.
+4. Re-check the `requires_explicit_live_go` reason path stays the only outward
+   refusal reason for the publish stage; the inner reply audit metadata may
+   still be richer but must not leak through the connector contract.
+
+This checklist is the operator-side gate referenced in the Mega-B
+out-of-scope notes. Update it in the same PR whenever rehearsal scope
+changes.
+
 ## TikTok
 
 ### Contract
