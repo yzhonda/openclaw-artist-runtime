@@ -381,4 +381,64 @@ describe("status ticker and reply simulation routes", () => {
     expect(status.suno.budget.date).not.toBe("2000-01-01");
     expect(status.suno.budget.monthly.consumed).toBe(0);
   });
+
+  it("surfaces Suno reset history and runtime artifact index through /api/status", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-suno-visibility-"));
+    await ensureArtistWorkspace(root);
+    await mkdir(join(root, "runtime", "suno", "run-visible"), { recursive: true });
+    await writeFile(
+      join(root, "runtime", "suno", "budget-reset.jsonl"),
+      `${JSON.stringify({ timestamp: "2026-04-23T12:00:00.000Z", consumedBefore: 40, reason: "operator_reset" })}\n`,
+      "utf8"
+    );
+    await writeFile(join(root, "runtime", "suno", "run-visible", "take.mp3"), "audio-bytes", "utf8");
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.suno.budget.resetHistory).toEqual([
+      {
+        timestamp: "2026-04-23T12:00:00.000Z",
+        consumedBefore: 40,
+        reason: "operator_reset"
+      }
+    ]);
+    expect(status.suno.artifacts).toMatchObject([
+      {
+        runId: "run-visible",
+        format: "mp3",
+        path: join(root, "runtime", "suno", "run-visible", "take.mp3")
+      }
+    ]);
+    expect(status.suno.artifacts[0]?.size).toBeGreaterThan(0);
+  });
+
+  it("surfaces persisted Suno profile stale state under /api/status.suno.profile", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-suno-profile-"));
+    await ensureArtistWorkspace(root);
+    await mkdir(join(root, "runtime"), { recursive: true });
+    await writeFile(
+      join(root, "runtime", "suno-worker.json"),
+      `${JSON.stringify({
+        state: "connected",
+        connected: true,
+        failureCount: 0,
+        sunoProfileStale: true,
+        sunoProfileDetail: "profile missing",
+        sunoProfileCheckedAt: "2026-04-23T12:00:00.000Z"
+      }, null, 2)}\n`,
+      "utf8"
+    );
+
+    const status = await buildStatusResponse({
+      artist: { workspaceRoot: root }
+    });
+
+    expect(status.suno.profile).toEqual({
+      stale: true,
+      detail: "profile missing",
+      checkedAt: "2026-04-23T12:00:00.000Z"
+    });
+  });
 });

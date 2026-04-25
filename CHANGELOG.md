@@ -45,6 +45,7 @@
 - Added Mega-B social-lane polish: X reply-target parsing/audit metadata, platform authStatus/tested-at persistence, Instagram token-expiry status, and a fail-closed Instagram live rehearsal skeleton.
 - Added Round 76 X/Bird Firefox profile wiring so `OPENCLAW_X_FIREFOX_PROFILE` can direct runtime probes and dry-run Bird calls at a dedicated artist Firefox profile.
 - Added Round 77 X/Bird lane polish with opt-in `t.co` dry-run expansion, normalized reply-target ledger metadata, probe reason badges, and an X probe diagnostics guide.
+- Added Round 78 Suno runtime visibility with artifact indexing, budget reset-history surfacing, profile stale banners, and per-URL import failure details.
 
 ### Fixed
 - Bumped Bird probe timeout from 750ms to 3000ms so Firefox-profile-backed `bird whoami --plain` calls finish within the probe budget.

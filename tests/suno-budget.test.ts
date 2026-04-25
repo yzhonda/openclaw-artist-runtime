@@ -284,6 +284,34 @@ describe("SunoBudgetTracker", () => {
     });
   });
 
+  it("reads recent reset history newest first and skips malformed jsonl lines", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-budget-reset-history-"));
+    await mkdir(join(root, "runtime", "suno"), { recursive: true });
+    await writeFile(
+      join(root, "runtime", "suno", "budget-reset.jsonl"),
+      [
+        JSON.stringify({ timestamp: "2026-04-21T00:00:00.000Z", consumedBefore: 30, reason: "old" }),
+        "{not-json",
+        JSON.stringify({ timestamp: "2026-04-22T00:00:00.000Z", consumedBefore: 20, reason: "middle" }),
+        JSON.stringify({ timestamp: "2026-04-23T00:00:00.000Z", consumedBefore: 10, reason: "new" })
+      ].join("\n"),
+      "utf8"
+    );
+    const tracker = new SunoBudgetTracker(root, () => new Date("2026-04-23T12:00:00.000Z"));
+
+    await expect(tracker.getResetHistory(2)).resolves.toEqual([
+      { timestamp: "2026-04-23T00:00:00.000Z", consumedBefore: 10, reason: "new" },
+      { timestamp: "2026-04-22T00:00:00.000Z", consumedBefore: 20, reason: "middle" }
+    ]);
+  });
+
+  it("returns an empty reset history when the audit log is absent", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-budget-reset-history-empty-"));
+    const tracker = new SunoBudgetTracker(root, () => new Date("2026-04-23T12:00:00.000Z"));
+
+    await expect(tracker.getResetHistory(5)).resolves.toEqual([]);
+  });
+
   it("leaves monthly credit enforcement bypassed when monthly limit is zero", async () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-budget-monthly-unlimited-"));
     await mkdir(join(root, "runtime", "suno"), { recursive: true });

@@ -294,6 +294,32 @@ textarea {
   color: #7a2818;
 }
 
+.reset-history,
+.failed-url-list,
+.artifact-index-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mini-row {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(120px, 1fr) minmax(80px, max-content) minmax(80px, max-content);
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+.failed-url-row {
+  grid-template-columns: minmax(90px, max-content) minmax(0, 1fr);
+  word-break: break-word;
+}
+
+.suno-profile-stale {
+  border-left: 4px solid var(--warning);
+  background: rgba(193, 138, 0, 0.08);
+}
+
 .asset-row {
   display: grid;
   gap: 4px;

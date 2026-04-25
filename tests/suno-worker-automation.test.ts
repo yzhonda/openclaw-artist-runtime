@@ -161,6 +161,72 @@ describe("SunoBrowserWorker automation skeleton", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  it("persists explicit per-URL import failures from the driver", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-import-failed-urls-"));
+    const worker = new SunoBrowserWorker(root);
+    const urls = ["https://suno.com/song/ok", "https://suno.com/song/missing"];
+    const driver = createDriver({
+      importResults: vi.fn(async ({ runId }) => ({
+        accepted: true,
+        runId,
+        urls: [urls[0]!],
+        paths: ["runtime/suno/run-failed-urls/ok.mp3"],
+        metadata: [
+          {
+            url: urls[0]!,
+            path: "runtime/suno/run-failed-urls/ok.mp3",
+            format: "mp3" as const
+          }
+        ],
+        failedUrls: [
+          {
+            url: urls[1]!,
+            reason: "404" as const
+          }
+        ],
+        importedAt: "2026-04-22T00:00:00.000Z",
+        reason: "partial import"
+      }))
+    });
+
+    await worker.start({ driver });
+    const result = await worker.importRun("run-failed-urls", urls, { driver });
+    const status = await worker.status();
+
+    expect(result.failedUrls).toEqual([{ url: urls[1], reason: "404" }]);
+    expect(status.lastImportOutcome?.failedUrls).toEqual([{ url: urls[1], reason: "404" }]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("infers failed URLs when a driver returns fewer imported metadata entries", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-suno-import-infer-failures-"));
+    const worker = new SunoBrowserWorker(root);
+    const urls = ["https://suno.com/song/ok", "https://suno.com/song/network-fail"];
+    const driver = createDriver({
+      importResults: vi.fn(async ({ runId }) => ({
+        accepted: true,
+        runId,
+        urls: [urls[0]!],
+        paths: ["runtime/suno/run-infer-failures/ok.mp3"],
+        metadata: [
+          {
+            url: urls[0]!,
+            path: "runtime/suno/run-infer-failures/ok.mp3",
+            format: "mp3" as const
+          }
+        ],
+        importedAt: "2026-04-22T00:00:00.000Z",
+        reason: "network timeout while importing one URL"
+      }))
+    });
+
+    await worker.start({ driver });
+    const result = await worker.importRun("run-infer-failures", urls, { driver });
+
+    expect(result.failedUrls).toEqual([{ url: urls[1], reason: "network" }]);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it("routes connector create/import through worker methods", async () => {
     const status = vi.fn(async () => ({
       state: "connected" as const,

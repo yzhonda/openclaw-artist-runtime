@@ -324,10 +324,15 @@ fail before they reach CI artifacts.
   This suite fixes the Round 48 UI/status seam: imported Suno asset metadata is
   mirrored into `/api/status` and `/api/suno/status`, while the UI helper stays
   on read-only links plus the explicit empty placeholder.
+- `tests/suno-artifact-index.test.ts`
+  This suite fixes the Round 78 runtime artifact index: local mp3/m4a files
+  under `runtime/suno/<runId>/` are exposed as read-only status evidence with
+  run/song linkage and size metadata.
 - `tests/suno-budget.test.ts`
   This suite fixes the Round 51 credit gate boundary: reserve success,
   over-limit live submit block before connector.create, UTC-day reset,
-  manual reset audit logging, stale `.tmp` cleanup, and monthly-limit blocking.
+  manual reset audit logging, reset-history reads, stale `.tmp` cleanup, and
+  monthly-limit blocking.
 - `tests/suno-budget-monthly.test.ts`
   This suite isolates the Round 63 monthly credit gate: default `0` remains
   unlimited, while an opted-in monthly cap fails closed without mutating state.
@@ -362,7 +367,8 @@ fail before they reach CI artifacts.
 - `tests/suno-worker-automation.test.ts`
 - `tests/status-ticker.test.ts`
   This suite now also fixes the `/api/status` contract for imported Suno
-  `paths[]` / `metadata[]` exposure.
+  `paths[]` / `metadata[]` exposure, profile stale surfacing, reset history,
+  runtime artifacts, and per-URL import failures.
   It also locks the social status surface for `liveGoArmed`,
   `platformLiveGoArmed`, and per-platform `effectiveDryRun`.
 - `tests/persisted-config-helper-routes.test.ts`

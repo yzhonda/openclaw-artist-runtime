@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import "./styles.css";
 import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
-import { SunoOutcomeCard, type ImportedAsset } from "./SunoOutcomeCard";
+import { SunoOutcomeCard, type FailedImportUrl, type ImportedAsset, type SunoArtifactIndexEntry } from "./SunoOutcomeCard";
 import { ObservabilityPanel } from "./ObservabilityPanel";
 import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
 
@@ -43,6 +43,11 @@ type StatusResponse = {
       limit: number;
       remaining: number;
       lastResetAt?: string;
+      resetHistory?: Array<{
+        timestamp: string;
+        consumedBefore: number;
+        reason: string;
+      }>;
       monthly?: {
         month: string;
         consumed: number;
@@ -50,6 +55,12 @@ type StatusResponse = {
         remaining: number;
         unlimited: boolean;
       };
+    };
+    artifacts: SunoArtifactIndexEntry[];
+    profile?: {
+      stale?: boolean;
+      detail?: string;
+      checkedAt?: string;
     };
   };
   sunoWorker: {
@@ -71,6 +82,7 @@ type StatusResponse = {
       pathCount?: number;
       paths?: string[];
       metadata?: ImportedAsset[];
+      failedUrls?: FailedImportUrl[];
       reason?: string;
       at: string;
       dryRun?: boolean;
@@ -219,6 +231,10 @@ type SunoStatusResponse = {
     lastImportOutcome?: {
       runId: string;
       urlCount: number;
+      pathCount?: number;
+      paths?: string[];
+      metadata?: ImportedAsset[];
+      failedUrls?: FailedImportUrl[];
       reason?: string;
       at: string;
       dryRun?: boolean;
@@ -228,6 +244,7 @@ type SunoStatusResponse = {
   latestRun?: { runId: string; status: string };
   recentRuns: Array<{ runId: string; status: string; urls: string[] }>;
   latestPromptPackVersion?: number;
+  artifacts?: SunoArtifactIndexEntry[];
   currentRunId?: string;
   lastImportedRunId?: string;
   lastCreateOutcome?: {
@@ -243,6 +260,7 @@ type SunoStatusResponse = {
     pathCount?: number;
     paths?: string[];
     metadata?: ImportedAsset[];
+    failedUrls?: FailedImportUrl[];
     reason?: string;
     at: string;
     dryRun?: boolean;
@@ -797,6 +815,8 @@ export function App() {
         lastCreateOutcome={sunoStatus?.lastCreateOutcome ?? sunoStatus?.worker.lastCreateOutcome}
         lastImportOutcome={sunoStatus?.lastImportOutcome ?? sunoStatus?.worker.lastImportOutcome}
         budget={status?.suno.budget}
+        artifacts={sunoStatus?.artifacts ?? status?.suno.artifacts}
+        profile={status?.suno.profile}
         onResetBudget={resetSunoBudget}
         budgetResetDisabled={busy !== null}
       />

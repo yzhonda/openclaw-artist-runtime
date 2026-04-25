@@ -1,7 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createSongSkeleton } from "../repositories/songRepository.js";
-import type { SongState, SongStatus } from "../types.js";
+import type { SongState, SongStateImportOutcome, SongStatus } from "../types.js";
 
 const stateBlockStart = "<!-- artist-runtime:song-state:start -->";
 const stateBlockEnd = "<!-- artist-runtime:song-state:end -->";
@@ -30,6 +30,7 @@ export interface SongStatePatch {
   selectedTakeId?: string;
   appendPublicLinks?: string[];
   runCountDelta?: number;
+  lastImportOutcome?: SongStateImportOutcome;
 }
 
 function nowIso(): string {
@@ -94,6 +95,21 @@ function parsePublicLinks(lines: string[]): string[] {
   return links;
 }
 
+function parseImportOutcome(lines: string[]): SongStateImportOutcome | undefined {
+  const raw = parseBulletedValue(lines, "Last Import Outcome");
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    const parsed = JSON.parse(raw) as SongStateImportOutcome;
+    return typeof parsed.runId === "string" && Number.isFinite(parsed.urlCount) && typeof parsed.at === "string"
+      ? parsed
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function parseSongState(contents: string, songId: string): SongState {
   const titleMatch = contents.match(/^#\s+(.+)$/m);
   const title = titleMatch?.[1]?.trim() || songId;
@@ -125,7 +141,8 @@ function parseSongState(contents: string, songId: string): SongState {
     selectedTakeId: parseBulletedValue(lines, "Selected Take") || undefined,
     publicLinks: parsePublicLinks(lines),
     runCount: Number.isFinite(runCount) ? runCount : 0,
-    lastReason: parseBulletedValue(lines, "Last Reason") || undefined
+    lastReason: parseBulletedValue(lines, "Last Reason") || undefined,
+    lastImportOutcome: parseImportOutcome(lines)
   };
 }
 
@@ -144,6 +161,7 @@ function renderSongStateBlock(state: SongState): string {
     "- Public Links:",
     ...linkLines,
     `- Last Reason: ${state.lastReason ?? ""}`,
+    `- Last Import Outcome: ${state.lastImportOutcome ? JSON.stringify(state.lastImportOutcome) : ""}`,
     stateBlockEnd
   ].join("\n");
 }
@@ -274,7 +292,8 @@ export async function updateSongState(root: string, songId: string, patch: SongS
     selectedTakeId: patch.selectedTakeId ?? current.selectedTakeId,
     publicLinks: Array.from(publicLinks),
     runCount: Math.max(0, current.runCount + (patch.runCountDelta ?? 0)),
-    lastReason: patch.reason ?? current.lastReason
+    lastReason: patch.reason ?? current.lastReason,
+    lastImportOutcome: patch.lastImportOutcome ?? current.lastImportOutcome
   };
   return writeSongState(root, next);
 }
