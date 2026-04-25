@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error -- importing a .mjs script is fine for vitest's runtime check.
-import { buildArtistMd, buildSocialVoiceMd, parseFrontmatter, splitSections } from "../scripts/import-obsidian-artist.mjs";
+import { buildArtistMd, buildSocialVoiceMd, parseFrontmatter, splitSections, stripSoundCloudLines } from "../scripts/import-obsidian-artist.mjs";
 
 const SAMPLE = `---
 name: "test::artist"
@@ -44,6 +44,7 @@ cover: "[[artists/test-cover.png]]"
 
 ### URLs
 - Spotify: https://open.spotify.com/artist/example
+- SoundCloud: (TBD)
 `;
 
 describe("import-obsidian-artist parser", () => {
@@ -105,5 +106,26 @@ describe("import-obsidian-artist parser", () => {
     expect(md).toContain("Spotify Profile (imported)");
     expect(md).toContain("東京の夜を割るジャズドラム");
     expect(md).toContain("https://open.spotify.com/artist/example");
+  });
+
+  it("strips the SoundCloud line during import (move-time filter)", () => {
+    const { body } = parseFrontmatter(SAMPLE);
+    const sections = splitSections(body);
+    const md = buildSocialVoiceMd({ sections });
+    expect(md).not.toMatch(/^\s*-\s*SoundCloud\s*:/im);
+    expect(md).toContain("https://open.spotify.com/artist/example");
+  });
+
+  it("stripSoundCloudLines removes only list-item SoundCloud entries", () => {
+    const input = [
+      "Some prose mentioning SoundCloud is allowed.",
+      "- Spotify: https://example",
+      "- SoundCloud: (TBD)",
+      "  - SoundCloud: nested also dropped"
+    ].join("\n");
+    const out = stripSoundCloudLines(input);
+    expect(out).toContain("Some prose mentioning SoundCloud is allowed.");
+    expect(out).toContain("- Spotify: https://example");
+    expect(out).not.toMatch(/^\s*-\s*SoundCloud\s*:/im);
   });
 });
