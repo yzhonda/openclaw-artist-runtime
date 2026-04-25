@@ -229,13 +229,16 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `vitest.config.ts`
 
 CI now runs separate typecheck, coverage test, build, and boundary-grep jobs.
-The typecheck/test/build jobs run on Node 20 and 22. `boundary-grep` scans
-`src/` and `tests/` for credential-like literals and sensitive console dumps,
+The typecheck/test/build jobs run on Node 20 and 22, and the boundary-grep job
+logs the runner Bash version before scanning. `boundary-grep` scans `src/`,
+`tests/`, `scripts/`, and `.github/workflows/` for credential-like literals,
+sensitive console dumps, and bash-4-only syntax that would break macOS Bash 3,
 while `test:coverage` enforces a 70% line coverage floor through Vitest's v8
 coverage provider.
 The boundary-grep rule set now includes additional Suno, OAuth, OpenClaw social
-token, bearer, cookie, and profile-copy patterns so credential-shaped literals
-fail before they reach CI artifacts.
+token, bearer, cookie, profile-copy, and bash 4 syntax patterns so
+credential-shaped literals and incompatible shell helpers fail before they reach
+CI artifacts.
 
 ### Notable test coverage
 
@@ -345,7 +348,13 @@ fail before they reach CI artifacts.
   This suite fixes the boundary-grep script itself: forbidden credential
   assignment patterns are detected, clean files pass, and safe env var names do
   not trip the gate. It now also covers the expanded Suno API key, OAuth token,
-  OpenClaw social token, legacy TikTok token, and cookie-header leak patterns.
+  OpenClaw social token, legacy TikTok token, cookie-header leak patterns, and
+  bash-4-only syntax such as `mapfile`, `readarray`, uppercase/lowercase
+  expansion, associative arrays, and `coproc`.
+- `tests/routes/route-fallback-telemetry.test.ts`
+  This suite fixes the Round 79 route fallback telemetry seam: intentional
+  defaulted route reads still return safe values, but emit reason-coded debug
+  telemetry instead of vanishing silently.
 - `tests/config-migrations.test.ts`
   This suite locks the schema-version contract, persisted override migration,
   future-version rejection, mock migration skeleton helpers, and

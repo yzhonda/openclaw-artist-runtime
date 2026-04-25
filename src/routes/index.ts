@@ -42,8 +42,39 @@ import type {
 } from "../types.js";
 import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes } from "../types.js";
 
+function logRouteFallback(reason: string, path: string, error?: unknown): void {
+  const detail = error instanceof Error ? ` (${error.name})` : "";
+  console.warn(`[artist-runtime] route fallback ${reason}: ${path}${detail}`);
+}
+
+async function readTextOrFallback(path: string, fallback: string, reason: string, logLevel: "warn" | "debug" = "warn"): Promise<string> {
+  try {
+    return await readFile(path, "utf8");
+  } catch (error) {
+    if (logLevel === "warn") {
+      logRouteFallback(reason, path, error);
+    } else {
+      console.debug(`[artist-runtime] route fallback ${reason}: ${path}`);
+    }
+    return fallback;
+  }
+}
+
+async function readJsonOrFallback<T>(path: string, fallback: T, reason: string, logLevel: "warn" | "debug" = "debug"): Promise<T> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as T;
+  } catch (error) {
+    if (logLevel === "warn") {
+      logRouteFallback(reason, path, error);
+    } else {
+      console.debug(`[artist-runtime] route fallback ${reason}: ${path}`);
+    }
+    return fallback;
+  }
+}
+
 async function readJsonlEntries<T>(path: string): Promise<T[]> {
-  const contents = await readFile(path, "utf8").catch(() => "");
+  const contents = await readTextOrFallback(path, "", "jsonl_read_fallback", "debug");
   if (!contents) {
     return [];
   }
@@ -249,7 +280,7 @@ function buildTickerStatus(config: ArtistRuntimeConfig): StatusResponse["ticker"
 }
 
 async function fileHasContent(path: string): Promise<boolean> {
-  const contents = await readFile(path, "utf8").catch(() => "");
+  const contents = await readTextOrFallback(path, "", "setup_file_read_fallback", "debug");
   return contents.trim().length > 0;
 }
 
@@ -387,12 +418,12 @@ export async function buildSongDetailResponse(songId: string, config?: Partial<A
   const workspaceRoot = mergedConfig.artist.workspaceRoot;
   const [state, brief, promptLedger, sunoRuns, latestSocialAction, selectedTake, socialAssets, latestPromptPack, takeHistory] = await Promise.all([
     readSongState(workspaceRoot, songId),
-    readFile(join(workspaceRoot, "songs", songId, "brief.md"), "utf8").catch(() => ""),
+    readTextOrFallback(join(workspaceRoot, "songs", songId, "brief.md"), "", "song_brief_missing", "debug"),
     readJsonlEntries<PromptLedgerEntry>(join(workspaceRoot, "songs", songId, "prompts", "prompt-ledger.jsonl")),
     readAllSunoRuns(workspaceRoot, songId),
     readLatestSocialAction(workspaceRoot, songId),
-    readFile(join(workspaceRoot, "songs", songId, "suno", "selected-take.json"), "utf8").then((value) => JSON.parse(value) as unknown).catch(() => undefined),
-    readFile(join(workspaceRoot, "songs", songId, "social", "assets.json"), "utf8").then((value) => JSON.parse(value) as unknown).catch(() => []),
+    readJsonOrFallback<unknown>(join(workspaceRoot, "songs", songId, "suno", "selected-take.json"), undefined, "selected_take_missing", "debug"),
+    readJsonOrFallback<unknown[]>(join(workspaceRoot, "songs", songId, "social", "assets.json"), [], "social_assets_missing", "debug"),
     readLatestPromptPackMetadata(workspaceRoot, songId),
     readTakeHistory(workspaceRoot, songId)
   ]);

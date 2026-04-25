@@ -78,4 +78,65 @@ describe("boundary-grep", () => {
       "cookie-header-literal"
     ]);
   });
+
+  it("detects bash 4 syntax that would break macOS bash 3 operators", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-boundary-grep-bash4-"));
+    await writeFixture(
+      root,
+      "scripts/bad.sh",
+      [
+        "#!/usr/bin/env bash",
+        `${"map" + "file"} lines < input.txt`,
+        `${"read" + "array"} more_lines < input.txt`,
+        `echo "${"${name" + "^^}"}"`,
+        `echo "${"${name" + ",,}"}"`,
+        `${"declare" + " -A"} table`,
+        `${"co" + "proc"} worker { cat; }`
+      ].join("\n")
+    );
+
+    const findings = await scanBoundaryPatterns({ cwd: root, roots: ["scripts"] });
+
+    expect(findings.map((finding) => finding.rule)).toEqual([
+      "bash-mapfile",
+      "bash-readarray",
+      "bash-uppercase-expansion",
+      "bash-lowercase-expansion",
+      "bash-associative-array",
+      "bash-coproc"
+    ]);
+  });
+
+  it("allows bash 3 compatible shell loops and arrays", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-boundary-grep-bash3-clean-"));
+    await writeFixture(
+      root,
+      "scripts/good.sh",
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "items=\"\"",
+        "while IFS= read -r line; do",
+        "  items=\"${items}${line}\"",
+        "done < input.txt"
+      ].join("\n")
+    );
+
+    const findings = await scanBoundaryPatterns({ cwd: root, roots: ["scripts"] });
+
+    expect(findings).toEqual([]);
+  });
+
+  it("does not flag safe cookie lifecycle messages without dumped values", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-boundary-grep-cookie-message-"));
+    await writeFixture(
+      root,
+      "scripts/login.mjs",
+      "console.log(`login cookie saved to ${profilePath}`);\n"
+    );
+
+    const findings = await scanBoundaryPatterns({ cwd: root, roots: ["scripts"] });
+
+    expect(findings).toEqual([]);
+  });
 });

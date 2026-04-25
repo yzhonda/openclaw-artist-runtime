@@ -4,6 +4,9 @@
 
 Artist Runtime stores creative and operational data locally by default:
 
+See also: `docs/ERRORS.md` for reason-code anchors related to credential
+exposure concerns and operator-safe recovery paths.
+
 - `ARTIST.md` and artist state files;
 - song briefs, lyrics, YAML lyrics, Style, Exclude, Suno payloads;
 - prompt-ledger JSONL files;

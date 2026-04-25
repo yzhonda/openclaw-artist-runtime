@@ -99,6 +99,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Log Bash version
+        run: bash --version | head -1
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
