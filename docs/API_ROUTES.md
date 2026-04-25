@@ -3,6 +3,11 @@
 `src/routes/index.ts` exposes the Producer Console shell and the plugin-backed
 `/plugins/artist-runtime/api/*` surface below.
 
+See also: [OPERATOR_QUICKSTART.md](OPERATOR_QUICKSTART.md),
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md), [ERRORS.md](ERRORS.md),
+[CONNECTOR_AUTH.md](CONNECTOR_AUTH.md), and
+[GATEWAY_AUTH.md](GATEWAY_AUTH.md).
+
 This catalog is consumer-facing: it shows the stable HTTP paths, the primary
 payload/response fields, and the route-family notes that matter under the
 current OpenClaw Gateway.
@@ -75,18 +80,21 @@ current OpenClaw Gateway.
 - Auth: `plugin`
 - Purpose: run the X/Bird connector probe and return `{ platform, status, testedAt }`
 - Notes: uses the same persisted config resolution path as the rest of the platform family
+- Common reasons: [bird_cli_not_installed](ERRORS.md#bird_cli_not_installed), [bird_auth_expired](ERRORS.md#bird_auth_expired), [bird_probe_failed](ERRORS.md#bird_probe_failed)
 
 ### POST /api/platforms/instagram/test
 
 - Auth: `plugin`
 - Purpose: run the Instagram connector probe and return `{ platform, status, testedAt }`
 - Notes: reports env-configured / fail-closed state without performing real external posting
+- Common reasons: [instagram_auth_not_configured](ERRORS.md#instagram_auth_not_configured); the lane is currently frozen by operator decision
 
 ### POST /api/platforms/tiktok/test
 
 - Auth: `plugin`
 - Purpose: run the TikTok connector probe and return `{ platform, status, testedAt }`
 - Notes: reports env-configured / fail-closed state without performing real external posting
+- Common reasons: [account_not_created](ERRORS.md#account_not_created), [tiktok_account_not_created](ERRORS.md#tiktok_account_not_created)
 
 ## Notes for implementers
 

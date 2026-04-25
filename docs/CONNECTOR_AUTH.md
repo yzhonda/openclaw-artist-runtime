@@ -12,6 +12,9 @@ Use it together with:
 - `docs/GATEWAY_AUTH.md` for the HTTP/gateway boundary around these connector checks
 - `docs/API_ROUTES.md` for the plugin HTTP surface
 - `docs/SUNO_BROWSER_DRIVER.md` for the separate Suno browser-profile lane
+- `docs/OPERATOR_QUICKSTART.md` for the end-to-end operator setup path
+- `docs/TROUBLESHOOTING.md` for symptom-first recovery flows
+- `docs/ERRORS.md` for reason-code meanings and recovery anchors
 
 ## Shared rules
 
@@ -114,6 +117,9 @@ half-written line.
   `OPENCLAW_X_TCO_FETCH_ENABLED=1` only when the operator explicitly wants
   dry-run reply validation to perform a real short-link GET before resolving the
   target status id.
+- For a symptom-first X recovery flow, see
+  [TROUBLESHOOTING.md#x-probe-red](TROUBLESHOOTING.md#x-probe-red) and the
+  Bird reason-code anchors in [ERRORS.md](ERRORS.md).
 
 ### Refresh
 
@@ -168,6 +174,9 @@ dedicated artist profile took slightly over `750ms` to answer `whoami`.
 > live publish path will be opened. Treat IG identically to TikTok: do not
 > add new IG-specific functionality without an explicit operator GO. The
 > sections below describe the existing skeleton for reference only.
+> For frozen-lane troubleshooting, use
+> [TROUBLESHOOTING.md#igtiktok-frozen-attempt](TROUBLESHOOTING.md#igtiktok-frozen-attempt)
+> rather than provisioning a token.
 
 ### Contract
 
@@ -252,6 +261,12 @@ changes.
 ## TikTok
 
 ### Contract
+
+TikTok is frozen by operator decision. The skeleton remains documented for
+package transparency, but setup and probe exercise are not part of the active
+operator lane. See
+[TROUBLESHOOTING.md#igtiktok-frozen-attempt](TROUBLESHOOTING.md#igtiktok-frozen-attempt)
+and [ERRORS.md#tiktok_account_not_created](ERRORS.md#tiktok_account_not_created).
 
 - TikTok is currently frozen while the operator account is not created.
 - `POST /plugins/artist-runtime/api/platforms/tiktok/test` reports

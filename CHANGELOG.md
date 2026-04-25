@@ -50,6 +50,7 @@
 - Added Round 80 dependency-audit hardening with root overrides for vulnerable transitive packages, a production `npm audit --omit=dev` CI gate, and documented dev-only advisory handling.
 - Added Round 81 operator self-serve scripts for doctor checks, manual runtime log rotation, runtime state snapshots, and `docs/OPERATOR_RUNBOOK.md`.
 - Added Round 82 Producer Console UX helpers for distribution-event filtering, unified error toasts, reconnect/recovered banners, and keyboard shortcuts without importing React components into root tests.
+- Added Round 83 operator quickstart and troubleshooting docs plus a cross-link coverage test for top-level docs references and anchors.
 
 ### Changed
 - Extracted `buildImportedAssetRows` and `importedAssetsPlaceholder` into `src/services/sunoImportedAssetsView.ts` so the helpers are shared by `SunoOutcomeCard` and root vitest without dragging the React entrypoint into the test scope.

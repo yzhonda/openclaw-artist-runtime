@@ -96,6 +96,17 @@ contributor onboarding, start with `AGENTS.md`, then `CODEX_START_HERE.md`, then
 docs in order. For the live plugin HTTP surface, use `docs/API_ROUTES.md` as the
 route catalog.
 
+Operator runbooks:
+
+- `docs/OPERATOR_QUICKSTART.md` — gateway start, probes, arm flags, dry-run
+  verification, and the explicit live-publish handoff boundary.
+- `docs/TROUBLESHOOTING.md` — symptom-first recovery decision tree linked to
+  reason-code anchors.
+- `docs/ERRORS.md` — compact reason-code catalog for Console badges, logs, and
+  incident notes.
+- `docs/OPERATOR_RUNBOOK.md` — manual doctor, log rotation, and runtime state
+  snapshot helpers.
+
 ## Key package files
 
 - `openclaw.plugin.json` — manifest, config schema, UI hints, capability declaration.
