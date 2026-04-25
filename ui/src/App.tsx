@@ -1052,18 +1052,34 @@ export function App() {
     </article>
   );
 
+  const isArchivedSong = (status: string) => status === "published" || status === "archived" || status === "failed";
+  const activeSongs = songs.filter((song) => !isArchivedSong(song.status));
+  const archiveSongs = songs.filter((song) => isArchivedSong(song.status));
+  const renderSongRow = (song: SongSummary) => (
+    <button className={`item item-button${selectedSongId === song.songId ? " is-selected" : ""}`} key={song.songId} disabled={busy !== null} onClick={() => void refresh(song.songId)}>
+      <span className="pill">{song.status}</span>
+      <strong>{song.title}</strong>
+      <div className="muted">{song.songId} · runs {song.runCount}{song.selectedTakeId ? ` · take ${song.selectedTakeId}` : ""}</div>
+    </button>
+  );
+
   const songsPanel = (
     <article className="panel">
       <div className="section-title">Songs</div>
       <div className="list">
-        {songs.length > 0 ? songs.map((song) => (
-          <button className={`item item-button${selectedSongId === song.songId ? " is-selected" : ""}`} key={song.songId} disabled={busy !== null} onClick={() => void refresh(song.songId)}>
-            <span className="pill">{song.status}</span>
-            <strong>{song.title}</strong>
-            <div className="muted">{song.songId} · runs {song.runCount}{song.selectedTakeId ? ` · take ${song.selectedTakeId}` : ""}</div>
-          </button>
-        )) : <div className="item muted">No songs yet.</div>}
+        {activeSongs.length > 0
+          ? activeSongs.map(renderSongRow)
+          : <div className="item muted">No active songs.</div>}
       </div>
+      {archiveSongs.length > 0 ? (
+        <>
+          <div className="section-title section-title-archive">Archive</div>
+          <div className="muted archive-hint">完成・公開済 (published) や撤退済 (archived/failed) はここに集まります。autopilot は触りません。</div>
+          <div className="list">
+            {archiveSongs.map(renderSongRow)}
+          </div>
+        </>
+      ) : null}
     </article>
   );
 
