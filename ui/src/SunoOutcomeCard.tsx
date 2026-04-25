@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  buildImportedAssetRows,
+  importedAssetsPlaceholder,
+  type SunoImportedAssetView
+} from "../../src/services/sunoImportedAssetsView";
 import { runbookHref } from "./errorRunbookMap";
+
+export { buildImportedAssetRows, importedAssetsPlaceholder };
+
+export type ImportedAsset = SunoImportedAssetView;
 
 type SunoOutcome = {
   runId: string;
@@ -12,14 +21,6 @@ type SunoOutcome = {
   reason?: string;
   at: string;
   dryRun?: boolean;
-};
-
-export type ImportedAsset = {
-  url: string;
-  path: string;
-  format: "mp3" | "m4a";
-  title?: string;
-  durationSec?: number;
 };
 
 export type FailedImportUrl = {
@@ -75,27 +76,6 @@ export type SunoOutcomeCardProps = {
   onResetBudget?: () => Promise<void>;
   budgetResetDisabled?: boolean;
 };
-
-export function buildImportedAssetRows(outcome?: SunoOutcome): ImportedAsset[] {
-  if (!outcome) {
-    return [];
-  }
-
-  if (outcome.metadata?.length) {
-    return outcome.metadata;
-  }
-
-  return (outcome.paths ?? []).map((path, index) => ({
-    url: outcome.runId,
-    path,
-    format: path.toLowerCase().endsWith(".m4a") ? "m4a" : "mp3",
-    title: `Imported asset ${index + 1}`
-  }));
-}
-
-export function importedAssetsPlaceholder(outcome?: SunoOutcome): string | null {
-  return buildImportedAssetRows(outcome).length === 0 ? "No imported assets yet." : null;
-}
 
 function formatDuration(durationSec?: number): string | null {
   if (typeof durationSec !== "number" || !Number.isFinite(durationSec) || durationSec < 0) {

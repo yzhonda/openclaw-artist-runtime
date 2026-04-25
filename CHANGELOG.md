@@ -48,6 +48,9 @@
 - Added Round 78 Suno runtime visibility with artifact indexing, budget reset-history surfacing, profile stale banners, and per-URL import failure details.
 - Added Round 79 infra hardening with bash-3 compatibility grep rules, route fallback telemetry, Producer Console stale/offline banners, and reason-code doc cross-links.
 
+### Changed
+- Extracted `buildImportedAssetRows` and `importedAssetsPlaceholder` into `src/services/sunoImportedAssetsView.ts` so the helpers are shared by `SunoOutcomeCard` and root vitest without dragging the React entrypoint into the test scope.
+
 ### Fixed
 - Bumped Bird probe timeout from 750ms to 3000ms so Firefox-profile-backed `bird whoami --plain` calls finish within the probe budget.
 
