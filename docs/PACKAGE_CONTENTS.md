@@ -67,6 +67,7 @@ runtime counters, imported Suno audio, or temporary budget write files.
 ├── docs/SUNO_BROWSER_DRIVER.md        # operator-facing Suno browser-profile lane guide
 ├── docs/PRODUCER_CONSOLE.md           # operator-facing console observability/export guide
 ├── docs/RUNTIME_CLEANUP.md            # operator-facing runtime retention and cleanup guide
+├── docs/OPERATOR_RUNBOOK.md           # operator-facing doctor/rotation/snapshot guide
 ├── reference/original-starter-scaffold/ # earlier scaffold retained as reference
 └── templates/                         # install-time templates
 ```
@@ -222,6 +223,13 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `scripts/runtime-retention-enforce.sh`
 - `scripts/suno-profile-diagnose.sh`
 - `scripts/suno-profile-backup.sh`
+- `scripts/openclaw-doctor.sh`
+- `scripts/rotate-runtime-logs.sh`
+- `scripts/snapshot-runtime-state.sh`
+
+`docs/OPERATOR_RUNBOOK.md` documents the manual operator flow for the doctor,
+runtime log rotation, and runtime state snapshots. These helpers are
+operator-invoked only; they do not install cron jobs or background timers.
 
 ### CI / regression gate
 
@@ -367,6 +375,11 @@ CI artifacts.
   This suite backs the operator cleanup scripts: dry-run JSON candidate output,
   runtime disk-usage JSON, and retention-policy candidate listing without
   deleting artifacts.
+- `tests/scripts/openclaw-doctor.test.ts`
+- `tests/scripts/rotate-runtime-logs.test.ts`
+- `tests/scripts/snapshot-runtime-state.test.ts`
+  These suites back the Round 81 operator helpers: doctor JSON output, manual
+  runtime log rotation, and runtime state snapshots with retention pruning.
 - `tests/threat-model-validation.test.ts`
   This suite binds the five operator threat-model rows to executable checks:
   Prompt Ledger non-exposure, invalid config override rejection, credential
@@ -486,6 +499,9 @@ Also keep the repo-local verification scripts because they are the documented sa
 - `scripts/runtime-retention-enforce.sh`
 - `scripts/suno-profile-diagnose.sh`
 - `scripts/suno-profile-backup.sh`
+- `scripts/openclaw-doctor.sh`
+- `scripts/rotate-runtime-logs.sh`
+- `scripts/snapshot-runtime-state.sh`
 
 Also keep the CI workflow and tracked workspace template files because they now form part of the package's regression discipline and bootstrap contract:
 
