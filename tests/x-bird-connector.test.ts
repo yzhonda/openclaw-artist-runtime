@@ -232,19 +232,23 @@ describe("XBirdConnector.reply", () => {
   it("keeps dry-run replies blocked", async () => {
     const connector = new XBirdConnector(createSpawnMock([]));
 
-    await expect(
-      connector.reply({
-        dryRun: true,
-        authority: "auto_publish",
-        postType: "reply",
-        text: "answering the static",
-        targetId: "123"
-      })
-    ).resolves.toEqual({
+    const result = await connector.reply({
+      dryRun: true,
+      authority: "auto_publish",
+      postType: "reply",
+      text: "answering the static",
+      targetId: "123"
+    });
+
+    expect(result).toMatchObject({
       accepted: false,
       platform: "x",
       dryRun: true,
-      reason: "dry-run blocks reply"
+      reason: "dry-run blocks reply",
+      raw: {
+        targetId: "123",
+        type: "reply"
+      }
     });
   });
 

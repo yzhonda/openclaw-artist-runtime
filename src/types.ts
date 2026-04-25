@@ -20,6 +20,7 @@ export const socialAuthorityModes = [
 ] as const;
 export const socialRiskLevels = ["low", "medium", "high"] as const;
 export const capabilityStates = [true, false, "unknown"] as const;
+export const platformAuthStatuses = ["unconfigured", "configured", "tested", "failed"] as const;
 export const sunoWorkerStates = ["disconnected", "connecting", "connected", "generating", "importing", "login_required", "login_challenge", "captcha", "payment_prompt", "ui_mismatch", "quota_exhausted", "paused", "stopped"] as const;
 export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generation", "take_selection", "asset_generation", "publishing", "completed", "paused", "failed_closed"] as const;
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "published", "archived", "failed"] as const;
@@ -42,6 +43,7 @@ export type SocialAuthorityMode = (typeof socialAuthorityModes)[number];
 export type SocialRiskLevel = (typeof socialRiskLevels)[number];
 export type SocialPlatform = "x" | "instagram" | "tiktok";
 export type CapabilityState = (typeof capabilityStates)[number];
+export type PlatformAuthStatus = (typeof platformAuthStatuses)[number];
 export type SunoWorkerState = (typeof sunoWorkerStates)[number];
 export type AutopilotStage = (typeof autopilotStages)[number];
 export type SongStatus = (typeof songStatuses)[number];
@@ -90,6 +92,8 @@ export interface MusicConfig {
 export interface XPlatformConfig {
   enabled: boolean;
   liveGoArmed: boolean;
+  authStatus: PlatformAuthStatus;
+  lastTestedAt?: number;
   connector: "bird";
   authority: XAuthority;
   maxPostsPerDay: number;
@@ -100,6 +104,10 @@ export interface XPlatformConfig {
 export interface InstagramPlatformConfig {
   enabled: boolean;
   liveGoArmed: boolean;
+  authStatus: PlatformAuthStatus;
+  lastTestedAt?: number;
+  liveRehearsalArmed: boolean;
+  accessTokenExpiresAt?: number;
   connector: "instagram_content_publishing";
   authority: InstagramAuthority;
   maxPostsPerDay: number;
@@ -109,6 +117,8 @@ export interface InstagramPlatformConfig {
 export interface TikTokPlatformConfig {
   enabled: boolean;
   liveGoArmed: boolean;
+  authStatus: PlatformAuthStatus;
+  lastTestedAt?: number;
   connector: "tiktok_content_posting";
   authority: TikTokAuthority;
   maxPostsPerDay: number;
@@ -261,6 +271,10 @@ export interface SocialPublishRequest {
   mediaPaths?: string[];
   targetId?: string;
   targetUrl?: string;
+  globalLiveGoArmed?: boolean;
+  platformLiveGoArmed?: boolean;
+  liveRehearsalArmed?: boolean;
+  liveRehearsalExplicitGo?: boolean;
 }
 
 export interface SocialPublishResult {
@@ -289,6 +303,15 @@ export interface SocialPublishLedgerEntry {
   verification?: VerificationResult;
   error?: SerializedError;
   reason: string;
+  replyTarget?: ReplyTargetAudit;
+}
+
+export interface ReplyTargetAudit {
+  type: "reply";
+  targetId?: string;
+  resolvedFrom?: string;
+  dryRun: boolean;
+  timestamp: string;
 }
 
 export interface DistributionEvent extends SocialPublishLedgerEntry {
@@ -316,6 +339,8 @@ export interface SocialAssetRecord {
 export interface PlatformStatus {
   connected: boolean;
   authority: string;
+  authStatus?: PlatformAuthStatus;
+  lastTestedAt?: number;
   liveGoArmed?: boolean;
   effectiveDryRun?: boolean;
   capabilitySummary: SocialCapability;
@@ -324,6 +349,7 @@ export interface PlatformStatus {
   repliesToday?: number;
   lastAction?: SocialPublishLedgerEntry;
   reason?: string;
+  instagramTokenExpiringSoon?: boolean;
 }
 
 export interface MusicSummary {

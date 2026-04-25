@@ -279,6 +279,20 @@
             "type": "boolean",
             "default": false
           },
+          "authStatus": {
+            "type": "string",
+            "enum": [
+              "unconfigured",
+              "configured",
+              "tested",
+              "failed"
+            ],
+            "default": "unconfigured"
+          },
+          "lastTestedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
           "connector": {
             "type": "string",
             "const": "bird",
@@ -332,6 +346,28 @@
             "type": "boolean",
             "default": false
           },
+          "authStatus": {
+            "type": "string",
+            "enum": [
+              "unconfigured",
+              "configured",
+              "tested",
+              "failed"
+            ],
+            "default": "unconfigured"
+          },
+          "lastTestedAt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "liveRehearsalArmed": {
+            "type": "boolean",
+            "default": false
+          },
+          "accessTokenExpiresAt": {
+            "type": "integer",
+            "minimum": 0
+          },
           "connector": {
             "type": "string",
             "const": "instagram_content_publishing",
@@ -375,6 +411,20 @@
           "liveGoArmed": {
             "type": "boolean",
             "default": false
+          },
+          "authStatus": {
+            "type": "string",
+            "enum": [
+              "unconfigured",
+              "configured",
+              "tested",
+              "failed"
+            ],
+            "default": "unconfigured"
+          },
+          "lastTestedAt": {
+            "type": "integer",
+            "minimum": 0
           },
           "connector": {
             "type": "string",

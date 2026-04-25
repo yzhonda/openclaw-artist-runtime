@@ -10,6 +10,7 @@ function configOverridePath(root: string): string {
 }
 
 function enforceFrozenPlatformBoundaries(config: ArtistRuntimeConfig): ArtistRuntimeConfig {
+  const { lastTestedAt: _lastTestedAt, ...tiktokConfig } = config.distribution.platforms.tiktok;
   return {
     ...config,
     distribution: {
@@ -17,7 +18,8 @@ function enforceFrozenPlatformBoundaries(config: ArtistRuntimeConfig): ArtistRun
       platforms: {
         ...config.distribution.platforms,
         tiktok: {
-          ...config.distribution.platforms.tiktok,
+          ...tiktokConfig,
+          authStatus: "unconfigured",
           liveGoArmed: false
         }
       }

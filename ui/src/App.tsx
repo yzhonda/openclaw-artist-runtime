@@ -107,6 +107,8 @@ type StatusResponse = {
     accountLabel?: string;
     reason?: string;
     capabilitySummary?: Record<string, boolean | "unknown">;
+    authStatus?: "unconfigured" | "configured" | "tested" | "failed";
+    lastTestedAt?: number;
     liveGoArmed?: boolean;
     effectiveDryRun?: boolean;
     postsToday?: number;
@@ -826,6 +828,7 @@ export function App() {
     <ObservabilityPanel
       events={status?.recentDistributionEvents}
       stats={status?.platformStats}
+      platforms={status?.platforms}
       budgetCard={sunoOutcomeCard}
       sunoCard={sunoPanel}
     />
@@ -939,7 +942,8 @@ export function App() {
           const isTikTok = platformKey === "tiktok";
           const probeResult = platformTests[platform]?.status ?? value;
           const probeBadge = platformProbeBadge(platformKey, probeResult);
-          const testedAt = platformTests[platform]?.testedAt;
+          const testedAt = platformTests[platform]?.status.lastTestedAt ?? value.lastTestedAt;
+          const testedAtLabel = testedAt ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(Math.round((testedAt - Date.now()) / 60000), "minute") : undefined;
           return (
             <div className={`item${isTikTok ? " platform-frozen-card" : ""}`} key={platform}>
               <div className="inline-actions">
@@ -959,8 +963,9 @@ export function App() {
               <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
               <div className="muted">arm {platformLiveGoArmed(configDraft, platformKey) ? "armed" : "off"} · {value.effectiveDryRun ? "effective dry-run" : "live lane open"}</div>
               <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
+              <div className="muted">{isTikTok ? "auth unconfigured · account pending" : `auth ${value.authStatus ?? "unconfigured"}`}</div>
               <div className="muted">
-                {testedAt ? `tested ${testedAt} · ${formatProbeReason(probeResult.reason)}` : `probe ${formatProbeReason(probeResult.reason)}`}
+                {testedAtLabel ? `tested ${testedAtLabel} · ${formatProbeReason(probeResult.reason)}` : `probe ${formatProbeReason(probeResult.reason)}`}
               </div>
             </div>
           );

@@ -33,6 +33,9 @@ Use it together with:
   lane is explicitly opened.
 - Use `POST /plugins/artist-runtime/api/platforms/{id}/test` for connector health
   checks (`x`, `instagram`, `tiktok`).
+  The route now records `authStatus` and `lastTestedAt` into runtime config for
+  X and Instagram. TikTok stays fixed at `authStatus: "unconfigured"` while the
+  account remains frozen.
 - Keep connector credentials local to the operator machine. CI, packaging, and
   tarball verification should run without bundling these values.
 
@@ -120,6 +123,13 @@ half-written line.
 
 - Dry-run publish/reply paths stay fail-closed and do not perform real external
   side effects.
+- Reply targets accept a bare status id or an `x.com` / `twitter.com`
+  `/status/<id>` URL. `t.co` expansion is supported only through an injected
+  test/rehearsal fetch implementation; the runtime does not perform real
+  short-link expansion by default.
+- Dry-run X replies write a reply-target audit object into
+  `social-publish.jsonl`: `{ type: "reply", targetId, resolvedFrom, dryRun,
+  timestamp }`. This is metadata only; it is not proof of a public reply.
 - The upstream social pipeline also requires both the global arm and the X
   platform arm to be `true` before it will even attempt to leave dry-run.
 
@@ -160,6 +170,19 @@ half-written line.
 - Instagram now runs the Graph API skeleton in dry-run only: the runtime is
   wired for the Graph account lookup, media container, and publish-stage fetch
   sequence, but this round still returns `dry-run blocks publish`.
+- The live rehearsal skeleton is fail-closed by default. Four gates must all be
+  true before the rehearsal code may touch the injected Graph fetch path:
+  `distribution.liveGoArmed`, `distribution.platforms.instagram.liveGoArmed`,
+  `distribution.platforms.instagram.liveRehearsalArmed`, and an explicit
+  runtime `liveRehearsalExplicitGo` signal. The shipped application does not set
+  that final signal in normal operation.
+- Rehearsal never calls `/{instagram_business_account_id}/media_publish`; it
+  stops after account/media-container staging and returns
+  `requires_explicit_live_go`.
+- Successful Instagram probes record `authStatus: "tested"` and a conservative
+  `accessTokenExpiresAt` placeholder when none is already configured. If the
+  stored expiry is within 30 days, status exposes
+  `instagramTokenExpiringSoon: true` for operator refresh planning.
 - The upper social distribution pipeline now adds a second hold: if
   `distribution.enabled` is off, `distribution.liveGoArmed` is off, the
   Instagram platform arm is off, or the target platform toggle is off, the

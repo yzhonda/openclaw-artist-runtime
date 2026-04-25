@@ -25,6 +25,15 @@ const GRAPH_API_BASE_URL = "https://graph.facebook.com";
 const DRY_RUN_BLOCK_REASON = "dry-run blocks publish";
 const LIVE_GO_BLOCK_REASON = "requires_explicit_live_go";
 
+export function canProceedWithLiveRehearsal(input: SocialPublishRequest): boolean {
+  return Boolean(
+    input.liveRehearsalArmed
+    && input.platformLiveGoArmed
+    && input.globalLiveGoArmed
+    && input.liveRehearsalExplicitGo
+  );
+}
+
 function resolveInstagramAuth(): string | undefined {
   for (const name of INSTAGRAM_AUTH_ENV_VARS) {
     const value = process.env[name]?.trim();
@@ -86,7 +95,7 @@ export class InstagramConnector implements SocialConnector {
       };
     }
 
-    if (!input.dryRun) {
+    if (!input.dryRun && !canProceedWithLiveRehearsal(input)) {
       return {
         accepted: false,
         platform: "instagram",
@@ -115,6 +124,22 @@ export class InstagramConnector implements SocialConnector {
         raw: {
           businessAccountId: businessAccount.businessAccountId,
           pageId: businessAccount.pageId
+        }
+      };
+    }
+
+    if (!input.dryRun) {
+      return {
+        accepted: false,
+        platform: "instagram",
+        dryRun: false,
+        reason: LIVE_GO_BLOCK_REASON,
+        raw: {
+          pageId: businessAccount.pageId,
+          businessAccountId: businessAccount.businessAccountId,
+          containerId: mediaContainer.containerId,
+          stageOrder: ["accounts", "media", "publish_blocked"],
+          liveRehearsal: true
         }
       };
     }

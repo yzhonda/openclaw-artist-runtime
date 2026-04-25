@@ -41,6 +41,7 @@
       "x": {
         "enabled": false,
         "liveGoArmed": false,
+        "authStatus": "unconfigured",
         "connector": "bird",
         "authority": "auto_publish",
         "maxPostsPerDay": 3,
@@ -50,6 +51,8 @@
       "instagram": {
         "enabled": false,
         "liveGoArmed": false,
+        "authStatus": "unconfigured",
+        "liveRehearsalArmed": false,
         "connector": "instagram_content_publishing",
         "authority": "auto_publish_visuals",
         "maxPostsPerDay": 1,
@@ -58,6 +61,7 @@
       "tiktok": {
         "enabled": false,
         "liveGoArmed": false,
+        "authStatus": "unconfigured",
         "connector": "tiktok_content_posting",
         "authority": "auto_publish_clips",
         "maxPostsPerDay": 1,
