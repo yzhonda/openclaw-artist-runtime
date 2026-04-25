@@ -45,6 +45,9 @@
 - Added Mega-B social-lane polish: X reply-target parsing/audit metadata, platform authStatus/tested-at persistence, Instagram token-expiry status, and a fail-closed Instagram live rehearsal skeleton.
 - Added Round 76 X/Bird Firefox profile wiring so `OPENCLAW_X_FIREFOX_PROFILE` can direct runtime probes and dry-run Bird calls at a dedicated artist Firefox profile.
 
+### Fixed
+- Bumped Bird probe timeout from 750ms to 3000ms so Firefox-profile-backed `bird whoami --plain` calls finish within the probe budget.
+
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
 - Suno worker selection now accepts `music.suno.driver`, defaulting to `mock` while reserving `playwright` for later operator-installed browser automation.
