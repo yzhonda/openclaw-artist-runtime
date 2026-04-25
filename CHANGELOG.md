@@ -48,6 +48,9 @@
 ### Fixed
 - Bumped Bird probe timeout from 750ms to 3000ms so Firefox-profile-backed `bird whoami --plain` calls finish within the probe budget.
 
+### Notes
+- Operator decision (2026-04-25): the Instagram lane is dropped at parity with TikTok. The Graph API skeleton, live rehearsal gates, and existing tests stay as feature carry-over, but no token will be provisioned, no probe is exercised, and no live publish path will be opened without an explicit operator GO.
+
 ### Changed
 - Connected `docs/CONNECTOR_AUTH.md` refresh steps directly to platform test route anchors in `docs/API_ROUTES.md` and refreshed package-contents docs for the post-0.3.0 doc/test surface.
 - Suno worker selection now accepts `music.suno.driver`, defaulting to `mock` while reserving `playwright` for later operator-installed browser automation.

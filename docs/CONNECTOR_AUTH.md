@@ -143,6 +143,14 @@ half-written line.
 
 ## Instagram
 
+> **Operator status (2026-04-25): frozen, parity with TikTok.** The operator
+> has decided not to pursue the Instagram lane. The Graph API skeleton, live
+> rehearsal gates, and existing tests stay in code as a feature carry-over,
+> but no Graph API token will be provisioned, no probe is exercised, and no
+> live publish path will be opened. Treat IG identically to TikTok: do not
+> add new IG-specific functionality without an explicit operator GO. The
+> sections below describe the existing skeleton for reference only.
+
 ### Contract
 
 - The current connector checks one of:
