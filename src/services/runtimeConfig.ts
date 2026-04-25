@@ -39,9 +39,14 @@ export async function readResolvedConfig(root: string): Promise<ArtistRuntimeCon
   return enforceFrozenPlatformBoundaries(applyConfigDefaults(await readConfigOverrides(root)));
 }
 
+export function resolveDefaultWorkspaceRoot(): string {
+  const envWorkspace = process.env.OPENCLAW_LOCAL_WORKSPACE?.trim();
+  return envWorkspace || defaultArtistRuntimeConfig.artist.workspaceRoot;
+}
+
 export async function resolveRuntimeConfig(
   payloadConfig?: Partial<ArtistRuntimeConfig>,
-  fallbackWorkspaceRoot = defaultArtistRuntimeConfig.artist.workspaceRoot
+  fallbackWorkspaceRoot: string = resolveDefaultWorkspaceRoot()
 ): Promise<ArtistRuntimeConfig> {
   const workspaceRoot = payloadConfig?.artist?.workspaceRoot ?? fallbackWorkspaceRoot;
   const persisted = await readResolvedConfig(workspaceRoot);
