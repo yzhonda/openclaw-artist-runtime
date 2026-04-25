@@ -215,8 +215,33 @@ export function stripSoundCloudLines(text) {
     .join("\n");
 }
 
-export function buildSocialVoiceMd({ sections }) {
-  const spotify = stripSoundCloudLines(joinSection(sections, "Spotify Profile"));
+export function extractSpotifyProfileSection(text) {
+  const lines = text.split("\n");
+  const startIdx = lines.findIndex((line) => /^##\s+Spotify Profile/.test(line));
+  if (startIdx === -1) return null;
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i])) {
+      endIdx = i;
+      break;
+    }
+  }
+  return lines.slice(startIdx + 1, endIdx).join("\n").trim();
+}
+
+export async function readExistingSpotifyProfileSection(socialVoicePath) {
+  try {
+    const text = await readFile(socialVoicePath, "utf8");
+    return extractSpotifyProfileSection(text);
+  } catch {
+    return null;
+  }
+}
+
+export function buildSocialVoiceMd({ sections, existingSpotifyProfile }) {
+  const spotify = existingSpotifyProfile && existingSpotifyProfile.trim().length > 0
+    ? existingSpotifyProfile
+    : stripSoundCloudLines(joinSection(sections, "Spotify Profile"));
   const lines = [];
   lines.push("<!--");
   lines.push("SOCIAL_VOICE.md - Imported from Obsidian vault.");
@@ -317,8 +342,10 @@ async function main() {
   const { frontmatter, body } = parseFrontmatter(raw);
   const sections = splitSections(body);
 
+  const existingSpotifyProfile = await readExistingSpotifyProfileSection(targetSocialVoice);
+
   const artistMd = buildArtistMd({ frontmatter, sections });
-  const socialVoiceMd = buildSocialVoiceMd({ sections });
+  const socialVoiceMd = buildSocialVoiceMd({ sections, existingSpotifyProfile });
 
   await backupIfPresent(targetArtistMd, opts);
   await backupIfPresent(targetSocialVoice, opts);

@@ -247,14 +247,18 @@ async function main() {
     references: join(songRoot, "references.md")
   };
 
-  const existingStatus = await readExistingSongStatus(targets.songMd);
-  const songStatus = existingStatus ?? "lyrics";
+  const songMdExists = await fileExists(targets.songMd);
 
-  for (const path of Object.values(targets)) {
+  for (const [key, path] of Object.entries(targets)) {
+    if (key === "songMd" && songMdExists) continue;
     await backupIfPresent(path, opts);
   }
 
-  await writeFileSafe(targets.songMd, buildSongMd({ songId: opts.songId, title, status: songStatus }), opts);
+  if (songMdExists) {
+    console.log(`skip: ${targets.songMd} (existing workspace state preserved — status, public_links, last_reason, run_count, body kept intact)`);
+  } else {
+    await writeFileSafe(targets.songMd, buildSongMd({ songId: opts.songId, title, status: "lyrics" }), opts);
+  }
   await writeFileSafe(targets.briefMd, buildBriefMd({ title, reference, styleSummary }), opts);
   await writeFileSafe(targets.lyricsV1, `${lyricsParsed.body.trim()}\n`, opts);
   await writeFileSafe(targets.yamlSuno, yamlSunoRaw, opts);
