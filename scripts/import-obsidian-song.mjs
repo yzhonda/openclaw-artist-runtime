@@ -162,6 +162,16 @@ async function fileExists(path) {
   }
 }
 
+export async function readExistingSongStatus(songMdPath) {
+  try {
+    const text = await readFile(songMdPath, "utf8");
+    const match = text.match(/^-\s*Status:\s*(\S+)/m);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 async function readIfExists(path) {
   try {
     return await readFile(path, "utf8");
@@ -237,11 +247,14 @@ async function main() {
     references: join(songRoot, "references.md")
   };
 
+  const existingStatus = await readExistingSongStatus(targets.songMd);
+  const songStatus = existingStatus ?? "lyrics";
+
   for (const path of Object.values(targets)) {
     await backupIfPresent(path, opts);
   }
 
-  await writeFileSafe(targets.songMd, buildSongMd({ songId: opts.songId, title, status: "lyrics" }), opts);
+  await writeFileSafe(targets.songMd, buildSongMd({ songId: opts.songId, title, status: songStatus }), opts);
   await writeFileSafe(targets.briefMd, buildBriefMd({ title, reference, styleSummary }), opts);
   await writeFileSafe(targets.lyricsV1, `${lyricsParsed.body.trim()}\n`, opts);
   await writeFileSafe(targets.yamlSuno, yamlSunoRaw, opts);
