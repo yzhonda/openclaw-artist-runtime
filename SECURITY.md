@@ -116,6 +116,21 @@ Audit logs must not include:
   credential stores
 - screenshots or copied browser storage from signed-in sessions
 
+## Dependency audit policy
+
+CI runs `npm audit --audit-level=moderate --omit=dev` as a fail-closed
+production dependency gate. Moderate-or-higher production advisories must be
+cleared before release, normally through root `overrides` that keep the plugin
+on the existing framework line and then pass typecheck, tests, build, coverage,
+and boundary-grep.
+
+Development-only advisories are not silently ignored. When the fix requires a
+test-framework or build-tool major upgrade, such as the Vitest 2 to Vitest 4
+path for Vite/esbuild dev-server advisories, the project keeps the existing
+framework line until the producer explicitly approves that architectural
+change. The accepted risk is limited to local/CI development tooling, not the
+distributed plugin runtime.
+
 ## Marketplace note
 
 Because plugin marketplaces are sensitive surfaces, this package must not ask users to run arbitrary shell commands beyond standard install/build/test instructions. Avoid obfuscated scripts and lifecycle `postinstall` behavior.
