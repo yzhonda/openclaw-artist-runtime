@@ -359,6 +359,15 @@ CI artifacts.
   Unit tests for `isPublishBlockedByDryRun`, the Plan v7 helper that
   decoupled autopilot publishing advancement from fragile string matching
   on the social authority reason.
+- `tests/import-obsidian-artist.test.ts`
+  Unit tests for the Obsidian artist importer parser: frontmatter,
+  `## Heading` section split, `ARTIST.md` shape, `SOCIAL_VOICE.md`
+  shape, and a credential-leak guard that refuses to emit
+  `api_key` / `access_token` / `cookie` substrings.
+- `scripts/import-obsidian-artist.mjs`
+  Migrates an Obsidian-style artist vault into the runtime workspace.
+  Backs up existing files before writing; supports `--dry-run` and
+  `--force`. The script is plain Node ESM with no extra dependencies.
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
 - `tests/suno-playwright-create.test.ts`
