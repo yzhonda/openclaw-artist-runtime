@@ -9,7 +9,7 @@ import type { ArtistRuntimeConfig, SocialCapability, SocialPlatform, SocialPubli
 import { updateSongState } from "./artistState.js";
 import { appendAuditLog, createAuditEvent } from "./auditLog.js";
 import { decideSocialAuthority } from "./socialAuthority.js";
-import { appendSocialPublishLedgerEntry, readLatestSocialPublishLedgerEntry } from "./socialPublishLedger.js";
+import { appendSocialPublishLedgerEntry, appendSocialReplyLedgerEntry, readLatestSocialPublishLedgerEntry } from "./socialPublishLedger.js";
 import { resolvePlatformSocialDryRun } from "./socialDryRunResolver.js";
 
 export interface SocialActionInput {
@@ -161,6 +161,7 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
       type: "reply",
       targetId: typeof raw.targetId === "string" ? raw.targetId : undefined,
       resolvedFrom: typeof raw.resolvedFrom === "string" ? raw.resolvedFrom : undefined,
+      resolutionReason: typeof raw.resolutionReason === "string" ? raw.resolutionReason : undefined,
       dryRun: raw.dryRun === true,
       timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString()
     };
@@ -183,7 +184,11 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
       }
     })
   );
-  await appendSocialPublishLedgerEntry(input.workspaceRoot, input.songId, entry);
+  if (action === "reply" && entry.replyTarget?.type === "reply") {
+    await appendSocialReplyLedgerEntry(input.workspaceRoot, input.songId, entry);
+  } else {
+    await appendSocialPublishLedgerEntry(input.workspaceRoot, input.songId, entry);
+  }
 
   if (action === "publish") {
     await updateSongState(input.workspaceRoot, input.songId, {

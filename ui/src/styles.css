@@ -462,6 +462,12 @@ textarea {
   border: 1px solid rgba(159, 79, 45, 0.2);
 }
 
+.badge-error {
+  background: rgba(132, 32, 32, 0.13);
+  color: #842020;
+  border: 1px solid rgba(132, 32, 32, 0.24);
+}
+
 .platform-frozen-card button:disabled {
   cursor: not-allowed;
 }

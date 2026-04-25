@@ -25,6 +25,16 @@ function idFromValue(value: string): string | undefined {
   return trimmed.match(X_STATUS_URL)?.[1];
 }
 
+function resolveFetchImpl(fetchImpl: ReplyTargetFetch | undefined): ReplyTargetFetch | undefined {
+  if (fetchImpl) {
+    return fetchImpl;
+  }
+  if (process.env.OPENCLAW_X_TCO_FETCH_ENABLED !== "1" || typeof globalThis.fetch !== "function") {
+    return undefined;
+  }
+  return (url: string) => globalThis.fetch(url, { redirect: "follow" });
+}
+
 export async function resolveReplyTarget(
   input: { targetId?: string; targetUrl?: string },
   options: { fetchImpl?: ReplyTargetFetch } = {}
@@ -49,12 +59,16 @@ export async function resolveReplyTarget(
     return { ok: false, reason: "reply_target_invalid", resolvedFrom: targetUrl };
   }
 
-  if (!options.fetchImpl) {
+  const fetchImpl = resolveFetchImpl(options.fetchImpl);
+  if (!fetchImpl) {
     return { ok: false, reason: "reply_target_tco_requires_fetch", resolvedFrom: targetUrl };
   }
 
   try {
-    const response = await options.fetchImpl(targetUrl);
+    const response = await fetchImpl(targetUrl);
+    if (!response.ok) {
+      return { ok: false, reason: "reply_target_tco_expand_failed", resolvedFrom: targetUrl };
+    }
     const expanded = response.url || response.headers.get("location") || "";
     const expandedId = idFromValue(expanded);
     return expandedId

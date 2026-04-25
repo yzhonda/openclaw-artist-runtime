@@ -21,10 +21,10 @@ type PlatformAuthDetail = {
 };
 
 function relativeTestedAt(timestamp?: number): string {
-  if (!timestamp) {
+  if (!Number.isFinite(timestamp) || !timestamp) {
     return "not tested yet";
   }
-  const seconds = Math.round((timestamp - Date.now()) / 1000);
+  const seconds = Math.min(0, Math.round((timestamp - Date.now()) / 1000));
   const absSeconds = Math.abs(seconds);
   const formatter = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
   if (absSeconds < 60) {
@@ -41,6 +41,50 @@ function relativeTestedAt(timestamp?: number): string {
   return formatter.format(Math.round(hours / 24), "day");
 }
 
+function platformReason(platform: SocialPlatform, auth?: PlatformAuthDetail): string {
+  if (platform === "tiktok") {
+    return "account_not_created";
+  }
+  if (auth?.reason) {
+    return auth.reason;
+  }
+  return auth?.authStatus === "tested" ? "connected" : auth?.authStatus ?? "unconfigured";
+}
+
+function reasonBadgeClass(reason: string): string {
+  switch (reason) {
+    case "connected":
+      return "badge-ok";
+    case "bird_auth_expired":
+      return "badge-warning";
+    case "bird_probe_failed":
+      return "badge-warning";
+    case "bird_cli_not_installed":
+      return "badge-error";
+    case "account_not_created":
+      return "badge-frozen";
+    default:
+      return "badge-held";
+  }
+}
+
+function reasonTooltip(reason: string): string {
+  switch (reason) {
+    case "connected":
+      return "Bird probe succeeded with the selected local profile.";
+    case "bird_auth_expired":
+      return "Bird reached X but the local session is expired; re-authenticate the selected Firefox profile.";
+    case "bird_probe_failed":
+      return "Bird ran but did not return a usable account; inspect the profile, timeout, and CLI output.";
+    case "bird_cli_not_installed":
+      return "The bird CLI is missing from PATH.";
+    case "account_not_created":
+      return "This platform is frozen until the operator creates and arms an account.";
+    default:
+      return "No platform-specific recovery hint is registered for this reason.";
+  }
+}
+
 export function PlatformUptimeCard(props: { stats?: Record<SocialPlatform, PlatformStat>; platforms?: Partial<Record<SocialPlatform, PlatformAuthDetail>> }) {
   return (
     <article className="panel platform-uptime-card">
@@ -51,6 +95,7 @@ export function PlatformUptimeCard(props: { stats?: Record<SocialPlatform, Platf
           const auth = props.platforms?.[platform];
           const frozen = platform === "tiktok";
           const failedReason = frozen ? "account_not_created" : Object.entries(stat?.failedReasons ?? {})[0]?.[0];
+          const authReason = platformReason(platform, auth);
           const authText = frozen
             ? "Not configured (account pending)"
             : `${auth?.authStatus ?? "unconfigured"} · tested at ${relativeTestedAt(auth?.lastTestedAt)}`;
@@ -60,6 +105,9 @@ export function PlatformUptimeCard(props: { stats?: Record<SocialPlatform, Platf
                 <strong>{platform}</strong>
                 <span className={`badge ${frozen ? "badge-frozen" : (stat?.successRate ?? 0) >= 0.8 ? "badge-ok" : "badge-warning"}`}>
                   {frozen ? "account_not_created" : `${formatRate(stat?.successRate ?? 0)} success`}
+                </span>
+                <span className={`badge ${reasonBadgeClass(authReason)}`} title={reasonTooltip(authReason)}>
+                  {authReason}
                 </span>
               </div>
               <div className="sparkline" aria-label={`${platform} 7 day publish count`}>
