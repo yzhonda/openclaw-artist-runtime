@@ -352,8 +352,13 @@ CI artifacts.
   `/api/config/update` receives `distribution.platforms.tiktok.liveGoArmed=true`,
   the persisted resolved config is sanitized back to `false`.
 - `tests/config-editor-payload.test.ts`
-  This suite now covers global/per-platform live-go draft shaping and the
-  frozen TikTok arm in the bundled UI payload builder.
+  This suite now covers global/per-platform live-go draft shaping, the
+  frozen TikTok arm, and the matching frozen Instagram arm + Suno
+  `driver` / `submitMode` round-trip in the bundled UI payload builder.
+- `tests/autopilot-publishing-reason.test.ts`
+  Unit tests for `isPublishBlockedByDryRun`, the Plan v7 helper that
+  decoupled autopilot publishing advancement from fragile string matching
+  on the social authority reason.
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
 - `tests/suno-playwright-create.test.ts`

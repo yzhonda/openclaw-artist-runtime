@@ -10,6 +10,62 @@ See also: [TROUBLESHOOTING.md](TROUBLESHOOTING.md),
 [SUNO_BROWSER_DRIVER.md](SUNO_BROWSER_DRIVER.md), and
 [OPERATOR_RUNBOOK.md](OPERATOR_RUNBOOK.md).
 
+## 5-Minute First Cycle (mock-only, no external side effects)
+
+Use this section to confirm the Producer Console works end-to-end before
+provisioning real Suno or X credentials. It exercises the UI, autopilot
+ticker, and dry-run social path without touching live services.
+
+1. Start the local gateway from the package root:
+
+   ```sh
+   scripts/openclaw-local-gateway start
+   ```
+
+2. Open the Producer Console in a browser:
+
+   ```
+   http://127.0.0.1:43134/plugins/artist-runtime
+   ```
+
+3. The Dashboard's "Last Cycle Summary" card pins the current state. With a
+   fresh workspace it shows `Autopilot Stage: idle` and zero artifacts.
+
+4. Open Settings (tab in Producer Console) and:
+   - turn on `Autopilot enabled` and `Dry-run safety`
+   - leave `Suno Driver` on `mock` and `Suno Submit Mode` on `skip`
+   - click `Save Settings`
+
+5. Return to Dashboard and click `Run Cycle` on the Last Cycle Summary card.
+   The autopilot advances through `planning` -> `prompt_pack` ->
+   `suno_generation`. It stops at `suno_generation` with
+   `blockedReason: waiting for Suno result import`. This is intentional:
+   `submitMode: skip` deliberately avoids the Suno Create click, so no song
+   URLs are produced and there is nothing to import. The mock-only lane is
+   for verifying the UI, ticker, and dry-run social path; it does not
+   advance further on its own.
+
+6. To see the X dry-run reply enrichment in action, open the Platforms tab
+   and use the Reply Simulation form (or POST to
+   `/api/platforms/x/simulate-reply`). The ledger captures `mentionedHandles`
+   and `tweetId` without contacting the X API.
+
+7. Skipped cycles are visible: clicking `Run Cycle` while one is in flight
+   shows `skipped:concurrent` in a yellow banner; toggling Autopilot off and
+   re-clicking shows `skipped:disabled` in a red banner.
+
+To advance through `take_selection`, `asset_generation`, and `publishing`
+the operator must switch `Suno Submit Mode` to `live` and complete the Suno
+login lane (`scripts/openclaw-suno-login.sh`). Switching to `live`
+consumes real Suno credits per cycle; the inline warning under the dropdown
+is a reminder. The `Suno Driver` select can stay on `mock` for harness-only
+exercises, but real Suno generation requires `playwright` plus a live
+browser session.
+
+If any step alerts something other than zero, follow
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) before continuing to the
+credentialed sections below.
+
 ## 0. Preconditions
 
 - Work from the package root.

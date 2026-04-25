@@ -9,7 +9,7 @@ import { ShortcutHelpOverlay, useKeyboardShortcuts } from "./KeyboardShortcuts";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
-import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
+import { instagramAuthorityModes, sunoDriverModes, sunoSubmitModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
 
 type StatusResponse = {
   dryRun: boolean;
@@ -169,6 +169,8 @@ type ConfigResponse = {
     suno: {
       dailyCreditLimit: number;
       monthlyCreditLimit: number;
+      driver: "mock" | "playwright";
+      submitMode: "skip" | "live";
     };
   };
   autopilot: {
@@ -971,6 +973,20 @@ export function App() {
               <div className="muted">0 means unlimited.</div>
             </label>
             <label>
+              <div className="eyebrow">Suno Driver</div>
+              <select value={configDraft.sunoDriver} onChange={(event) => updateConfigDraft({ sunoDriver: event.target.value as ConfigDraft["sunoDriver"] })}>
+                {sunoDriverModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+              </select>
+              <div className="muted">mock = no browser, playwright = real Suno (operator login required).</div>
+            </label>
+            <label>
+              <div className="eyebrow">Suno Submit Mode</div>
+              <select value={configDraft.sunoSubmitMode} onChange={(event) => updateConfigDraft({ sunoSubmitMode: event.target.value as ConfigDraft["sunoSubmitMode"] })}>
+                {sunoSubmitModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+              </select>
+              {configDraft.sunoSubmitMode === "live" ? <div className="warning-banner">Live submit consumes real Suno credits. Confirm Suno login is fresh and the daily/monthly budget is set.</div> : <div className="muted">skip = no Create click, live = real submit + polling.</div>}
+            </label>
+            <label>
               <div className="eyebrow">Songs Per Week</div>
               <input type="number" min={0} max={21} value={configDraft.songsPerWeek} onChange={(event) => updateConfigDraft({ songsPerWeek: event.target.value })} />
             </label>
@@ -993,11 +1009,12 @@ export function App() {
                 {xAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
               </select>
             </label>
-            <label className={`platform-config${globalArmHeld ? " is-held" : ""}`}>
+            <label className="platform-config is-frozen" title="凍結中 (#4 boundary)">
               <div className="toggle"><input type="checkbox" checked={configDraft.instagramEnabled} onChange={(event) => updateConfigDraft({ instagramEnabled: event.target.checked })} />Instagram enabled</div>
-              <div className="toggle toggle-arm-row">
-                <input type="checkbox" checked={configDraft.instagramLiveGoArmed} onChange={(event) => updateConfigDraft({ instagramLiveGoArmed: event.target.checked })} />
+              <div className="toggle toggle-arm-row" title="凍結中 (#4 boundary)">
+                <input type="checkbox" checked={configDraft.instagramLiveGoArmed} disabled readOnly />
                 Instagram live-go arm
+                <span className="badge badge-frozen">frozen</span>
                 {globalArmHeld ? <span className="badge badge-held">held by global</span> : null}
                 {status?.platforms.instagram?.effectiveDryRun ? <span className="badge badge-dry-run">effective dry-run</span> : null}
               </div>
@@ -1005,6 +1022,7 @@ export function App() {
               <select value={configDraft.instagramAuthority} onChange={(event) => updateConfigDraft({ instagramAuthority: event.target.value as ConfigDraft["instagramAuthority"] })}>
                 {instagramAuthorityModes.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
               </select>
+              <div className="muted platform-note">Instagram stays frozen until operator review (#4 boundary). The arm toggle is visible for status only.</div>
             </label>
             <label className="platform-config is-frozen" title="アカウント未作成 / 凍結中">
               <div className="toggle"><input type="checkbox" checked={configDraft.tiktokEnabled} onChange={(event) => updateConfigDraft({ tiktokEnabled: event.target.checked })} />TikTok enabled</div>
@@ -1056,18 +1074,21 @@ export function App() {
         {status ? Object.entries(status.platforms).map(([platform, value]) => {
           const platformKey = platform as "x" | "instagram" | "tiktok";
           const isTikTok = platformKey === "tiktok";
+          const isInstagram = platformKey === "instagram";
+          const isFrozen = isTikTok || isInstagram;
           const probeResult = platformTests[platform]?.status ?? value;
           const probeBadge = platformProbeBadge(platformKey, probeResult);
           const testedAt = platformTests[platform]?.status.lastTestedAt ?? value.lastTestedAt;
           const testedAtLabel = testedAt ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(Math.round((testedAt - Date.now()) / 60000), "minute") : undefined;
+          const frozenLabel = isTikTok ? "凍結中 / アカウント未作成" : "凍結中 / Instagram lane (#4)";
           return (
-            <div className={`item${isTikTok ? " platform-frozen-card" : ""}`} key={platform}>
+            <div className={`item${isFrozen ? " platform-frozen-card" : ""}`} key={platform}>
               <div className="inline-actions">
                 <strong>{platform}</strong>
                 <div className="inline-actions">
                   <span className={`badge ${probeBadge.className}`}>{probeBadge.label}</span>
-                  {isTikTok ? (
-                    <button disabled title="アカウント未作成 / 凍結中">凍結中 / アカウント未作成</button>
+                  {isFrozen ? (
+                    <button disabled title={isTikTok ? "アカウント未作成 / 凍結中" : "Instagram is frozen by #4 boundary"}>{frozenLabel}</button>
                   ) : (
                     <button disabled={busy !== null} onClick={() => void testPlatform(platformKey)}>Probe 再走</button>
                   )}
@@ -1079,13 +1100,69 @@ export function App() {
               <div className="muted">{value.connected ? "connected" : "offline"} · {value.authority}</div>
               <div className="muted">arm {platformLiveGoArmed(configDraft, platformKey) ? "armed" : "off"} · {value.effectiveDryRun ? "effective dry-run" : "live lane open"}</div>
               <div className="muted">posts {value.postsToday ?? 0} · replies {value.repliesToday ?? 0}</div>
-              <div className="muted">{isTikTok ? "auth unconfigured · account pending" : `auth ${value.authStatus ?? "unconfigured"}`}</div>
+              <div className="muted">{isFrozen ? `auth unconfigured · ${isTikTok ? "account pending" : "Instagram lane frozen"}` : `auth ${value.authStatus ?? "unconfigured"}`}</div>
               <div className="muted">
                 {testedAtLabel ? `tested ${testedAtLabel} · ${formatProbeReason(probeResult.reason)}` : `probe ${formatProbeReason(probeResult.reason)}`}
               </div>
             </div>
           );
         }) : <div className="item muted">Loading platforms.</div>}
+      </div>
+    </article>
+  );
+
+  const tickerOutcome = status?.ticker.lastOutcome ?? "";
+  const tickerSkipKind: "concurrent" | "disabled" | null
+    = tickerOutcome === "skipped:concurrent"
+      ? "concurrent"
+      : tickerOutcome === "skipped:disabled"
+        ? "disabled"
+        : null;
+  const tickerBannerMessage = tickerSkipKind === "concurrent"
+    ? "前回 cycle が走行中のためスキップされました。完了を待って再度トリガーしてください。"
+    : tickerSkipKind === "disabled"
+      ? "Autopilot が無効化されています。Settings で Autopilot enabled を ON にしてください。"
+      : null;
+  const lastSocial = status?.lastSocialAction;
+  const lastTickAtLabel = status?.ticker.lastTickAt
+    ? new Intl.RelativeTimeFormat(undefined, { numeric: "auto" }).format(
+        Math.round((new Date(status.ticker.lastTickAt).getTime() - Date.now()) / 60000),
+        "minute"
+      )
+    : null;
+
+  const lastCyclePanel = (
+    <article className="panel">
+      <div className="section-title">Last Cycle Summary</div>
+      {tickerBannerMessage ? (
+        <div className={`warning-banner ticker-skip-banner ticker-skip-${tickerSkipKind}`}>{tickerBannerMessage}</div>
+      ) : null}
+      <div className="list">
+        <div className="item">
+          <div className="eyebrow">Autopilot Stage</div>
+          <strong>{status?.autopilot.stage ?? "-"}</strong>
+          <div className="muted">{status?.autopilot.blockedReason ?? status?.autopilot.nextAction ?? "no run"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Ticker Outcome</div>
+          <strong>{tickerOutcome || "never"}</strong>
+          <div className="muted">{lastTickAtLabel ? `last tick ${lastTickAtLabel}` : "no tick yet"} · interval {status ? `${status.ticker.intervalMs}ms` : "-"}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Current Song / Suno</div>
+          <strong>{status?.autopilot.currentSongId ?? "-"}</strong>
+          <div className="muted">suno {status?.sunoWorker.state ?? "-"}{status?.sunoWorker.pendingAction ? ` · ${status.sunoWorker.pendingAction}` : ""}</div>
+          <div className="muted">artifacts {status?.suno.artifacts.length ?? 0}</div>
+        </div>
+        <div className="item">
+          <div className="eyebrow">Last Social Action</div>
+          <strong>{lastSocial ? `${lastSocial.platform} ${lastSocial.action}` : "none"}</strong>
+          <div className="muted">{lastSocial ? `${lastSocial.accepted ? "accepted" : "blocked"} · ${lastSocial.reason ?? "no reason"}` : "no publish or reply yet"}</div>
+        </div>
+      </div>
+      <div className="inline-actions">
+        <button className="primary" disabled={busy !== null} onClick={() => void runAction("run-cycle")}>Run Cycle</button>
+        <button disabled={busy !== null} onClick={() => void refresh(selectedSongId, true)}>Refresh</button>
       </div>
     </article>
   );
@@ -1330,7 +1407,7 @@ export function App() {
         ))}
       </nav>
 
-      {activeView === "dashboard" ? <section className="two-column">{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
+      {activeView === "dashboard" ? <section className="two-column">{lastCyclePanel}{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
       {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}

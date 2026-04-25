@@ -3,7 +3,14 @@
 ## [Unreleased]
 
 ### Added
+- Plan v7 (operator-ready in one shot): pinned a "Last Cycle Summary" card on the Producer Console Dashboard surfacing autopilot stage, ticker outcome, current song, last social action, and Suno artifact count from the existing `/api/status` payload. Skipped ticker outcomes (`skipped:concurrent` / `skipped:disabled`) now render an inline color-coded banner instead of being silently equivalent to a successful run.
+- Plan v7 (operator-ready in one shot): exposed `music.suno.driver` (mock / playwright) and `music.suno.submitMode` (skip / live) selects in the Producer Console Config Editor. Switching `submitMode` to `live` shows an inline warning that real Suno credits will be consumed.
 - Round 86 (Mega-X-Plus skeleton): added `xLiveGateState.evaluateGate()` returning `idle` for every input, `extractMediaMetadata()` that reads only `stat()` size and extension-based mime, and `mentionedHandles` / `tweetId` enrichment in dry-run reply audit ledger entries. Real publish, real upload, and real fetch paths remain blocked.
+
+### Changed
+- Plan v7: autopilot publishing stage now advances to `published` based on `result.dryRun` and `policyDecision === "deny_dry_run"` instead of fragile string matching on the social authority reason. The new helper `isPublishBlockedByDryRun` is unit-tested.
+- Plan v7: Instagram lane is now visually frozen in both the Config Editor and the Platforms list, matching TikTok's existing freeze. The arm toggle is read-only with a `frozen` badge and the upstream `liveGoArmed` is clamped to `false` even if a draft tries to flip it on (mirrors the `feedback_social_real_post_ban.md` and #4 boundary).
+- Plan v7: documented a 5-Minute First Cycle in `docs/OPERATOR_QUICKSTART.md` so a fresh operator can verify the Producer Console end-to-end without provisioning real Suno or X credentials.
 - Added `docs/X_LIVE_PUBLISH_DESIGN.md` documenting the staged X live publish state machine and the operator GO requirements that remain deferred.
 - Marketplace listing docs now summarize connector credential requirements and include a first-pass credential refresh troubleshooting section for X/Bird, Instagram, and TikTok.
 - Added `docs/CONNECTOR_AUTH.md` as the dedicated connector setup / refresh guide and linked operator-facing docs back to it.

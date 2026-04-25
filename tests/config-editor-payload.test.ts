@@ -7,7 +7,9 @@ describe("config editor payload builder", () => {
       music: {
         suno: {
           dailyCreditLimit: 60,
-          monthlyCreditLimit: 0
+          monthlyCreditLimit: 0,
+          driver: "mock",
+          submitMode: "skip"
         }
       },
       autopilot: {
@@ -27,6 +29,8 @@ describe("config editor payload builder", () => {
     })).toEqual({
       dailyCreditLimit: "60",
       monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "5",
@@ -48,6 +52,8 @@ describe("config editor payload builder", () => {
     expect(buildConfigUpdatePatch({
       dailyCreditLimit: "120",
       monthlyCreditLimit: "240",
+      sunoDriver: "playwright",
+      sunoSubmitMode: "live",
       autopilotEnabled: true,
       dryRun: false,
       songsPerWeek: "7",
@@ -66,7 +72,9 @@ describe("config editor payload builder", () => {
       music: {
         suno: {
           dailyCreditLimit: 120,
-          monthlyCreditLimit: 240
+          monthlyCreditLimit: 240,
+          driver: "playwright",
+          submitMode: "live"
         }
       },
       autopilot: {
@@ -79,7 +87,7 @@ describe("config editor payload builder", () => {
         liveGoArmed: true,
         platforms: {
           x: { enabled: true, liveGoArmed: true, authority: "auto_publish_and_low_risk_replies" },
-          instagram: { enabled: true, liveGoArmed: true, authority: "auto_publish_visuals" },
+          instagram: { enabled: true, liveGoArmed: false, authority: "auto_publish_visuals" },
           tiktok: { enabled: false, liveGoArmed: false, authority: "draft_only" }
         }
       }
@@ -90,6 +98,8 @@ describe("config editor payload builder", () => {
     expect(buildConfigUpdatePatch({
       dailyCreditLimit: "120",
       monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: false,
       songsPerWeek: "7",
@@ -107,10 +117,81 @@ describe("config editor payload builder", () => {
     }).distribution.platforms.tiktok.liveGoArmed).toBe(false);
   });
 
+  it("keeps the Instagram live-go arm frozen even when the draft flips it on", () => {
+    expect(buildConfigUpdatePatch({
+      dailyCreditLimit: "120",
+      monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
+      autopilotEnabled: true,
+      dryRun: false,
+      songsPerWeek: "7",
+      cycleIntervalMinutes: "60",
+      distributionLiveGoArmed: true,
+      xEnabled: true,
+      xLiveGoArmed: true,
+      xAuthority: "auto_publish",
+      instagramEnabled: true,
+      instagramLiveGoArmed: true,
+      instagramAuthority: "auto_publish_visuals",
+      tiktokEnabled: false,
+      tiktokLiveGoArmed: false,
+      tiktokAuthority: "draft_only"
+    }).distribution.platforms.instagram.liveGoArmed).toBe(false);
+  });
+
+  it("rejects unsupported Suno driver values", () => {
+    expect(validateConfigDraft({
+      dailyCreditLimit: "60",
+      monthlyCreditLimit: "0",
+      sunoDriver: "selenium" as never,
+      sunoSubmitMode: "skip",
+      autopilotEnabled: true,
+      dryRun: true,
+      songsPerWeek: "5",
+      cycleIntervalMinutes: "180",
+      distributionLiveGoArmed: false,
+      xEnabled: true,
+      xLiveGoArmed: false,
+      xAuthority: "draft_only",
+      instagramEnabled: false,
+      instagramLiveGoArmed: false,
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokLiveGoArmed: false,
+      tiktokAuthority: "draft_only"
+    })).toBe("sunoDriver must be one of the supported Suno driver modes");
+  });
+
+  it("rejects unsupported Suno submit mode values", () => {
+    expect(validateConfigDraft({
+      dailyCreditLimit: "60",
+      monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "burn" as never,
+      autopilotEnabled: true,
+      dryRun: true,
+      songsPerWeek: "5",
+      cycleIntervalMinutes: "180",
+      distributionLiveGoArmed: false,
+      xEnabled: true,
+      xLiveGoArmed: false,
+      xAuthority: "draft_only",
+      instagramEnabled: false,
+      instagramLiveGoArmed: false,
+      instagramAuthority: "draft_only",
+      tiktokEnabled: false,
+      tiktokLiveGoArmed: false,
+      tiktokAuthority: "draft_only"
+    })).toBe("sunoSubmitMode must be one of the supported Suno submit modes");
+  });
+
   it("rejects out-of-range numeric values", () => {
     expect(validateConfigDraft({
       dailyCreditLimit: "0",
       monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "24",
@@ -132,6 +213,8 @@ describe("config editor payload builder", () => {
     expect(validateConfigDraft({
       dailyCreditLimit: "sixty",
       monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "2.5",
@@ -153,6 +236,8 @@ describe("config editor payload builder", () => {
     expect(validateConfigDraft({
       dailyCreditLimit: "60",
       monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "5",
@@ -174,6 +259,8 @@ describe("config editor payload builder", () => {
     expect(validateConfigDraft({
       dailyCreditLimit: "1001",
       monthlyCreditLimit: "0",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "5",
@@ -195,6 +282,8 @@ describe("config editor payload builder", () => {
     expect(validateConfigDraft({
       dailyCreditLimit: "60",
       monthlyCreditLimit: "50001",
+      sunoDriver: "mock",
+      sunoSubmitMode: "skip",
       autopilotEnabled: true,
       dryRun: true,
       songsPerWeek: "5",
