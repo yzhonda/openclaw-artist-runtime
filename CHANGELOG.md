@@ -46,6 +46,7 @@
 - Added Round 76 X/Bird Firefox profile wiring so `OPENCLAW_X_FIREFOX_PROFILE` can direct runtime probes and dry-run Bird calls at a dedicated artist Firefox profile.
 - Added Round 77 X/Bird lane polish with opt-in `t.co` dry-run expansion, normalized reply-target ledger metadata, probe reason badges, and an X probe diagnostics guide.
 - Added Round 78 Suno runtime visibility with artifact indexing, budget reset-history surfacing, profile stale banners, and per-URL import failure details.
+- Added Round 79 infra hardening with bash-3 compatibility grep rules, route fallback telemetry, Producer Console stale/offline banners, and reason-code doc cross-links.
 
 ### Fixed
 - Bumped Bird probe timeout from 750ms to 3000ms so Firefox-profile-backed `bird whoami --plain` calls finish within the probe budget.

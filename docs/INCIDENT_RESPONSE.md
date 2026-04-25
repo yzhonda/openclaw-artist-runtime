@@ -4,6 +4,8 @@ This runbook is for operator recovery when Artist Runtime stops behaving like a
 normal dry-run or live-lane workflow. Keep incidents small: identify the surface,
 freeze side effects, collect status, and only then repair.
 
+See also: `docs/ERRORS.md` for reason-code anchors and operator recovery links.
+
 ## Triage matrix
 
 | Symptom | First surface | Immediate action | Primary doc |
@@ -75,4 +77,3 @@ Forbidden in incident notes:
 - raw request or response bodies from platform providers
 - screenshots that show signed-in account pages or profile internals
 - contents of `.local/`, `.env`, or `.openclaw-browser-profiles/suno/`
-

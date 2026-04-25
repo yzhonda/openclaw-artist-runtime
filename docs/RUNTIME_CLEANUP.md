@@ -5,6 +5,9 @@ it does not assume the operator wants automatic deletion. Cleanup scripts are
 manual tools: they show what would be removed first, and only delete after an
 explicit operator action.
 
+See also: `docs/ERRORS.md` for reason-code anchors related to disk pressure,
+artifact import failures, and cleanup-facing incidents.
+
 ## Policy table
 
 | Runtime area | Default retention | Script handling | Notes |

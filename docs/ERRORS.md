@@ -90,6 +90,14 @@ See the Suno and budget table entry for `playwright_create_rate_limited`.
 ### gateway_token_mismatch
 See the gateway and auth boundary table entry for `gateway_token_mismatch`.
 
+## Operator runbook quick links
+
+| Scenario | Primary reason codes | Runbook |
+| --- | --- | --- |
+| Credential exposure concern | `gateway_token_mismatch`, `bird_auth_expired`, credential-like boundary-grep hits | `PRIVACY.md` data-boundary sections and `docs/INCIDENT_RESPONSE.md` safe incident notes |
+| Disk space exhausted or runtime growth | `playwright_create_network_error`, failed artifact imports, cleanup warnings | `docs/RUNTIME_CLEANUP.md` retention policy and manual cleanup scripts |
+| Frozen-platform attempt | `account_not_created`, `tiktok_account_not_created`, `instagram_auth_not_configured` after operator freeze | Keep the lane frozen; use `docs/INCIDENT_RESPONSE.md` publish-stuck flow only for active platforms |
+
 ## Social distribution
 
 | Code | Source | Meaning | Operator recovery |

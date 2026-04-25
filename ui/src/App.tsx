@@ -339,9 +339,24 @@ const consoleViews: Array<{ id: ConsoleView; label: string }> = [
 ];
 
 const apiBase = "/plugins/artist-runtime/api";
+const fetchTimeoutMs = 10_000;
+const staleRefreshMs = 15_000;
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), fetchTimeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
 
 async function apiGet<T>(path: string): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`);
+  const response = await fetchWithTimeout(`${apiBase}${path}`);
   if (!response.ok) {
     throw new Error(`${path} -> ${response.status}`);
   }
@@ -349,7 +364,7 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 async function apiPost<T>(path: string, body: unknown = {}): Promise<T> {
-  const response = await fetch(`${apiBase}${path}`, {
+  const response = await fetchWithTimeout(`${apiBase}${path}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body)
@@ -492,6 +507,9 @@ export function App() {
   const [replyTargetId, setReplyTargetId] = useState("");
   const [replyText, setReplyText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
+  const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [busy, setBusy] = useState<string | null>(null);
 
   const refresh = async (preferredSongId?: string | null, forceConfigDraftSync = false) => {
@@ -533,15 +551,24 @@ export function App() {
         if (forceConfigDraftSync || !configDirty) {
           setConfigDraft(buildConfigDraft(nextConfig));
         }
+        setLastRefreshAt(Date.now());
+        setNetworkError(null);
       });
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setNetworkError(message);
+      setError(message);
     }
   };
 
   useEffect(() => {
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const intervalId = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -627,6 +654,7 @@ export function App() {
 
   const configValidationError = configDraft ? validateConfigDraft(configDraft) : null;
   const globalArmHeld = Boolean(configDraft && !configDraft.distributionLiveGoArmed);
+  const refreshIsStale = lastRefreshAt !== null && nowMs - lastRefreshAt > staleRefreshMs;
 
   const testPlatform = async (platform: "x" | "instagram" | "tiktok") => {
     if (platform === "tiktok") {
@@ -1177,6 +1205,20 @@ export function App() {
         </div>
       </header>
 
+      {refreshIsStale ? (
+        <section className="panel stale-banner">
+          <strong>Console data may be stale.</strong>
+          <div className="muted">
+            Last successful refresh {lastRefreshAt ? `${Math.floor((nowMs - lastRefreshAt) / 1000)}s ago` : "has not completed yet"}.
+          </div>
+        </section>
+      ) : null}
+      {networkError ? (
+        <section className="panel offline-banner">
+          <strong>Console refresh failed.</strong>
+          <div className="muted">Fetches time out after {fetchTimeoutMs / 1000}s. Last error: {networkError}</div>
+        </section>
+      ) : null}
       {error ? <section className="panel error-banner">{error}</section> : null}
       {status?.summary?.allPlatformsEffectivelyDryRun ? (
         <section className="panel dry-run-banner">

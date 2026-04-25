@@ -402,6 +402,19 @@ textarea {
   background: rgba(244, 227, 196, 0.78);
 }
 
+.stale-banner {
+  margin-bottom: 16px;
+  border-color: rgba(153, 100, 0, 0.32);
+  background: rgba(244, 227, 196, 0.82);
+}
+
+.offline-banner {
+  margin-bottom: 16px;
+  border-color: rgba(143, 32, 22, 0.32);
+  background: rgba(255, 226, 219, 0.86);
+  color: var(--critical);
+}
+
 .toggle {
   display: flex;
   align-items: center;

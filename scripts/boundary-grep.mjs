@@ -15,15 +15,22 @@ export const forbiddenPatterns = [
   { id: "oauth-token-literal", pattern: /\boauth_token_[A-Za-z0-9_-]+/i },
   { id: "bearer-header-literal", pattern: /\bauthorization\s*:\s*bearer\s+["'`]?[A-Za-z0-9._-]{12,}/i },
   { id: "cookie-header-literal", pattern: /\bcookie\s*:\s*["'`][^"'`]{8,}/i },
-  { id: "sensitive-console-dump", pattern: /\bconsole\.(?:log|warn|error)\([^)]*(?:token|secret|password|cookie|authorization)/i },
+  { id: "sensitive-console-dump", pattern: /\bconsole\.(?:log|warn|error)\([^)]*(?:token|secret|password|cookie|authorization)(?:\s*[:=]|["'`]\s*,)/i },
   { id: "hardcoded-env-fallback", pattern: /process\.env\.[A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|COOKIE)\s*\|\|\s*["'`][^"'`\s]+/ },
   { id: "absolute-env-path", pattern: /\/Users\/[^"'`\s]+\/[^"'`\s]*\.env(?:\.[^"'`\s]+)?/ },
   { id: "document-cookie-access", pattern: /\bdocument\.cookie\b/ },
-  { id: "profile-cookie-copy", pattern: /openclaw-browser-profiles\/suno\/.*(?:cookie|session|token)/i }
+  { id: "profile-cookie-copy", pattern: /openclaw-browser-profiles\/suno\/.*(?:cookie|session|token)/i },
+  { id: "bash-mapfile", pattern: /^\s*mapfile\b/ },
+  { id: "bash-readarray", pattern: /^\s*readarray\b/ },
+  { id: "bash-uppercase-expansion", pattern: /\$\{[A-Za-z_][A-Za-z0-9_]*\^\^\}/ },
+  { id: "bash-lowercase-expansion", pattern: /\$\{[A-Za-z_][A-Za-z0-9_]*,,\}/ },
+  { id: "bash-associative-array", pattern: /^\s*declare\s+-A\b/ },
+  { id: "bash-coproc", pattern: /^\s*coproc\b/ }
 ];
 
-const defaultRoots = ["src", "tests"];
+const defaultRoots = ["src", "tests", "scripts", ".github/workflows"];
 const textExtensions = new Set([
+  "",
   ".cjs",
   ".cts",
   ".js",
@@ -31,9 +38,14 @@ const textExtensions = new Set([
   ".jsx",
   ".mjs",
   ".mts",
+  ".sh",
   ".ts",
-  ".tsx"
+  ".tsx",
+  ".yml",
+  ".yaml"
 ]);
+
+const ignoredRelativePaths = new Set(["scripts/boundary-grep.mjs"]);
 
 function extensionOf(path) {
   const index = path.lastIndexOf(".");
@@ -59,7 +71,11 @@ async function collectFiles(root) {
     if (child.name === "node_modules" || child.name === "dist" || child.name === "coverage" || child.name === ".git") {
       continue;
     }
-    files.push(...await collectFiles(join(root, child.name)));
+    const path = join(root, child.name);
+    if (ignoredRelativePaths.has(relative(process.cwd(), path))) {
+      continue;
+    }
+    files.push(...await collectFiles(path));
   }
   return files;
 }
@@ -69,6 +85,9 @@ export async function scanBoundaryPatterns({ cwd = process.cwd(), roots = defaul
   const files = (await Promise.all(roots.map((root) => collectFiles(join(cwd, root))))).flat();
 
   for (const file of files) {
+    if (ignoredRelativePaths.has(relative(cwd, file))) {
+      continue;
+    }
     const contents = await readFile(file, "utf8");
     const lines = contents.split(/\r?\n/);
     for (const [index, line] of lines.entries()) {
