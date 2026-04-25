@@ -44,13 +44,20 @@ export function resolveDefaultWorkspaceRoot(): string {
   return envWorkspace || defaultArtistRuntimeConfig.artist.workspaceRoot;
 }
 
+function isRelativeWorkspaceRoot(value: string): boolean {
+  return value === "." || value === "./" || value === "" || value.startsWith("./") || value.startsWith("../");
+}
+
 export async function resolveRuntimeConfig(
   payloadConfig?: Partial<ArtistRuntimeConfig>,
   fallbackWorkspaceRoot: string = resolveDefaultWorkspaceRoot()
 ): Promise<ArtistRuntimeConfig> {
   const workspaceRoot = payloadConfig?.artist?.workspaceRoot ?? fallbackWorkspaceRoot;
   const persisted = await readResolvedConfig(workspaceRoot);
-  return payloadConfig ? mergeResolvedConfig(persisted, payloadConfig) : persisted;
+  const normalizedPersisted = isRelativeWorkspaceRoot(persisted.artist.workspaceRoot)
+    ? { ...persisted, artist: { ...persisted.artist, workspaceRoot } }
+    : persisted;
+  return payloadConfig ? mergeResolvedConfig(normalizedPersisted, payloadConfig) : normalizedPersisted;
 }
 
 export function mergeResolvedConfig(current: ArtistRuntimeConfig, patch: Partial<ArtistRuntimeConfig>): ArtistRuntimeConfig {
