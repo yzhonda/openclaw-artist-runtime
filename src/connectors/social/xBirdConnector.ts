@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import type { ConnectionStatus, SocialCapability, SocialPublishRequest, SocialPublishResult } from "../../types.js";
 import type { SocialConnector } from "./SocialConnector.js";
 import { resolveReplyTarget, type ReplyTargetFetch } from "./resolveReplyTarget.js";
+import { extractMentionedHandles, extractTweetIdFromUrl } from "./xMediaMetadata.js";
 
 const xCapabilities: SocialCapability = {
   textPost: true,
@@ -331,6 +332,8 @@ export class XBirdConnector implements SocialConnector {
   async reply(input: SocialPublishRequest): Promise<SocialPublishResult> {
     if (input.dryRun) {
       const resolvedTarget = await resolveReplyTarget(input, { fetchImpl: this.replyTargetFetchImpl });
+      const mentionedHandles = extractMentionedHandles(input.text ?? "");
+      const tweetIdHint = extractTweetIdFromUrl(input.targetUrl);
       if (!resolvedTarget.ok) {
         return {
           accepted: false,
@@ -342,7 +345,9 @@ export class XBirdConnector implements SocialConnector {
             resolvedFrom: resolvedTarget.resolvedFrom,
             resolutionReason: resolvedTarget.reason,
             dryRun: true,
-            timestamp: new Date(this.now()).toISOString()
+            timestamp: new Date(this.now()).toISOString(),
+            mentionedHandles,
+            tweetId: tweetIdHint
           }
         };
       }
@@ -356,7 +361,9 @@ export class XBirdConnector implements SocialConnector {
           targetId: resolvedTarget.targetId,
           resolvedFrom: resolvedTarget.resolvedFrom,
           dryRun: true,
-          timestamp: new Date(this.now()).toISOString()
+          timestamp: new Date(this.now()).toISOString(),
+          mentionedHandles,
+          tweetId: resolvedTarget.targetId
         }
       };
     }

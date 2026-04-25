@@ -325,6 +325,8 @@ export interface ReplyTargetAudit {
   resolutionReason?: string;
   dryRun: boolean;
   timestamp: string;
+  mentionedHandles?: string[];
+  tweetId?: string;
 }
 
 export interface DistributionEvent extends SocialPublishLedgerEntry {
