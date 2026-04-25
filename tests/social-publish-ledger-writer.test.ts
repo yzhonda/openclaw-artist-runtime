@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  appendSocialReplyLedgerEntry,
   appendSocialPublishLedgerEntry,
   getSocialLedgerArchivePath,
   getSocialLedgerPath,
@@ -89,5 +90,38 @@ describe("social publish ledger writer", () => {
     ]);
 
     expect(readJsonl(getSocialLedgerPath(root, "song-001")).map((record) => record.reason)).toEqual(["one", "two", "three"]);
+  });
+
+  it("accepts normalized reply entries through the reply append helper", async () => {
+    const root = makeRoot();
+    const replyEntry: SocialPublishLedgerEntry = {
+      ...entry("2026-04-24T00:00:00.000Z", "dry-run blocks social publish"),
+      postType: "reply",
+      action: "reply",
+      replyTarget: {
+        type: "reply",
+        targetId: "1234567890",
+        resolvedFrom: "https://x.com/ghost/status/1234567890",
+        dryRun: true,
+        timestamp: "2026-04-24T00:00:00.000Z"
+      }
+    };
+
+    await appendSocialReplyLedgerEntry(root, "song-001", replyEntry);
+
+    expect(readJsonl(getSocialLedgerPath(root, "song-001"))[0]).toMatchObject({
+      action: "reply",
+      replyTarget: {
+        type: "reply",
+        targetId: "1234567890",
+        dryRun: true
+      }
+    });
+  });
+
+  it("rejects non-reply entries through the reply append helper", async () => {
+    await expect(
+      appendSocialReplyLedgerEntry(makeRoot(), "song-001", entry("2026-04-24T00:00:00.000Z"))
+    ).rejects.toThrow("reply ledger entries must include action=reply and replyTarget.type=reply");
   });
 });

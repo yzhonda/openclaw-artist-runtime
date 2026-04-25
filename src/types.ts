@@ -310,6 +310,7 @@ export interface ReplyTargetAudit {
   type: "reply";
   targetId?: string;
   resolvedFrom?: string;
+  resolutionReason?: string;
   dryRun: boolean;
   timestamp: string;
 }

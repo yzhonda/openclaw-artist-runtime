@@ -110,6 +110,10 @@ half-written line.
   and load `scripts/openclaw-local-env.sh`; the script exports
   `OPENCLAW_X_FIREFOX_PROFILE`, which makes runtime Bird calls add
   `--firefox-profile <name>`.
+- `t.co` reply-target expansion is disabled by default. Set
+  `OPENCLAW_X_TCO_FETCH_ENABLED=1` only when the operator explicitly wants
+  dry-run reply validation to perform a real short-link GET before resolving the
+  target status id.
 
 ### Refresh
 
@@ -127,14 +131,28 @@ half-written line.
    `bird_probe_failed`, inspect the local Bird install/session outside the plugin
    before retrying distribution.
 
+### Probe diagnostics
+
+| Probe reason | Likely cause | Operator recovery |
+| --- | --- | --- |
+| `connected` | Bird returned the selected `@handle`. | Confirm it is the artist account before arming any later social lane. |
+| `bird_cli_not_installed` | `bird` is not on the gateway `PATH`. | Install/repair Bird, then restart the local gateway from an environment that can resolve `bird`. |
+| `bird_auth_expired` | Bird reached X but the selected local profile no longer has a valid session. | Re-authenticate the dedicated Firefox profile, then re-run `bird --firefox-profile <name> whoami --plain`. |
+| `bird_probe_failed` | Bird ran but did not return a usable account. | Check `OPENCLAW_X_FIREFOX_PROFILE`, run `bird --firefox-profile <name> whoami --plain`, and inspect local Bird output before retrying the route. |
+
+Profile-backed Bird probes can be slower than the default personal profile
+because Firefox cookie storage may require a cold SQLite read. Round 76 raised
+the runtime probe timeout to match the publish timeout (`3000ms`) after a
+dedicated artist profile took slightly over `750ms` to answer `whoami`.
+
 ### Dry-run behavior
 
 - Dry-run publish/reply paths stay fail-closed and do not perform real external
   side effects.
 - Reply targets accept a bare status id or an `x.com` / `twitter.com`
-  `/status/<id>` URL. `t.co` expansion is supported only through an injected
-  test/rehearsal fetch implementation; the runtime does not perform real
-  short-link expansion by default.
+  `/status/<id>` URL. `t.co` expansion is supported through injected tests or
+  `OPENCLAW_X_TCO_FETCH_ENABLED=1`; otherwise the runtime records
+  `reply_target_tco_requires_fetch` and stays fail-closed.
 - Dry-run X replies write a reply-target audit object into
   `social-publish.jsonl`: `{ type: "reply", targetId, resolvedFrom, dryRun,
   timestamp }`. This is metadata only; it is not proof of a public reply.

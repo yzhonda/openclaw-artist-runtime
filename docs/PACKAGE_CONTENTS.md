@@ -249,10 +249,12 @@ fail before they reach CI artifacts.
 - `tests/resolve-reply-target.test.ts`
   This suite locks X reply-target parsing for bare ids, `x.com` /
   `twitter.com` status URLs, missing/invalid targets, and mocked-only `t.co`
-  expansion.
+  expansion. It also covers the opt-in `OPENCLAW_X_TCO_FETCH_ENABLED=1`
+  runtime fetch path and fail-closed non-OK expansion responses.
 - `tests/x-connector-reply-audit.test.ts`
   This suite locks the dry-run reply audit metadata written into
-  `social-publish.jsonl` while keeping live replies on
+  `social-publish.jsonl`, including `t.co` expansion evidence and
+  fail-closed `resolutionReason` values, while keeping live replies on
   `requires_explicit_live_go`.
 - `tests/instagram-connector.test.ts`
 - `tests/instagram-connector-dry-run-e2e.test.ts`
@@ -413,6 +415,9 @@ route (`/me/accounts -> /media -> /media_publish`), the required scopes, the
 global + per-platform `liveGoArmed` guards, and the fact that Round 42-45 still
 block live posting with an upstream dry-run hold plus
 `requires_explicit_live_go` at the connector edge.
+Its X section also documents dedicated Firefox profile routing, opt-in `t.co`
+dry-run expansion, and a probe diagnostics table for Bird CLI / auth / timeout
+failure modes.
 It also documents the social publish ledger rotation rule:
 `social-publish.jsonl` stays active, while entries older than 90 days move to
 `social-publish.archive.jsonl` during the next append.

@@ -56,6 +56,18 @@ export async function appendSocialPublishLedgerEntry(
   return entry;
 }
 
+export async function appendSocialReplyLedgerEntry(
+  root: string,
+  songId: string,
+  entry: SocialPublishLedgerEntry,
+  options: { now?: Date; rotationDays?: number } = {}
+): Promise<SocialPublishLedgerEntry> {
+  if (entry.action !== "reply" || entry.replyTarget?.type !== "reply") {
+    throw new Error("reply ledger entries must include action=reply and replyTarget.type=reply");
+  }
+  return appendSocialPublishLedgerEntry(root, songId, entry, options);
+}
+
 async function enqueueLedgerWrite(path: string, task: () => Promise<void>): Promise<void> {
   const previous = ledgerQueues.get(path) ?? Promise.resolve();
   const current = previous.catch(() => {}).then(task);
