@@ -47,6 +47,7 @@
 - Added Round 77 X/Bird lane polish with opt-in `t.co` dry-run expansion, normalized reply-target ledger metadata, probe reason badges, and an X probe diagnostics guide.
 - Added Round 78 Suno runtime visibility with artifact indexing, budget reset-history surfacing, profile stale banners, and per-URL import failure details.
 - Added Round 79 infra hardening with bash-3 compatibility grep rules, route fallback telemetry, Producer Console stale/offline banners, and reason-code doc cross-links.
+- Added Round 80 dependency-audit hardening with root overrides for vulnerable transitive packages, a production `npm audit --omit=dev` CI gate, and documented dev-only advisory handling.
 
 ### Changed
 - Extracted `buildImportedAssetRows` and `importedAssetsPlaceholder` into `src/services/sunoImportedAssetsView.ts` so the helpers are shared by `SunoOutcomeCard` and root vitest without dragging the React entrypoint into the test scope.

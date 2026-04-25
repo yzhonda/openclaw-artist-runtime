@@ -228,13 +228,17 @@ and manual `runtime/suno/budget.json` editing guidance.
 - `.github/workflows/ci.yml`
 - `vitest.config.ts`
 
-CI now runs separate typecheck, coverage test, build, and boundary-grep jobs.
+CI now runs separate typecheck, coverage test, build, dependency-audit, and
+boundary-grep jobs.
 The typecheck/test/build jobs run on Node 20 and 22, and the boundary-grep job
 logs the runner Bash version before scanning. `boundary-grep` scans `src/`,
 `tests/`, `scripts/`, and `.github/workflows/` for credential-like literals,
 sensitive console dumps, and bash-4-only syntax that would break macOS Bash 3,
 while `test:coverage` enforces a 70% line coverage floor through Vitest's v8
 coverage provider.
+The audit job runs `npm audit --audit-level=moderate --omit=dev` so production
+dependency advisories fail closed while documented dev-only framework advisories
+stay outside the distributed runtime gate.
 The boundary-grep rule set now includes additional Suno, OAuth, OpenClaw social
 token, bearer, cookie, profile-copy, and bash 4 syntax patterns so
 credential-shaped literals and incompatible shell helpers fail before they reach
@@ -371,6 +375,10 @@ CI artifacts.
 - `tests/error-runbook-map.test.ts`
   This suite keeps Producer Console reason-code links aligned with
   `docs/ERRORS.md` headings.
+- `tests/dependency-audit.test.ts`
+  This suite keeps the Round 80 audit policy visible: Vitest stays on the 2.x
+  framework line, root overrides pin vulnerable transitive packages, and CI
+  carries the production `npm audit --omit=dev` gate.
 - `tests/suno-playwright-probe.test.ts`
 - `tests/suno-worker-lifecycle.test.ts`
 - `tests/suno-worker-automation.test.ts`
