@@ -208,8 +208,15 @@ export function buildArtistMd({ frontmatter, sections }) {
   return lines.join("\n");
 }
 
+export function stripSoundCloudLines(text) {
+  return text
+    .split("\n")
+    .filter((line) => !/^\s*-\s*SoundCloud\s*:/i.test(line))
+    .join("\n");
+}
+
 export function buildSocialVoiceMd({ sections }) {
-  const spotify = joinSection(sections, "Spotify Profile");
+  const spotify = stripSoundCloudLines(joinSection(sections, "Spotify Profile"));
   const lines = [];
   lines.push("<!--");
   lines.push("SOCIAL_VOICE.md - Imported from Obsidian vault.");
