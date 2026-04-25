@@ -89,8 +89,9 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
     requestedAction: action,
     capabilityAvailable
   });
+  const collectDryRunReplyAudit = action === "reply" && input.platform === "x" && effectiveDryRun;
 
-  const result: SocialPublishResult = authorityDecision.allowed
+  let result: SocialPublishResult = authorityDecision.allowed || collectDryRunReplyAudit
     ? action === "reply"
       ? await (connector.reply?.({
           dryRun: effectiveDryRun,
@@ -99,7 +100,10 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
           text: input.text,
           mediaPaths: input.mediaPaths,
           targetId: input.targetId,
-          targetUrl: input.targetUrl
+          targetUrl: input.targetUrl,
+          globalLiveGoArmed: config.distribution.liveGoArmed,
+          platformLiveGoArmed: config.distribution.platforms[input.platform].liveGoArmed,
+          liveRehearsalArmed: input.platform === "instagram" ? config.distribution.platforms.instagram.liveRehearsalArmed : undefined
         }) ?? Promise.resolve({
           accepted: false,
           platform: input.platform,
@@ -112,7 +116,10 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
           authority: getPlatformAuthority(config, input.platform),
           postType: input.postType,
           text: input.text,
-          mediaPaths: input.mediaPaths
+          mediaPaths: input.mediaPaths,
+          globalLiveGoArmed: config.distribution.liveGoArmed,
+          platformLiveGoArmed: config.distribution.platforms[input.platform].liveGoArmed,
+          liveRehearsalArmed: input.platform === "instagram" ? config.distribution.platforms.instagram.liveRehearsalArmed : undefined
         })
     : {
         accepted: false,
@@ -121,6 +128,12 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
         reason: authorityDecision.reason,
         url: undefined
       };
+  if (collectDryRunReplyAudit) {
+    result = {
+      ...result,
+      reason: authorityDecision.reason
+    };
+  }
 
   const entry: SocialPublishLedgerEntry = {
     timestamp: new Date().toISOString(),
@@ -142,6 +155,16 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
     error: result.accepted ? undefined : { name: "SocialPublishResult", message: result.reason },
     reason: result.reason
   };
+  if (action === "reply" && input.platform === "x" && result.raw && typeof result.raw === "object") {
+    const raw = result.raw as Record<string, unknown>;
+    entry.replyTarget = {
+      type: "reply",
+      targetId: typeof raw.targetId === "string" ? raw.targetId : undefined,
+      resolvedFrom: typeof raw.resolvedFrom === "string" ? raw.resolvedFrom : undefined,
+      dryRun: raw.dryRun === true,
+      timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString()
+    };
+  }
 
   await appendAuditLog(
     getAuditPath(input.workspaceRoot, input.songId),

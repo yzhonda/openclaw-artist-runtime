@@ -4,6 +4,7 @@ import {
   dailySharingModes,
   instagramAuthorityModes,
   officialReleaseModes,
+  platformAuthStatuses,
   producerDigestModes,
   sunoAuthorityModes,
   sunoConnectionModes,
@@ -38,6 +39,19 @@ function validateKnownKeys(path: string, record: Record<string, unknown>, allowe
 function validateEnum(path: string, value: unknown, allowed: readonly string[], errors: string[]): void {
   if (typeof value !== "string" || !allowed.includes(value)) {
     errors.push(`${path} must be one of ${allowed.join(", ")}`);
+  }
+}
+
+function validateTimestamp(path: string, value: unknown, errors: string[]): void {
+  const max = Date.now() + 24 * 60 * 60 * 1000;
+  if (!Number.isInteger(value) || Number(value) < 0 || Number(value) > max) {
+    errors.push(`${path} must be an integer between 0 and now+1d`);
+  }
+}
+
+function validateNonNegativeInteger(path: string, value: unknown, errors: string[]): void {
+  if (!Number.isInteger(value) || Number(value) < 0) {
+    errors.push(`${path} must be a non-negative integer`);
   }
 }
 
@@ -334,12 +348,18 @@ function validateXPlatform(value: unknown, errors: string[]): void {
     errors.push("config.distribution.platforms.x must be an object");
     return;
   }
-  validateKnownKeys("config.distribution.platforms.x", value, ["enabled", "liveGoArmed", "connector", "authority", "maxPostsPerDay", "maxRepliesPerDay", "autoPostTypes"], errors);
+  validateKnownKeys("config.distribution.platforms.x", value, ["enabled", "liveGoArmed", "authStatus", "lastTestedAt", "connector", "authority", "maxPostsPerDay", "maxRepliesPerDay", "autoPostTypes"], errors);
   if ("enabled" in value && typeof value.enabled !== "boolean") {
     errors.push("config.distribution.platforms.x.enabled must be a boolean");
   }
   if ("liveGoArmed" in value && typeof value.liveGoArmed !== "boolean") {
     errors.push("config.distribution.platforms.x.liveGoArmed must be a boolean");
+  }
+  if ("authStatus" in value) {
+    validateEnum("config.distribution.platforms.x.authStatus", value.authStatus, platformAuthStatuses, errors);
+  }
+  if ("lastTestedAt" in value) {
+    validateTimestamp("config.distribution.platforms.x.lastTestedAt", value.lastTestedAt, errors);
   }
   if ("connector" in value && value.connector !== "bird") {
     errors.push("config.distribution.platforms.x.connector must be bird");
@@ -363,12 +383,24 @@ function validateInstagramPlatform(value: unknown, errors: string[]): void {
     errors.push("config.distribution.platforms.instagram must be an object");
     return;
   }
-  validateKnownKeys("config.distribution.platforms.instagram", value, ["enabled", "liveGoArmed", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
+  validateKnownKeys("config.distribution.platforms.instagram", value, ["enabled", "liveGoArmed", "authStatus", "lastTestedAt", "liveRehearsalArmed", "accessTokenExpiresAt", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
   if ("enabled" in value && typeof value.enabled !== "boolean") {
     errors.push("config.distribution.platforms.instagram.enabled must be a boolean");
   }
   if ("liveGoArmed" in value && typeof value.liveGoArmed !== "boolean") {
     errors.push("config.distribution.platforms.instagram.liveGoArmed must be a boolean");
+  }
+  if ("authStatus" in value) {
+    validateEnum("config.distribution.platforms.instagram.authStatus", value.authStatus, platformAuthStatuses, errors);
+  }
+  if ("lastTestedAt" in value) {
+    validateTimestamp("config.distribution.platforms.instagram.lastTestedAt", value.lastTestedAt, errors);
+  }
+  if ("liveRehearsalArmed" in value && typeof value.liveRehearsalArmed !== "boolean") {
+    errors.push("config.distribution.platforms.instagram.liveRehearsalArmed must be a boolean");
+  }
+  if ("accessTokenExpiresAt" in value) {
+    validateNonNegativeInteger("config.distribution.platforms.instagram.accessTokenExpiresAt", value.accessTokenExpiresAt, errors);
   }
   if ("connector" in value && value.connector !== "instagram_content_publishing") {
     errors.push("config.distribution.platforms.instagram.connector must be instagram_content_publishing");
@@ -389,12 +421,18 @@ function validateTikTokPlatform(value: unknown, errors: string[]): void {
     errors.push("config.distribution.platforms.tiktok must be an object");
     return;
   }
-  validateKnownKeys("config.distribution.platforms.tiktok", value, ["enabled", "liveGoArmed", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
+  validateKnownKeys("config.distribution.platforms.tiktok", value, ["enabled", "liveGoArmed", "authStatus", "lastTestedAt", "connector", "authority", "maxPostsPerDay", "autoPostTypes"], errors);
   if ("enabled" in value && typeof value.enabled !== "boolean") {
     errors.push("config.distribution.platforms.tiktok.enabled must be a boolean");
   }
   if ("liveGoArmed" in value && typeof value.liveGoArmed !== "boolean") {
     errors.push("config.distribution.platforms.tiktok.liveGoArmed must be a boolean");
+  }
+  if ("authStatus" in value) {
+    validateEnum("config.distribution.platforms.tiktok.authStatus", value.authStatus, platformAuthStatuses, errors);
+  }
+  if ("lastTestedAt" in value) {
+    validateTimestamp("config.distribution.platforms.tiktok.lastTestedAt", value.lastTestedAt, errors);
   }
   if ("connector" in value && value.connector !== "tiktok_content_posting") {
     errors.push("config.distribution.platforms.tiktok.connector must be tiktok_content_posting");

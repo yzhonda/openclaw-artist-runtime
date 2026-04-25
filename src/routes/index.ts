@@ -114,6 +114,13 @@ function exportWindowFromPayload(payload: Record<string, unknown>): Observabilit
   return exportWindowFromInput(new URLSearchParams(requestPath.slice(queryIndex + 1)).get("window"));
 }
 
+const INSTAGRAM_TOKEN_EXPIRY_WARN_MS = 30 * 24 * 60 * 60 * 1000;
+const INSTAGRAM_DEFAULT_TOKEN_EXPIRY_MS = 60 * 24 * 60 * 60 * 1000;
+
+function isInstagramTokenExpiringSoon(expiresAt: number | undefined, now = Date.now()): boolean {
+  return typeof expiresAt === "number" && expiresAt - now <= INSTAGRAM_TOKEN_EXPIRY_WARN_MS;
+}
+
 function filterEventsByExportWindow<T extends { timestamp: string }>(
   events: T[],
   window: ObservabilityExportWindow,
@@ -177,6 +184,8 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
     x: {
       connected: xConnection.connected,
       authority: config.distribution.platforms.x.authority,
+      authStatus: config.distribution.platforms.x.authStatus,
+      lastTestedAt: config.distribution.platforms.x.lastTestedAt,
       liveGoArmed: config.distribution.platforms.x.liveGoArmed,
       effectiveDryRun: resolvePlatformSocialDryRun(config, "x"),
       capabilitySummary: await xConnector.checkCapabilities(),
@@ -189,11 +198,14 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
     instagram: {
       connected: instagramConnection.connected,
       authority: config.distribution.platforms.instagram.authority,
+      authStatus: config.distribution.platforms.instagram.authStatus,
+      lastTestedAt: config.distribution.platforms.instagram.lastTestedAt,
       liveGoArmed: config.distribution.platforms.instagram.liveGoArmed,
       effectiveDryRun: resolvePlatformSocialDryRun(config, "instagram"),
       capabilitySummary: await instagramConnector.checkCapabilities(),
       accountLabel: instagramConnection.accountLabel,
       reason: instagramConnection.reason,
+      instagramTokenExpiringSoon: isInstagramTokenExpiringSoon(config.distribution.platforms.instagram.accessTokenExpiresAt),
       postsToday: instagramSummary.postsToday,
       repliesToday: instagramSummary.repliesToday,
       lastAction: instagramSummary.lastAction
@@ -201,6 +213,8 @@ async function buildPlatformStatuses(config: ArtistRuntimeConfig): Promise<Recor
     tiktok: {
       connected: tiktokConnection.connected,
       authority: config.distribution.platforms.tiktok.authority,
+      authStatus: "unconfigured",
+      lastTestedAt: undefined,
       liveGoArmed: config.distribution.platforms.tiktok.liveGoArmed,
       effectiveDryRun: resolvePlatformSocialDryRun(config, "tiktok"),
       capabilitySummary: await tiktokConnector.checkCapabilities(),
@@ -804,10 +818,57 @@ export function registerRoutes(api: unknown): void {
         const platform = platformFromSegment(segments[0]);
         if (segments.length === 2 && platform && segments[1] === "test") {
           const status = await buildPlatformDetailResponse(platform, config);
+          const testedAtMs = Date.now();
+          if (platform === "tiktok") {
+            await patchResolvedConfig(config.artist.workspaceRoot, {
+              distribution: {
+                platforms: {
+                  tiktok: {
+                    authStatus: "unconfigured",
+                    liveGoArmed: false
+                  }
+                }
+              } as unknown as ArtistRuntimeConfig["distribution"]
+            } as Partial<ArtistRuntimeConfig>);
+            status.authStatus = "unconfigured";
+            status.lastTestedAt = undefined;
+          } else {
+            const authStatus = status.connected ? "tested" : "failed";
+            const instagramTokenExpiresAt = status.connected
+              ? config.distribution.platforms.instagram.accessTokenExpiresAt ?? testedAtMs + INSTAGRAM_DEFAULT_TOKEN_EXPIRY_MS
+              : undefined;
+            const platformPatch = platform === "instagram"
+              ? {
+                  instagram: {
+                    authStatus,
+                    lastTestedAt: testedAtMs,
+                    ...(instagramTokenExpiresAt !== undefined ? { accessTokenExpiresAt: instagramTokenExpiresAt } : {})
+                  }
+                }
+              : {
+                  x: {
+                    authStatus,
+                    lastTestedAt: testedAtMs
+                  }
+                };
+            await patchResolvedConfig(config.artist.workspaceRoot, {
+              distribution: {
+                platforms: platformPatch
+              } as unknown as ArtistRuntimeConfig["distribution"]
+            } as Partial<ArtistRuntimeConfig>);
+            status.authStatus = authStatus;
+            status.lastTestedAt = testedAtMs;
+            if (platform === "instagram" && status.connected) {
+              status.instagramTokenExpiringSoon = isInstagramTokenExpiringSoon(
+                config.distribution.platforms.instagram.accessTokenExpiresAt ?? testedAtMs + INSTAGRAM_DEFAULT_TOKEN_EXPIRY_MS,
+                testedAtMs
+              );
+            }
+          }
           return {
             platform,
             status,
-            testedAt: new Date().toISOString()
+            testedAt: new Date(testedAtMs).toISOString()
           };
         }
         if (segments.length === 2 && platform && (segments[1] === "connect" || segments[1] === "disconnect")) {

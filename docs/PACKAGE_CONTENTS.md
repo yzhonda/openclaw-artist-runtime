@@ -243,8 +243,24 @@ fail before they reach CI artifacts.
 - `tests/config.test.ts`
 - `tests/x-bird-connector.test.ts`
 - `tests/x-connector-dry-run-e2e.test.ts`
+- `tests/resolve-reply-target.test.ts`
+  This suite locks X reply-target parsing for bare ids, `x.com` /
+  `twitter.com` status URLs, missing/invalid targets, and mocked-only `t.co`
+  expansion.
+- `tests/x-connector-reply-audit.test.ts`
+  This suite locks the dry-run reply audit metadata written into
+  `social-publish.jsonl` while keeping live replies on
+  `requires_explicit_live_go`.
 - `tests/instagram-connector.test.ts`
 - `tests/instagram-connector-dry-run-e2e.test.ts`
+- `tests/instagram-live-rehearsal.test.ts`
+  This suite locks the fail-closed Instagram live rehearsal skeleton: no fetch
+  without all arms plus explicit GO, mocked account/media staging when armed,
+  and no `media_publish` call.
+- `tests/platform-auth-status.test.ts`
+  This suite locks platform authStatus persistence after probes, TikTok's fixed
+  unconfigured state, authStatus schema validation, and Instagram token-expiry
+  warning surfacing.
   This suite now fixes the Round 42 Graph skeleton contract: auth missing,
   dry-run stage traversal, and non-dry-run `requires_explicit_live_go`.
 - `tests/social-dry-run-resolver.test.ts`
@@ -395,6 +411,9 @@ block live posting with an upstream dry-run hold plus
 It also documents the social publish ledger rotation rule:
 `social-publish.jsonl` stays active, while entries older than 90 days move to
 `social-publish.archive.jsonl` during the next append.
+It now also documents X reply-target parsing/audit metadata, persisted
+platform `authStatus` / `lastTestedAt` probe evidence, and the fail-closed
+Instagram live rehearsal skeleton.
 
 `docs/ERRORS.md` catalogs operator-facing reason codes across social staging,
 Suno budget/Playwright failures, and gateway boundary issues. Keep it aligned
@@ -470,13 +489,18 @@ Also keep the social connector source and tests together, because the package no
 ships one aligned dry-run contract across X, Instagram, and TikTok:
 
 - `src/connectors/social/xBirdConnector.ts`
+- `src/connectors/social/resolveReplyTarget.ts`
 - `src/connectors/social/instagramConnector.ts`
 - `src/connectors/social/tiktokConnector.ts`
 - `src/services/socialDryRunResolver.ts`
 - `tests/x-bird-connector.test.ts`
+- `tests/resolve-reply-target.test.ts`
+- `tests/x-connector-reply-audit.test.ts`
 - `tests/x-connector-dry-run-e2e.test.ts`
 - `tests/instagram-connector.test.ts`
 - `tests/instagram-connector-dry-run-e2e.test.ts`
+- `tests/instagram-live-rehearsal.test.ts`
+- `tests/platform-auth-status.test.ts`
 - `tests/social-dry-run-resolver.test.ts`
 - `tests/tiktok-connector.test.ts`
 

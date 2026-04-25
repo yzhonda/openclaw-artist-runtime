@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { ConnectionStatus, SocialCapability, SocialPublishRequest, SocialPublishResult } from "../../types.js";
 import type { SocialConnector } from "./SocialConnector.js";
+import { resolveReplyTarget, type ReplyTargetFetch } from "./resolveReplyTarget.js";
 
 const xCapabilities: SocialCapability = {
   textPost: true,
@@ -48,6 +49,7 @@ interface XBirdConnectorOptions {
   minPublishIntervalMs?: number;
   dedupeHistoryLimit?: number;
   dryRunStageExecution?: boolean;
+  replyTargetFetchImpl?: ReplyTargetFetch;
 }
 
 const DEFAULT_PUBLISH_GUARD_STATE: PublishGuardState = {
@@ -245,24 +247,13 @@ function buildPublishFailure(result: CommandResult): SocialPublishResult {
   };
 }
 
-function resolveReplyTarget(input: SocialPublishRequest): string | undefined {
-  const targetUrl = input.targetUrl?.trim();
-  if (targetUrl) {
-    return targetUrl;
-  }
-  const targetId = input.targetId?.trim();
-  if (targetId) {
-    return targetId;
-  }
-  return undefined;
-}
-
 export class XBirdConnector implements SocialConnector {
   private readonly now: () => number;
   private readonly publishGuardState: PublishGuardState;
   private readonly minPublishIntervalMs: number;
   private readonly dedupeHistoryLimit: number;
   private readonly dryRunStageExecution: boolean;
+  private readonly replyTargetFetchImpl?: ReplyTargetFetch;
 
   constructor(private readonly spawnImpl: SpawnImpl = spawn, options: XBirdConnectorOptions = {}) {
     this.now = options.now ?? Date.now;
@@ -270,6 +261,7 @@ export class XBirdConnector implements SocialConnector {
     this.minPublishIntervalMs = options.minPublishIntervalMs ?? DEFAULT_MIN_PUBLISH_INTERVAL_MS;
     this.dedupeHistoryLimit = options.dedupeHistoryLimit ?? DEFAULT_DEDUPE_HISTORY_LIMIT;
     this.dryRunStageExecution = options.dryRunStageExecution ?? false;
+    this.replyTargetFetchImpl = options.replyTargetFetchImpl;
   }
 
   id = "x" as const;
@@ -333,11 +325,34 @@ export class XBirdConnector implements SocialConnector {
 
   async reply(input: SocialPublishRequest): Promise<SocialPublishResult> {
     if (input.dryRun) {
+      const resolvedTarget = await resolveReplyTarget(input, { fetchImpl: this.replyTargetFetchImpl });
+      if (!resolvedTarget.ok) {
+        return {
+          accepted: false,
+          platform: "x",
+          dryRun: true,
+          reason: DRY_RUN_REPLY_BLOCK_REASON,
+          raw: {
+            type: "reply",
+            resolvedFrom: resolvedTarget.resolvedFrom,
+            resolutionReason: resolvedTarget.reason,
+            dryRun: true,
+            timestamp: new Date(this.now()).toISOString()
+          }
+        };
+      }
       return {
         accepted: false,
         platform: "x",
         dryRun: true,
-        reason: DRY_RUN_REPLY_BLOCK_REASON
+        reason: DRY_RUN_REPLY_BLOCK_REASON,
+        raw: {
+          type: "reply",
+          targetId: resolvedTarget.targetId,
+          resolvedFrom: resolvedTarget.resolvedFrom,
+          dryRun: true,
+          timestamp: new Date(this.now()).toISOString()
+        }
       };
     }
 

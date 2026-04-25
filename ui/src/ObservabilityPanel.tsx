@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { DistributionEventsCard } from "./DistributionEventsCard";
 import { PlatformUptimeCard } from "./PlatformUptimeCard";
-import type { DistributionEvent, PlatformStat, SocialPlatform } from "../../src/types";
+import type { DistributionEvent, PlatformStatus, PlatformStat, SocialPlatform } from "../../src/types";
 
 type ObservabilityTab = "distribution" | "platforms" | "budget" | "suno";
 type ExportWindow = "7d" | "30d" | "all";
@@ -65,6 +65,7 @@ function ObservabilityExport() {
 export function ObservabilityPanel(props: {
   events?: DistributionEvent[];
   stats?: Record<SocialPlatform, PlatformStat>;
+  platforms?: Partial<Record<SocialPlatform, Pick<PlatformStatus, "authStatus" | "lastTestedAt" | "reason">>>;
   budgetCard: ReactNode;
   sunoCard: ReactNode;
 }) {
@@ -95,7 +96,7 @@ export function ObservabilityPanel(props: {
       </div>
       <div className="observability-body">
         {activeTab === "distribution" ? <DistributionEventsCard events={props.events} /> : null}
-        {activeTab === "platforms" ? <PlatformUptimeCard stats={props.stats} /> : null}
+        {activeTab === "platforms" ? <PlatformUptimeCard stats={props.stats} platforms={props.platforms} /> : null}
         {activeTab === "budget" ? props.budgetCard : null}
         {activeTab === "suno" ? props.sunoCard : null}
       </div>
