@@ -591,11 +591,17 @@ Also keep the social connector source and tests together, because the package no
 ships one aligned dry-run contract across X, Instagram, and TikTok:
 
 - `src/connectors/social/xBirdConnector.ts`
+- `src/connectors/social/xLiveGateState.ts`
+- `src/connectors/social/xMediaMetadata.ts`
 - `src/connectors/social/resolveReplyTarget.ts`
 - `src/connectors/social/instagramConnector.ts`
 - `src/connectors/social/tiktokConnector.ts`
 - `src/services/socialDryRunResolver.ts`
+- `docs/X_LIVE_PUBLISH_DESIGN.md`
 - `tests/x-bird-connector.test.ts`
+- `tests/x-live-gate-skeleton.test.ts`
+- `tests/x-media-upload-skeleton.test.ts`
+- `tests/x-reply-target-enrichment.test.ts`
 - `tests/resolve-reply-target.test.ts`
 - `tests/x-connector-reply-audit.test.ts`
 - `tests/x-connector-dry-run-e2e.test.ts`

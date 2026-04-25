@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Round 86 (Mega-X-Plus skeleton): added `xLiveGateState.evaluateGate()` returning `idle` for every input, `extractMediaMetadata()` that reads only `stat()` size and extension-based mime, and `mentionedHandles` / `tweetId` enrichment in dry-run reply audit ledger entries. Real publish, real upload, and real fetch paths remain blocked.
+- Added `docs/X_LIVE_PUBLISH_DESIGN.md` documenting the staged X live publish state machine and the operator GO requirements that remain deferred.
 - Marketplace listing docs now summarize connector credential requirements and include a first-pass credential refresh troubleshooting section for X/Bird, Instagram, and TikTok.
 - Added `docs/CONNECTOR_AUTH.md` as the dedicated connector setup / refresh guide and linked operator-facing docs back to it.
 - Added `docs/GATEWAY_AUTH.md` to document the current plugin-level gateway auth boundary for the HTTP route surface.

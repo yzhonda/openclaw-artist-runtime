@@ -157,13 +157,18 @@ export async function publishSocialAction(input: SocialActionInput): Promise<{ r
   };
   if (action === "reply" && input.platform === "x" && result.raw && typeof result.raw === "object") {
     const raw = result.raw as Record<string, unknown>;
+    const mentionedHandles = Array.isArray(raw.mentionedHandles)
+      ? raw.mentionedHandles.filter((value): value is string => typeof value === "string")
+      : undefined;
     entry.replyTarget = {
       type: "reply",
       targetId: typeof raw.targetId === "string" ? raw.targetId : undefined,
       resolvedFrom: typeof raw.resolvedFrom === "string" ? raw.resolvedFrom : undefined,
       resolutionReason: typeof raw.resolutionReason === "string" ? raw.resolutionReason : undefined,
       dryRun: raw.dryRun === true,
-      timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString()
+      timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString(),
+      mentionedHandles: mentionedHandles && mentionedHandles.length > 0 ? mentionedHandles : undefined,
+      tweetId: typeof raw.tweetId === "string" ? raw.tweetId : undefined
     };
   }
 
