@@ -18,6 +18,7 @@ import { publishSocialAction, readLatestSocialAction } from "../services/socialP
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../services/socialDryRunResolver.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
+import { buildSunoArtifactsPage, STATUS_SUNO_ARTIFACT_LIMIT } from "../services/sunoArtifacts.js";
 import { SunoBudgetTracker } from "../services/sunoBudget.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
 import { buildSunoArtifactIndex, generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services/sunoRuns.js";
@@ -38,7 +39,9 @@ import type {
   StatusExportResponse,
   ObservabilityExportWindow,
   SunoStatusResponse,
-  SunoRunRecord
+  SunoRunRecord,
+  SunoDiagnosticsExportResponse,
+  SunoDiagnosticsImportOutcome
 } from "../types.js";
 import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes } from "../types.js";
 
@@ -143,6 +146,17 @@ function exportWindowFromPayload(payload: Record<string, unknown>): Observabilit
     return "7d";
   }
   return exportWindowFromInput(new URLSearchParams(requestPath.slice(queryIndex + 1)).get("window"));
+}
+
+function payloadInteger(payload: Record<string, unknown>, key: string, fallback: number): number {
+  const value = payload[key];
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : Number.NaN;
+  return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
+}
+
+function sunoDiagnosticsDaysFromPayload(payload: Record<string, unknown>): number {
+  return Math.min(30, Math.max(1, payloadInteger(payload, "days", 7)));
 }
 
 const INSTAGRAM_TOKEN_EXPIRY_WARN_MS = 30 * 24 * 60 * 60 * 1000;
@@ -530,7 +544,7 @@ export async function buildSunoStatusResponse(config?: Partial<ArtistRuntimeConf
     recentRuns: recentSong ? await readAllSunoRuns(workspaceRoot, recentSong.songId) : [],
     latestPromptPackVersion: latestPromptPack?.version,
     latestPromptPackMetadata: latestPromptPack?.metadata,
-    artifacts: await buildSunoArtifactIndex(workspaceRoot),
+    artifacts: (await buildSunoArtifactIndex(workspaceRoot)).slice(0, STATUS_SUNO_ARTIFACT_LIMIT),
     currentRunId: worker.currentRunId,
     lastImportedRunId: worker.lastImportedRunId,
     lastCreateOutcome: worker.lastCreateOutcome,
@@ -617,7 +631,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
         ...sunoBudgetState,
         resetHistory: sunoBudgetResetHistory
       },
-      artifacts: sunoArtifacts,
+      artifacts: sunoArtifacts.slice(0, STATUS_SUNO_ARTIFACT_LIMIT),
       profile: {
         stale: sunoWorker.sunoProfileStale,
         detail: sunoWorker.sunoProfileDetail,
@@ -636,6 +650,46 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     recentSong: workspaceStatus.recentSong,
     lastSunoRun: workspaceStatus.lastSunoRun,
     lastSocialAction: workspaceStatus.lastSocialAction
+  };
+}
+
+export async function buildSunoDiagnosticsExportResponse(
+  config?: Partial<ArtistRuntimeConfig>,
+  days = 7,
+  now = new Date()
+): Promise<SunoDiagnosticsExportResponse> {
+  const mergedConfig = await resolveRuntimeConfig(config);
+  const workspaceRoot = mergedConfig.artist.workspaceRoot;
+  const cutoffMs = now.getTime() - Math.min(30, Math.max(1, days)) * 24 * 60 * 60 * 1000;
+  const worker = await new BrowserWorkerSunoConnector(workspaceRoot, { config: mergedConfig }).status();
+  const [resetHistory, songs] = await Promise.all([
+    new SunoBudgetTracker(workspaceRoot).getResetHistory(Number.MAX_SAFE_INTEGER),
+    listSongStates(workspaceRoot)
+  ]);
+  const inWindow = (timestamp: string) => {
+    const parsed = Date.parse(timestamp);
+    return Number.isFinite(parsed) && parsed >= cutoffMs && parsed <= now.getTime();
+  };
+  const importOutcomes: SunoDiagnosticsImportOutcome[] = songs.flatMap((song) =>
+    song.lastImportOutcome ? [{ songId: song.songId, ...song.lastImportOutcome }] : []
+  );
+
+  return {
+    generatedAt: now.toISOString(),
+    days: Math.min(30, Math.max(1, days)),
+    profile: {
+      state: worker.state,
+      connected: worker.connected,
+      stale: worker.sunoProfileStale,
+      detail: worker.sunoProfileDetail,
+      checkedAt: worker.sunoProfileCheckedAt
+    },
+    budgetResetHistory: resetHistory
+      .filter((entry) => inWindow(entry.timestamp))
+      .sort((left, right) => right.timestamp.localeCompare(left.timestamp)),
+    importOutcomes: importOutcomes
+      .filter((outcome) => inWindow(outcome.at))
+      .sort((left, right) => right.at.localeCompare(left.at))
   };
 }
 
@@ -956,6 +1010,12 @@ export function registerRoutes(api: unknown): void {
             ? payload.songId
             : (await listSongStates(config.artist.workspaceRoot))[0]?.songId;
           return songId ? readAllSunoRuns(config.artist.workspaceRoot, songId) : [];
+        }
+        if (segments.length === 1 && segments[0] === "artifacts") {
+          return buildSunoArtifactsPage(config.artist.workspaceRoot, payload.offset, payload.limit);
+        }
+        if (segments.length === 2 && segments[0] === "diagnostics" && segments[1] === "export") {
+          return buildSunoDiagnosticsExportResponse(config, sunoDiagnosticsDaysFromPayload(payload));
         }
       }
 

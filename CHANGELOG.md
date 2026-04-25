@@ -52,6 +52,7 @@
 - Added Round 82 Producer Console UX helpers for distribution-event filtering, unified error toasts, reconnect/recovered banners, and keyboard shortcuts without importing React components into root tests.
 - Added Round 83 operator quickstart and troubleshooting docs plus a cross-link coverage test for top-level docs references and anchors.
 - Added Round 84 in-process gateway chain tests for X probe config persistence, X dry-run reply audit reads, and Suno mock create/import/archive regression coverage.
+- Added Round 85 Suno operator UX endpoints and helpers for paged artifact reads, diagnostics export, profile-snapshot retention, and imported-asset URL filtering.
 
 ### Changed
 - Extracted `buildImportedAssetRows` and `importedAssetsPlaceholder` into `src/services/sunoImportedAssetsView.ts` so the helpers are shared by `SunoOutcomeCard` and root vitest without dragging the React entrypoint into the test scope.

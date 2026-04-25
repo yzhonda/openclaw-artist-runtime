@@ -51,6 +51,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 TARGET="${ROOT%/}/runtime/suno"
+PROFILE_SNAPSHOT_TARGET="${TARGET}/profile-snapshots"
+PROFILE_SNAPSHOT_DAYS=365
 if [[ ! -d "$TARGET" ]]; then
   if [[ "$JSON" -eq 1 ]]; then
     echo '{"target":"'"$TARGET"'","deleted":0,"candidates":[]}'
@@ -63,20 +65,33 @@ fi
 CANDIDATES=()
 while IFS= read -r candidate; do
   CANDIDATES+=("$candidate")
-done < <(find "$TARGET" -mindepth 1 -maxdepth 1 -type d -mtime +"$DAYS" -print | sort)
+done < <(find "$TARGET" -mindepth 1 -maxdepth 1 -type d ! -name "profile-snapshots" -mtime +"$DAYS" -print | sort)
 
-if [[ ${#CANDIDATES[@]} -eq 0 ]]; then
+PROFILE_SNAPSHOT_CANDIDATES=()
+if [[ -d "$PROFILE_SNAPSHOT_TARGET" ]]; then
+  while IFS= read -r candidate; do
+    PROFILE_SNAPSHOT_CANDIDATES+=("$candidate")
+  done < <(find "$PROFILE_SNAPSHOT_TARGET" -mindepth 1 -maxdepth 1 -mtime +"$PROFILE_SNAPSHOT_DAYS" -print | sort)
+fi
+
+if [[ ${#CANDIDATES[@]} -eq 0 && ${#PROFILE_SNAPSHOT_CANDIDATES[@]} -eq 0 ]]; then
   if [[ "$JSON" -eq 1 ]]; then
-    echo '{"target":"'"$TARGET"'","deleted":0,"candidates":[]}'
+    echo '{"target":"'"$TARGET"'","deleted":0,"candidates":[],"profileSnapshotRetentionDays":365,"profileSnapshotCandidates":[]}'
     exit 0
   fi
-  echo "No runtime Suno run directories older than $DAYS days."
+  echo "No runtime Suno run directories older than $DAYS days and no profile snapshots older than $PROFILE_SNAPSHOT_DAYS days."
   exit 0
 fi
 
 if [[ "$JSON" -ne 1 ]]; then
-  echo "Runtime Suno directories older than $DAYS days:"
-  printf '  %s\n' "${CANDIDATES[@]}"
+  if [[ ${#CANDIDATES[@]} -gt 0 ]]; then
+    echo "Runtime Suno directories older than $DAYS days:"
+    printf '  %s\n' "${CANDIDATES[@]}"
+  fi
+  if [[ ${#PROFILE_SNAPSHOT_CANDIDATES[@]} -gt 0 ]]; then
+    echo "Suno profile snapshots older than $PROFILE_SNAPSHOT_DAYS days:"
+    printf '  %s\n' "${PROFILE_SNAPSHOT_CANDIDATES[@]}"
+  fi
 fi
 
 if [[ "$DRY_RUN" -eq 1 ]]; then
@@ -85,6 +100,11 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
     for index in "${!CANDIDATES[@]}"; do
       [[ "$index" -gt 0 ]] && printf ','
       printf '"%s"' "${CANDIDATES[$index]}"
+    done
+    printf '],"profileSnapshotRetentionDays":%s,"profileSnapshotCandidates":[' "$PROFILE_SNAPSHOT_DAYS"
+    for index in "${!PROFILE_SNAPSHOT_CANDIDATES[@]}"; do
+      [[ "$index" -gt 0 ]] && printf ','
+      printf '"%s"' "${PROFILE_SNAPSHOT_CANDIDATES[$index]}"
     done
     printf ']}\n'
   fi
@@ -101,13 +121,23 @@ if [[ "$YES" -ne 1 ]]; then
   fi
 fi
 
-rm -rf -- "${CANDIDATES[@]}"
+[[ ${#CANDIDATES[@]} -gt 0 ]] && rm -rf -- "${CANDIDATES[@]}"
+[[ ${#PROFILE_SNAPSHOT_CANDIDATES[@]} -gt 0 ]] && rm -rf -- "${PROFILE_SNAPSHOT_CANDIDATES[@]}"
 if [[ "$JSON" -eq 1 ]]; then
-  printf '{"target":"%s","dryRun":false,"cron":%s,"deleted":%s,"candidates":[' "$TARGET" "$([[ "$CRON" -eq 1 ]] && echo true || echo false)" "${#CANDIDATES[@]}"
+  DELETED_TOTAL=$(( ${#CANDIDATES[@]} + ${#PROFILE_SNAPSHOT_CANDIDATES[@]} ))
+  printf '{"target":"%s","dryRun":false,"cron":%s,"deleted":%s,"candidates":[' "$TARGET" "$([[ "$CRON" -eq 1 ]] && echo true || echo false)" "$DELETED_TOTAL"
   for index in "${!CANDIDATES[@]}"; do
     [[ "$index" -gt 0 ]] && printf ','
     printf '"%s"' "${CANDIDATES[$index]}"
   done
+  printf '],"profileSnapshotRetentionDays":%s,"profileSnapshotCandidates":[' "$PROFILE_SNAPSHOT_DAYS"
+  for index in "${!PROFILE_SNAPSHOT_CANDIDATES[@]}"; do
+    [[ "$index" -gt 0 ]] && printf ','
+    printf '"%s"' "${PROFILE_SNAPSHOT_CANDIDATES[$index]}"
+  done
   printf ']}\n'
 fi
-[[ "$JSON" -ne 1 ]] && echo "Deleted ${#CANDIDATES[@]} runtime Suno director$( [[ ${#CANDIDATES[@]} -eq 1 ]] && echo 'y' || echo 'ies' )."
+if [[ "$JSON" -ne 1 ]]; then
+  DELETED_TOTAL=$(( ${#CANDIDATES[@]} + ${#PROFILE_SNAPSHOT_CANDIDATES[@]} ))
+  echo "Deleted $DELETED_TOTAL runtime Suno item$( [[ $DELETED_TOTAL -eq 1 ]] && echo '' || echo 's' )."
+fi

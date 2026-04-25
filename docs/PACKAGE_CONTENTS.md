@@ -114,9 +114,14 @@ Producer Console status surfaces. In practice that means:
   from root vitest without importing React `.tsx` components.
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
+- `src/services/sunoArtifacts.ts` owns paged read-only views over imported
+  `runtime/suno/<runId>/` assets, keeping `/api/status` lightweight while
+  allowing operators to page the full local artifact index.
 - `src/services/sunoProfileLifecycle.ts` owns the local-only Suno profile stale
   detector, directory snapshot helper, and snapshot pruning helper used for
-  operator recovery without changing the live submit path.
+  operator recovery without changing the live submit path. It also exposes the
+  365-day profile-snapshot retention helper used by the manual runtime cleanup
+  lane.
 - `src/services/sunoPlaywrightDriver.ts` now owns the real Playwright-backed
   login probe, live create submit/polling lane, and the local mp3 import
   downloader under `runtime/suno/<runId>/`.
@@ -366,6 +371,20 @@ CI artifacts.
   This suite fixes the Round 78 runtime artifact index: local mp3/m4a files
   under `runtime/suno/<runId>/` are exposed as read-only status evidence with
   run/song linkage and size metadata.
+- `tests/suno-artifacts-pagination.test.ts`
+  This suite locks `/api/suno/artifacts` pagination: default pages, offsets,
+  `totalCount`, `hasMore`, max-limit clamping, and the lightweight 8-entry
+  status fallback.
+- `tests/suno-diagnostics-export.test.ts`
+  This suite locks `/api/suno/diagnostics/export` windows and privacy bounds:
+  7-day default, 30-day clamp, profile state, reset history, import outcomes,
+  and no credential-shaped fields.
+- `tests/suno-profile-retention.test.ts`
+  This suite locks 365-day `runtime/suno/profile-snapshots/` retention and the
+  manual `scripts/cleanup-runtime.sh` dry-run JSON surface.
+- `tests/suno-imported-assets-view.test.ts`
+  This suite keeps imported-asset URL prefix filtering in pure root-testable
+  helpers, avoiding React component imports in root vitest.
 - `tests/suno-budget.test.ts`
   This suite fixes the Round 51 credit gate boundary: reserve success,
   over-limit live submit block before connector.create, UTC-day reset,

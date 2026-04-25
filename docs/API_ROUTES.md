@@ -52,6 +52,8 @@ current OpenClaw Gateway.
 | `GET` | `/api/platforms/:id` | `plugin` | Read one platform detail. | optional `config` override | `PlatformStatus` | `:id` must be `x`, `instagram`, or `tiktok`. |
 | `GET` | `/api/suno/status` | `plugin` | Read Suno worker/runtime state. | optional `config` override | `SunoStatusResponse` with `worker`, `currentSongId`, `latestRun`, `recentRuns`, `currentRunId`, `lastImportedRunId`, `lastCreateOutcome`, `lastImportOutcome` | Main Suno card data source for the Console. |
 | `GET` | `/api/suno/runs` | `plugin` | Read Suno runs for a song. | optional `config`, optional `songId` | `SunoRunRecord[]` | If `songId` is omitted, the latest song is used when available. |
+| `GET` | `/api/suno/artifacts` | `plugin` | Page through local imported Suno artifacts. | optional `config`, `offset?`, `limit?` | `{ artifacts, totalCount, offset, limit, hasMore }` | Defaults to `offset=0&limit=20`; `limit` is clamped to `100`. |
+| `GET` | `/api/suno/diagnostics/export` | `plugin` | Export local Suno diagnostics as JSON. | optional `config`, `days?` | `{ generatedAt, days, profile, budgetResetHistory, importOutcomes }` | Defaults to `days=7`; `days` is clamped to `30` and excludes credentials/cookies/tokens. |
 
 ## Mutating routes
 

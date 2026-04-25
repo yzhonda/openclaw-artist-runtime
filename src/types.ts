@@ -404,6 +404,40 @@ export interface SunoArtifactIndexEntry {
   createdAt: string;
 }
 
+export interface SunoArtifactsPageResponse {
+  artifacts: SunoArtifactIndexEntry[];
+  totalCount: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+export interface SunoDiagnosticsImportOutcome {
+  songId: string;
+  runId: string;
+  urlCount: number;
+  pathCount?: number;
+  paths?: string[];
+  failedUrls?: SunoImportFailedUrl[];
+  reason?: string;
+  at: string;
+  dryRun?: boolean;
+}
+
+export interface SunoDiagnosticsExportResponse {
+  generatedAt: string;
+  days: number;
+  profile: {
+    state: SunoWorkerState;
+    connected: boolean;
+    stale?: boolean;
+    detail?: string;
+    checkedAt?: string;
+  };
+  budgetResetHistory: SunoBudgetResetEntry[];
+  importOutcomes: SunoDiagnosticsImportOutcome[];
+}
+
 export type SunoImportFailureReason = "404" | "network" | "extraction_failed";
 
 export interface SunoImportFailedUrl {

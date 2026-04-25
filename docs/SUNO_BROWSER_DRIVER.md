@@ -48,6 +48,9 @@ without changing the submit path:
   and keeps seven generations by default;
 - the TypeScript lifecycle helper can also create directory snapshots and prune
   old generations for tests and future runtime wiring.
+- operator-run cleanup treats `runtime/suno/profile-snapshots/` as a local-only
+  snapshot store and prunes entries older than 365 days when
+  `scripts/cleanup-runtime.sh` is run manually.
 
 When `sunoProfileStale` appears, first run the diagnose script, then either
 rerun `scripts/openclaw-suno-login.sh` for normal reauthentication or follow
@@ -212,9 +215,33 @@ Round 49 now locks the cheap boundary cases in mock-only tests:
 - Round 78 also indexes the local `runtime/suno/<runId>/` directory and exposes
   the latest mp3/m4a artifacts in the Console. The index is read-only and shows
   `runId`, optional `songId`, file size, format, created timestamp, and path.
+- `/api/status.suno.artifacts` stays capped to the latest 8 entries for the
+  dashboard. Operators can page the full local artifact index through
+  `/api/suno/artifacts?offset=N&limit=M`; the route defaults to
+  `offset=0&limit=20` and clamps `limit` to `100`.
+- The Imported Assets section includes a session-local URL prefix filter. It
+  filters the already-returned rows only; it does not fetch, play, or mutate
+  artifacts.
 - Failed import URLs are surfaced separately as `failedUrls[]` with a compact
   reason (`404`, `network`, or `extraction_failed`) so partial imports can be
   triaged without re-running the whole Suno job.
+
+## Diagnostics export
+
+`GET /api/suno/diagnostics/export?days=N` returns a synchronous JSON dump for
+operator support bundles. It defaults to 7 days and clamps `days` to 30.
+
+The export includes only local operational state:
+
+- Suno worker/profile state (`state`, `connected`, stale flag, stale detail,
+  checked timestamp)
+- recent budget reset audit rows from `runtime/suno/budget-reset.jsonl`
+- recent per-song import outcomes, including failed URL summaries and local
+  artifact paths
+
+It intentionally excludes browser profile contents, cookies, tokens, headers,
+raw credential files, and Suno page bodies. Treat the JSON as operator-local
+evidence; review paths and song titles before attaching it to tickets.
 
 ## Credit budget
 
@@ -434,6 +461,9 @@ Use this when a live create attempt returns `accepted: false` with
 - Operators can run `scripts/cleanup-runtime.sh` to list and remove
   `runtime/suno/<runId>/` directories older than 30 days. Without `-y`, the
   script asks for confirmation before deleting anything.
+- The same manual cleanup command also lists and removes
+  `runtime/suno/profile-snapshots/` entries older than 365 days. Fresh snapshots
+  and the snapshot root itself are left intact.
 
 ## Troubleshooting
 

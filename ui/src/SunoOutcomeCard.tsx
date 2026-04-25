@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   buildImportedAssetRows,
+  filterImportedAssetsByUrlPrefix,
   importedAssetsPlaceholder,
   type SunoImportedAssetView
 } from "../../src/services/sunoImportedAssetsView";
@@ -140,6 +141,8 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const importOutcome = formatOutcome("Last Import", props.lastImportOutcome);
   const importedAssets = buildImportedAssetRows(props.lastImportOutcome);
   const importedAssetsEmpty = importedAssetsPlaceholder(props.lastImportOutcome);
+  const [assetUrlPrefix, setAssetUrlPrefix] = useState("");
+  const visibleImportedAssets = filterImportedAssetsByUrlPrefix(importedAssets, assetUrlPrefix);
   const failedUrls = props.lastImportOutcome?.failedUrls ?? [];
   const artifacts = props.artifacts ?? [];
   const [copyFeedback, setCopyFeedback] = useState<Record<string, "copied" | "failed">>({});
@@ -331,7 +334,17 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
         {importedAssetsEmpty ? <div className="muted">{importedAssetsEmpty}</div> : null}
         {importedAssets.length > 0 ? (
           <div className="asset-list">
-            {importedAssets.map((asset) => (
+            <label className="asset-filter">
+              <span>Filter by URL prefix</span>
+              <input
+                type="text"
+                placeholder="https://suno.com/song/..."
+                value={assetUrlPrefix}
+                onChange={(event) => setAssetUrlPrefix(event.target.value)}
+              />
+            </label>
+            {visibleImportedAssets.length === 0 ? <div className="muted">No imported assets match this URL prefix.</div> : null}
+            {visibleImportedAssets.map((asset) => (
               <div className="asset-row" key={`${asset.path}-${asset.url}`}>
                 <div className="asset-row-header">
                   <strong className="asset-link">{asset.title ?? asset.path.split("/").at(-1) ?? asset.path}</strong>

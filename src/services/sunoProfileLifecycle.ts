@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 export const DEFAULT_SUNO_PROFILE_STALE_DAYS = 30;
 export const DEFAULT_SUNO_PROFILE_SNAPSHOT_KEEP = 7;
+export const DEFAULT_SUNO_PROFILE_SNAPSHOT_RETENTION_DAYS = 365;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type SunoProfileStaleReason = "missing" | "empty" | "stale" | "fresh";
@@ -144,4 +145,24 @@ export async function pruneSnapshots(backupRoot: string, keepN = DEFAULT_SUNO_PR
   const remove = snapshots.slice(0, Math.max(0, snapshots.length - keep));
   await Promise.all(remove.map((snapshot) => rm(snapshot.path, { recursive: true, force: true })));
   return remove.map((snapshot) => snapshot.name);
+}
+
+export async function pruneSnapshotsOlderThan(
+  snapshotRoot: string,
+  retentionDays = DEFAULT_SUNO_PROFILE_SNAPSHOT_RETENTION_DAYS,
+  now = new Date()
+): Promise<string[]> {
+  const entries = await readdir(snapshotRoot, { withFileTypes: true }).catch(() => []);
+  const cutoffMs = now.getTime() - Math.max(0, retentionDays) * MS_PER_DAY;
+  const removed: string[] = [];
+  for (const entry of entries) {
+    const snapshotPath = join(snapshotRoot, entry.name);
+    const snapshot = await stat(snapshotPath).catch(() => undefined);
+    if (!snapshot || snapshot.mtimeMs >= cutoffMs) {
+      continue;
+    }
+    await rm(snapshotPath, { recursive: true, force: true });
+    removed.push(entry.name);
+  }
+  return removed.sort((left, right) => left.localeCompare(right));
 }
