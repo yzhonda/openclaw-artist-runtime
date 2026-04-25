@@ -368,6 +368,16 @@ CI artifacts.
   Migrates an Obsidian-style artist vault into the runtime workspace.
   Backs up existing files before writing; supports `--dry-run` and
   `--force`. The script is plain Node ESM with no extra dependencies.
+- `scripts/import-obsidian-song.mjs`
+  Migrates a single Obsidian-style song folder into the runtime
+  workspace, including lyrics, Suno YAML, Style/Exclude sections, and
+  the Sliders markdown table converted to JSON. Same safety
+  surface (`--dry-run` / `--force`) and zero new dependencies.
+- `tests/import-obsidian-song.test.ts`
+  Unit tests for the song importer parser: top-level `# Heading`
+  split, the `(<n> chars)` heading suffix stripper, the Sliders
+  markdown table to camelCase JSON conversion, and brief/song.md
+  shape including credential-leak guard.
 - `tests/repository-and-ledger.test.ts`
 - `tests/suno-driver-selection.test.ts`
 - `tests/suno-playwright-create.test.ts`
