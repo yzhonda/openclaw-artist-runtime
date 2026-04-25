@@ -106,6 +106,10 @@ Producer Console status surfaces. In practice that means:
 - `src/services/socialPublishing.ts` now enforces a two-level social live arm:
   `distribution.liveGoArmed` plus `distribution.platforms.{x,instagram,tiktok}.liveGoArmed`
   must both be `true` before upstream dry-run can release.
+- `src/services/distributionEventsFilter.ts`,
+  `src/services/errorToastQueue.ts`, `src/services/connectionState.ts`, and
+  `src/services/keyboardShortcutMap.ts` keep Producer Console UX logic testable
+  from root vitest without importing React `.tsx` components.
 - `src/services/sunoBrowserWorker.ts` carries both lifecycle state and mock-only
   create/import automation outcomes for the Suno lane.
 - `src/services/sunoProfileLifecycle.ts` owns the local-only Suno profile stale
@@ -168,6 +172,9 @@ The Console source now includes:
 - recent distribution event and platform uptime cards sourced from
   `/api/status.recentDistributionEvents` and `/api/status.platformStats`
 - an all-platforms effective dry-run banner sourced from `/api/status.summary`
+- distribution-event filters, unified error toasts, reconnect/recovered status
+  banners, and keyboard shortcuts (`r`, `p`, `esc`, `?`) backed by pure helper
+  services instead of root tests importing React components
 - the same Suno/status markers mirrored in the fallback inline Console shell
 
 The config editor source now owns both:

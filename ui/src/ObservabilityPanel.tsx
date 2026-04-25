@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { DistributionEventsCard } from "./DistributionEventsCard";
 import { PlatformUptimeCard } from "./PlatformUptimeCard";
+import type { DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import type { DistributionEvent, PlatformStatus, PlatformStat, SocialPlatform } from "../../src/types";
 
 type ObservabilityTab = "distribution" | "platforms" | "budget" | "suno";
@@ -64,6 +65,9 @@ function ObservabilityExport() {
 
 export function ObservabilityPanel(props: {
   events?: DistributionEvent[];
+  eventFilter?: DistributionEventsFilterState;
+  onEventFilterChange?: (filter: DistributionEventsFilterState) => void;
+  onClearEventFilters?: () => void;
   stats?: Record<SocialPlatform, PlatformStat>;
   platforms?: Partial<Record<SocialPlatform, Pick<PlatformStatus, "authStatus" | "lastTestedAt" | "reason">>>;
   budgetCard: ReactNode;
@@ -95,7 +99,14 @@ export function ObservabilityPanel(props: {
         ))}
       </div>
       <div className="observability-body">
-        {activeTab === "distribution" ? <DistributionEventsCard events={props.events} /> : null}
+        {activeTab === "distribution" ? (
+          <DistributionEventsCard
+            events={props.events}
+            filter={props.eventFilter}
+            onFilterChange={props.onEventFilterChange}
+            onClearFilters={props.onClearEventFilters}
+          />
+        ) : null}
         {activeTab === "platforms" ? <PlatformUptimeCard stats={props.stats} platforms={props.platforms} /> : null}
         {activeTab === "budget" ? props.budgetCard : null}
         {activeTab === "suno" ? props.sunoCard : null}

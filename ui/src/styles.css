@@ -190,6 +190,21 @@ textarea {
   background: rgba(255, 255, 255, 0.42);
 }
 
+.events-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid rgba(216, 204, 189, 0.78);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.events-search {
+  grid-column: 1 / -1;
+}
+
 .metric-card {
   min-height: 140px;
 }
@@ -413,6 +428,20 @@ textarea {
   border-color: rgba(143, 32, 22, 0.32);
   background: rgba(255, 226, 219, 0.86);
   color: var(--critical);
+}
+
+.reconnecting-banner {
+  margin-bottom: 16px;
+  border-color: rgba(153, 100, 0, 0.32);
+  background: rgba(244, 227, 196, 0.86);
+  color: var(--warning);
+}
+
+.recovered-banner {
+  margin-bottom: 16px;
+  border-color: rgba(29, 106, 69, 0.28);
+  background: rgba(223, 238, 227, 0.82);
+  color: #1d6a45;
 }
 
 .toggle {
@@ -648,6 +677,79 @@ textarea {
   margin-bottom: 16px;
   border-color: rgba(143, 32, 22, 0.3);
   color: var(--critical);
+}
+
+.toast-stack {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  width: min(380px, calc(100vw - 36px));
+}
+
+.toast-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(143, 32, 22, 0.28);
+  border-radius: 18px;
+  padding: 12px;
+  background: rgba(255, 246, 240, 0.96);
+  box-shadow: 0 18px 40px rgba(65, 42, 21, 0.16);
+}
+
+.toast-close {
+  white-space: nowrap;
+}
+
+.shortcut-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(28, 22, 17, 0.34);
+}
+
+.shortcut-card {
+  width: min(520px, 100%);
+  border: 1px solid rgba(216, 204, 189, 0.96);
+  border-radius: 24px;
+  padding: 18px;
+  background: rgba(255, 250, 244, 0.98);
+  box-shadow: 0 24px 70px rgba(65, 42, 21, 0.2);
+}
+
+.shortcut-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.shortcut-list > div {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  align-items: center;
+}
+
+.shortcut-list dt {
+  margin: 0;
+  border: 1px solid rgba(31, 62, 96, 0.18);
+  border-radius: 10px;
+  padding: 0.35rem 0.45rem;
+  text-align: center;
+  font-weight: 800;
+  background: rgba(31, 62, 96, 0.08);
+}
+
+.shortcut-list dd {
+  margin: 0;
+  color: var(--muted);
 }
 
 .debug-panel pre {

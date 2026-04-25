@@ -3,6 +3,12 @@ import "./styles.css";
 import { buildConfigDraft, buildConfigUpdatePatch, validateConfigDraft, type ConfigDraft } from "./configEditor";
 import { SunoOutcomeCard, type FailedImportUrl, type ImportedAsset, type SunoArtifactIndexEntry } from "./SunoOutcomeCard";
 import { ObservabilityPanel } from "./ObservabilityPanel";
+import { ConnectionBanner } from "./ConnectionBanner";
+import { ErrorToastStack } from "./ErrorToast";
+import { ShortcutHelpOverlay, useKeyboardShortcuts } from "./KeyboardShortcuts";
+import { deriveConnectionState } from "../../src/services/connectionState";
+import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
+import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
 import { instagramAuthorityModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
 
 type StatusResponse = {
@@ -509,10 +515,21 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [lastRefreshAt, setLastRefreshAt] = useState<number | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [recoveredUntil, setRecoveredUntil] = useState<number | null>(null);
+  const [eventFilter, setEventFilter] = useState<DistributionEventsFilterState>(defaultDistributionEventsFilter);
+  const [errorToasts, setErrorToasts] = useState<ErrorToast[]>([]);
+  const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [busy, setBusy] = useState<string | null>(null);
 
+  const showErrorToast = (source: ErrorToastSource, reason: string, message: string) => {
+    setErrorToasts((current) => pushErrorToast(current, { source, reason, message }, Date.now()));
+  };
+
   const refresh = async (preferredSongId?: string | null, forceConfigDraftSync = false) => {
+    const hadNetworkError = Boolean(networkError);
+    setIsRefreshing(true);
     try {
       setError(null);
       const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery] = await Promise.all([
@@ -553,11 +570,17 @@ export function App() {
         }
         setLastRefreshAt(Date.now());
         setNetworkError(null);
+        if (hadNetworkError) {
+          setRecoveredUntil(Date.now() + 3000);
+        }
       });
     } catch (caughtError) {
       const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
       setNetworkError(message);
       setError(message);
+      showErrorToast("network", "refresh_failed", message);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -567,6 +590,13 @@ export function App() {
 
   useEffect(() => {
     const intervalId = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setErrorToasts((current) => expireErrorToasts(current, Date.now()));
+    }, 1000);
     return () => clearInterval(intervalId);
   }, []);
 
@@ -596,7 +626,9 @@ export function App() {
       }
       await refresh();
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", `${action}_failed`, message);
     } finally {
       setBusy(null);
     }
@@ -608,7 +640,9 @@ export function App() {
       await apiPost(`/alerts/${alertId}/ack`);
       await refresh(selectedSongId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "ack_failed", message);
     } finally {
       setBusy(null);
     }
@@ -632,7 +666,9 @@ export function App() {
       setConfigDirty(false);
       await refresh(selectedSongId, true);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("config-patch", "config_update_failed", message);
     } finally {
       setBusy(null);
     }
@@ -654,7 +690,14 @@ export function App() {
 
   const configValidationError = configDraft ? validateConfigDraft(configDraft) : null;
   const globalArmHeld = Boolean(configDraft && !configDraft.distributionLiveGoArmed);
-  const refreshIsStale = lastRefreshAt !== null && nowMs - lastRefreshAt > staleRefreshMs;
+  const connection = deriveConnectionState({
+    now: nowMs,
+    lastRefreshAt,
+    networkError,
+    isRefreshing,
+    recoveredUntil,
+    staleMs: staleRefreshMs
+  });
 
   const testPlatform = async (platform: "x" | "instagram" | "tiktok") => {
     if (platform === "tiktok") {
@@ -668,7 +711,9 @@ export function App() {
       });
       await refresh(selectedSongId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("probe", `${platform}_probe_failed`, message);
     } finally {
       setBusy(null);
     }
@@ -680,7 +725,9 @@ export function App() {
       await apiPost(`/platforms/${platform}/${enabled ? "connect" : "disconnect"}`);
       await refresh(selectedSongId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", `platform_${platform}_toggle_failed`, message);
     } finally {
       setBusy(null);
     }
@@ -699,7 +746,9 @@ export function App() {
       }
       await refresh(selectedSongId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", `suno_${action}_failed`, message);
     } finally {
       setBusy(null);
     }
@@ -711,7 +760,9 @@ export function App() {
       await apiPost("/suno/budget/reset");
       await refresh(selectedSongId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "suno_budget_reset_failed", message);
       throw caughtError;
     } finally {
       setBusy(null);
@@ -733,11 +784,25 @@ export function App() {
       setReplyText("");
       await refresh(selectedSongId);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : String(caughtError));
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "simulate_reply_failed", message);
     } finally {
       setBusy(null);
     }
   };
+
+  const clearEventFilters = () => {
+    setEventFilter(defaultDistributionEventsFilter);
+    setShortcutHelpOpen(false);
+  };
+
+  useKeyboardShortcuts({
+    refresh: () => void refresh(selectedSongId),
+    "probe-x": () => void testPlatform("x"),
+    "clear-filters": clearEventFilters,
+    "toggle-help": () => setShortcutHelpOpen((current) => !current)
+  });
 
   const setupPanel = (
     <article className="panel">
@@ -875,6 +940,9 @@ export function App() {
   const observabilityPanel = (
     <ObservabilityPanel
       events={status?.recentDistributionEvents}
+      eventFilter={eventFilter}
+      onEventFilterChange={setEventFilter}
+      onClearEventFilters={clearEventFilters}
       stats={status?.platformStats}
       platforms={status?.platforms}
       budgetCard={sunoOutcomeCard}
@@ -1191,6 +1259,8 @@ export function App() {
 
   return (
     <main className="console-shell">
+      <ErrorToastStack toasts={errorToasts} onDismiss={(id) => setErrorToasts((current) => dismissErrorToast(current, id))} />
+      <ShortcutHelpOverlay open={shortcutHelpOpen} onClose={() => setShortcutHelpOpen(false)} />
       <header className="hero">
         <div>
           <div className="eyebrow">Producer Console</div>
@@ -1205,20 +1275,7 @@ export function App() {
         </div>
       </header>
 
-      {refreshIsStale ? (
-        <section className="panel stale-banner">
-          <strong>Console data may be stale.</strong>
-          <div className="muted">
-            Last successful refresh {lastRefreshAt ? `${Math.floor((nowMs - lastRefreshAt) / 1000)}s ago` : "has not completed yet"}.
-          </div>
-        </section>
-      ) : null}
-      {networkError ? (
-        <section className="panel offline-banner">
-          <strong>Console refresh failed.</strong>
-          <div className="muted">Fetches time out after {fetchTimeoutMs / 1000}s. Last error: {networkError}</div>
-        </section>
-      ) : null}
+      <ConnectionBanner connection={connection} now={nowMs} timeoutSeconds={fetchTimeoutMs / 1000} />
       {error ? <section className="panel error-banner">{error}</section> : null}
       {status?.summary?.allPlatformsEffectivelyDryRun ? (
         <section className="panel dry-run-banner">

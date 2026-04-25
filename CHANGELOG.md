@@ -49,6 +49,7 @@
 - Added Round 79 infra hardening with bash-3 compatibility grep rules, route fallback telemetry, Producer Console stale/offline banners, and reason-code doc cross-links.
 - Added Round 80 dependency-audit hardening with root overrides for vulnerable transitive packages, a production `npm audit --omit=dev` CI gate, and documented dev-only advisory handling.
 - Added Round 81 operator self-serve scripts for doctor checks, manual runtime log rotation, runtime state snapshots, and `docs/OPERATOR_RUNBOOK.md`.
+- Added Round 82 Producer Console UX helpers for distribution-event filtering, unified error toasts, reconnect/recovered banners, and keyboard shortcuts without importing React components into root tests.
 
 ### Changed
 - Extracted `buildImportedAssetRows` and `importedAssetsPlaceholder` into `src/services/sunoImportedAssetsView.ts` so the helpers are shared by `SunoOutcomeCard` and root vitest without dragging the React entrypoint into the test scope.
