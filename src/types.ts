@@ -204,6 +204,17 @@ export interface PromptLedgerEntry {
   error?: SerializedError;
 }
 
+export interface SongStateImportOutcome {
+  runId: string;
+  urlCount: number;
+  pathCount?: number;
+  paths?: string[];
+  failedUrls?: SunoImportFailedUrl[];
+  reason?: string;
+  at: string;
+  dryRun?: boolean;
+}
+
 export interface SongState {
   songId: string;
   title: string;
@@ -216,6 +227,7 @@ export interface SongState {
   publicLinks: string[];
   runCount: number;
   lastReason?: string;
+  lastImportOutcome?: SongStateImportOutcome;
 }
 
 export interface SongIdeaResult {
@@ -367,6 +379,7 @@ export interface SunoBudgetStatus {
   limit: number;
   remaining: number;
   lastResetAt?: string;
+  resetHistory?: SunoBudgetResetEntry[];
   monthly: {
     month: string;
     consumed: number;
@@ -374,6 +387,28 @@ export interface SunoBudgetStatus {
     remaining: number;
     unlimited: boolean;
   };
+}
+
+export interface SunoBudgetResetEntry {
+  timestamp: string;
+  consumedBefore: number;
+  reason: string;
+}
+
+export interface SunoArtifactIndexEntry {
+  runId: string;
+  songId?: string;
+  path: string;
+  size: number;
+  format: "mp3" | "m4a";
+  createdAt: string;
+}
+
+export type SunoImportFailureReason = "404" | "network" | "extraction_failed";
+
+export interface SunoImportFailedUrl {
+  url: string;
+  reason: SunoImportFailureReason;
 }
 
 export interface DistributionSummary {
@@ -451,6 +486,7 @@ export interface SunoWorkerStatus {
     pathCount?: number;
     paths?: string[];
     metadata?: SunoImportedAssetMetadata[];
+    failedUrls?: SunoImportFailedUrl[];
     reason?: string;
     at: string;
     dryRun?: boolean;
@@ -484,6 +520,7 @@ export interface SunoImportResult {
   urls: string[];
   paths?: string[];
   metadata?: SunoImportedAssetMetadata[];
+  failedUrls?: SunoImportFailedUrl[];
   runId?: string;
   selectedTakeId?: string;
   importedAt?: string;
@@ -661,6 +698,12 @@ export interface StatusResponse {
   ticker: AutopilotTickerStatus;
   suno: {
     budget: SunoBudgetStatus;
+    artifacts: SunoArtifactIndexEntry[];
+    profile?: {
+      stale?: boolean;
+      detail?: string;
+      checkedAt?: string;
+    };
   };
   sunoWorker: SunoWorkerStatus;
   distributionWorker: SocialDistributionWorkerStatus;
@@ -695,6 +738,7 @@ export interface SunoStatusResponse {
   recentRuns: SunoRunRecord[];
   latestPromptPackVersion?: number;
   latestPromptPackMetadata?: unknown;
+  artifacts?: SunoArtifactIndexEntry[];
   currentRunId?: string;
   lastImportedRunId?: string;
   lastCreateOutcome?: SunoWorkerStatus["lastCreateOutcome"];

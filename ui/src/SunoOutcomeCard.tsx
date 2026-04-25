@@ -8,6 +8,7 @@ type SunoOutcome = {
   pathCount?: number;
   paths?: string[];
   metadata?: ImportedAsset[];
+  failedUrls?: FailedImportUrl[];
   reason?: string;
   at: string;
   dryRun?: boolean;
@@ -19,6 +20,26 @@ export type ImportedAsset = {
   format: "mp3" | "m4a";
   title?: string;
   durationSec?: number;
+};
+
+export type FailedImportUrl = {
+  url: string;
+  reason: "404" | "network" | "extraction_failed";
+};
+
+export type SunoArtifactIndexEntry = {
+  runId: string;
+  songId?: string;
+  path: string;
+  size: number;
+  format: "mp3" | "m4a";
+  createdAt: string;
+};
+
+type BudgetResetEntry = {
+  timestamp: string;
+  consumedBefore: number;
+  reason: string;
 };
 
 export type SunoOutcomeCardProps = {
@@ -36,6 +57,7 @@ export type SunoOutcomeCardProps = {
     limit: number;
     remaining: number;
     lastResetAt?: string;
+    resetHistory?: BudgetResetEntry[];
     monthly?: {
       month: string;
       consumed: number;
@@ -43,6 +65,12 @@ export type SunoOutcomeCardProps = {
       remaining: number;
       unlimited: boolean;
     };
+  };
+  artifacts?: SunoArtifactIndexEntry[];
+  profile?: {
+    stale?: boolean;
+    detail?: string;
+    checkedAt?: string;
   };
   onResetBudget?: () => Promise<void>;
   budgetResetDisabled?: boolean;
@@ -132,6 +160,8 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
   const importOutcome = formatOutcome("Last Import", props.lastImportOutcome);
   const importedAssets = buildImportedAssetRows(props.lastImportOutcome);
   const importedAssetsEmpty = importedAssetsPlaceholder(props.lastImportOutcome);
+  const failedUrls = props.lastImportOutcome?.failedUrls ?? [];
+  const artifacts = props.artifacts ?? [];
   const [copyFeedback, setCopyFeedback] = useState<Record<string, "copied" | "failed">>({});
   const [resetFeedback, setResetFeedback] = useState<"failed" | null>(null);
   const copyTimers = useRef<Record<string, number>>({});
@@ -213,6 +243,16 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
 
   return (
     <div className="list">
+      {props.profile?.stale ? (
+        <div className="item suno-profile-stale">
+          <div className="eyebrow">Suno Profile</div>
+          <strong>Profile looks stale</strong>
+          <div className="muted">
+            {props.profile.detail ?? "Run scripts/suno-profile-diagnose.sh manually on the operator machine. No console action runs the script."}
+          </div>
+          {props.profile.checkedAt ? <div className="muted">checked {props.profile.checkedAt}</div> : null}
+        </div>
+      ) : null}
       <div className="item">
         <strong>{props.state || "-"}</strong>
         <div className="muted">{props.pendingAction ?? props.hardStopReason ?? "No pending operator step."}</div>
@@ -258,6 +298,18 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
               <button type="button" className="budget-reset-button" disabled={props.budgetResetDisabled} onClick={() => void resetBudget()}>Reset budget</button>
               {resetFeedback === "failed" ? <span className="field-error">reset failed</span> : null}
             </div>
+            {props.budget.resetHistory?.length ? (
+              <div className="reset-history">
+                <div className="eyebrow">Recent Resets</div>
+                {props.budget.resetHistory.slice(0, 5).map((entry) => (
+                  <div className="mini-row" key={`${entry.timestamp}-${entry.reason}`}>
+                    <span>{entry.timestamp}</span>
+                    <span>{entry.consumedBefore} before</span>
+                    <span>{entry.reason}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </>
         ) : (
           <div className="muted">No budget state yet.</div>
@@ -282,6 +334,17 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
           {props.lastImportOutcome?.pathCount ?? importedAssets.length} files
           {props.lastImportOutcome?.urlCount !== undefined ? ` · ${props.lastImportOutcome.urlCount} urls` : ""}
         </div>
+        {failedUrls.length > 0 ? (
+          <details className="failed-url-list">
+            <summary>{failedUrls.length} failed URL(s)</summary>
+            {failedUrls.map((failure) => (
+              <div className="mini-row failed-url-row" key={`${failure.url}-${failure.reason}`}>
+                <span>{failure.reason}</span>
+                <span>{failure.url}</span>
+              </div>
+            ))}
+          </details>
+        ) : null}
       </div>
       <div className="item">
         <div className="eyebrow">Imported Assets</div>
@@ -310,6 +373,28 @@ export function SunoOutcomeCard(props: SunoOutcomeCardProps) {
                   {formatDuration(asset.durationSec) ? ` · ${formatDuration(asset.durationSec)}` : ""}
                   {asset.path ? ` · ${asset.path}` : ""}
                 </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      <div className="item">
+        <div className="eyebrow">Runtime Artifacts</div>
+        {artifacts.length === 0 ? <div className="muted">No runtime artifacts indexed yet.</div> : null}
+        {artifacts.length > 0 ? (
+          <div className="artifact-index-list">
+            {artifacts.slice(0, 8).map((artifact) => (
+              <div className="asset-row" key={`${artifact.runId}-${artifact.path}`}>
+                <div className="asset-row-header">
+                  <strong>{artifact.path.split("/").at(-1) ?? artifact.path}</strong>
+                  <span className="badge badge-dry-run">{artifact.format}</span>
+                </div>
+                <div className="muted">
+                  run {artifact.runId}
+                  {artifact.songId ? ` · song ${artifact.songId}` : ""}
+                  {` · ${artifact.size} bytes · ${artifact.createdAt}`}
+                </div>
+                <div className="muted">{artifact.path}</div>
               </div>
             ))}
           </div>

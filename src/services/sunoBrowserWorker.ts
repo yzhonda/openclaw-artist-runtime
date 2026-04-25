@@ -5,6 +5,8 @@ import type {
   SunoCreateRequest,
   SunoCreateResult,
   SunoImportRequest,
+  SunoImportFailedUrl,
+  SunoImportFailureReason,
   SunoImportResult,
   SunoLoginHandoff,
   SunoDriverMode,
@@ -90,6 +92,37 @@ function buildHandoffMessage(state: SunoWorkerProbeState, detail?: string): stri
     default:
       return "Suno worker needs operator attention.";
   }
+}
+
+function classifyImportFailure(reason?: string): SunoImportFailureReason {
+  const normalized = (reason ?? "").toLowerCase();
+  if (normalized.includes("404")) {
+    return "404";
+  }
+  if (
+    normalized.includes("network")
+    || normalized.includes("timeout")
+    || normalized.includes("econn")
+    || normalized.includes("enotfound")
+    || normalized.includes("socket")
+    || normalized.includes("fetch")
+  ) {
+    return "network";
+  }
+  return "extraction_failed";
+}
+
+function inferFailedImportUrls(requestedUrls: string[], result: SunoImportResult): SunoImportFailedUrl[] {
+  if (result.failedUrls?.length) {
+    return result.failedUrls;
+  }
+  const importedUrls = new Set(result.metadata?.map((asset) => asset.url) ?? result.urls);
+  return requestedUrls
+    .filter((url) => !importedUrls.has(url))
+    .map((url) => ({
+      url,
+      reason: classifyImportFailure(result.reason)
+    }));
 }
 
 export class SunoBrowserWorker {
@@ -443,6 +476,7 @@ export class SunoBrowserWorker {
           pathCount: 0,
           paths: [],
           metadata: [],
+          failedUrls: [],
           reason: blockedResult.reason,
           at: now(),
           dryRun
@@ -472,6 +506,7 @@ export class SunoBrowserWorker {
           pathCount: 0,
           paths: [],
           metadata: [],
+          failedUrls: [],
           reason: "dry-run blocks Suno import",
           at: now(),
           dryRun: true
@@ -501,6 +536,7 @@ export class SunoBrowserWorker {
           pathCount: 0,
           paths: [],
           metadata: [],
+          failedUrls: [],
           reason: "suno_browser_driver_missing_import",
           at: now(),
           dryRun
@@ -516,6 +552,7 @@ export class SunoBrowserWorker {
     }
 
     const result = await driver.importResults({ runId, urls });
+    const failedUrls = inferFailedImportUrls(urls, result);
     await this.transition({
       state: "connected",
       connected: true,
@@ -529,6 +566,7 @@ export class SunoBrowserWorker {
         pathCount: result.paths?.length ?? 0,
         paths: result.paths,
         metadata: result.metadata,
+        failedUrls,
         reason: result.reason,
         at: result.importedAt ?? now(),
         dryRun: result.dryRun
@@ -537,7 +575,8 @@ export class SunoBrowserWorker {
     return {
       ...result,
       runId: result.runId ?? runId,
-      importedAt: result.importedAt ?? now()
+      importedAt: result.importedAt ?? now(),
+      failedUrls
     };
   }
 }

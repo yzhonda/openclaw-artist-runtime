@@ -1,10 +1,16 @@
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import { BrowserWorkerSunoConnector } from "../connectors/suno/browserWorkerConnector.js";
-import type { ArtistRuntimeConfig, PromptLedgerEntry, SunoRunRecord, SunoRunStatus } from "../types.js";
-import { updateSongState } from "./artistState.js";
+import type {
+  ArtistRuntimeConfig,
+  PromptLedgerEntry,
+  SunoArtifactIndexEntry,
+  SunoRunRecord,
+  SunoRunStatus
+} from "../types.js";
+import { listSongStates, updateSongState } from "./artistState.js";
 import { appendPromptLedger, createPromptLedgerEntry, getSongPromptLedgerPath, inspectJsonlFile } from "./promptLedger.js";
 import { decideMusicAuthority } from "./musicAuthority.js";
 import {
@@ -107,6 +113,51 @@ export async function readAllSunoRuns(root: string, songId: string): Promise<Sun
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
+export async function buildSunoArtifactIndex(root: string): Promise<SunoArtifactIndexEntry[]> {
+  const runtimeRoot = join(root, "runtime", "suno");
+  const runToSongId = new Map<string, string>();
+  const songs = await listSongStates(root);
+  await Promise.all(
+    songs.map(async (song) => {
+      const runs = await readAllSunoRuns(root, song.songId);
+      for (const run of runs) {
+        runToSongId.set(run.runId, song.songId);
+      }
+    })
+  );
+
+  const runDirs = await readdir(runtimeRoot, { withFileTypes: true }).catch(() => []);
+  const entries = await Promise.all(
+    runDirs
+      .filter((entry) => entry.isDirectory())
+      .map(async (runDir) => {
+        const runId = runDir.name;
+        const runPath = join(runtimeRoot, runId);
+        const files = await readdir(runPath, { withFileTypes: true }).catch(() => []);
+        const assets = await Promise.all(
+          files
+            .filter((file) => file.isFile() && (file.name.toLowerCase().endsWith(".mp3") || file.name.toLowerCase().endsWith(".m4a")))
+            .map(async (file) => {
+              const path = join(runPath, file.name);
+              const fileStat = await stat(path);
+              const format = file.name.toLowerCase().endsWith(".m4a") ? "m4a" : "mp3";
+              return {
+                runId,
+                songId: runToSongId.get(runId),
+                path,
+                size: fileStat.size,
+                format,
+                createdAt: fileStat.mtime.toISOString()
+              } satisfies SunoArtifactIndexEntry;
+            })
+        );
+        return assets;
+      })
+  );
+
+  return entries.flat().sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
 export async function generateSunoRun(input: GenerateSunoRunInput): Promise<SunoRunRecord> {
   const config = applyConfigDefaults(input.config);
   const connector = new BrowserWorkerSunoConnector(input.workspaceRoot, { config });
@@ -206,6 +257,7 @@ export async function generateSunoRun(input: GenerateSunoRunInput): Promise<Suno
 
 export async function importSunoResults(input: ImportSunoResultsInput): Promise<SunoRunRecord> {
   const config = applyConfigDefaults(input.config);
+  const importedAt = new Date().toISOString();
   const payload = {
     runId: input.runId,
     urls: input.urls,
@@ -224,7 +276,7 @@ export async function importSunoResults(input: ImportSunoResultsInput): Promise<
   const importedRecord: SunoRunRecord = {
     runId: input.runId,
     songId: input.songId,
-    createdAt: new Date().toISOString(),
+    createdAt: importedAt,
     mode: config.music.suno.connectionMode,
     authorityDecision: {
       allowed: true,
@@ -257,7 +309,17 @@ export async function importSunoResults(input: ImportSunoResultsInput): Promise<
     status: "takes_imported",
     reason: "Suno results imported",
     selectedTakeId: input.selectedTakeId,
-    appendPublicLinks: input.urls
+    appendPublicLinks: input.urls,
+    lastImportOutcome: {
+      runId: input.runId,
+      urlCount: input.urls.length,
+      pathCount: input.resultRefs?.length ?? 0,
+      paths: input.resultRefs ?? [],
+      failedUrls: [],
+      reason: "Suno results imported",
+      at: importedAt,
+      dryRun: config.autopilot.dryRun
+    }
   });
 
   return importedRecord;

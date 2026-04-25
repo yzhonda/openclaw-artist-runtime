@@ -1,5 +1,6 @@
 import { appendFile, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import type { SunoBudgetResetEntry } from "../types.js";
 
 export const DEFAULT_SUNO_DAILY_CREDIT_LIMIT = 60;
 export const DEFAULT_SUNO_MONTHLY_CREDIT_LIMIT = 0;
@@ -128,6 +129,36 @@ export class SunoBudgetTracker {
     const path = this.resetLogPath();
     await mkdir(dirname(path), { recursive: true });
     await appendFile(path, `${JSON.stringify(entry)}\n`, "utf8");
+  }
+
+  async getResetHistory(limit = 10): Promise<SunoBudgetResetEntry[]> {
+    const contents = await readFile(this.resetLogPath(), "utf8").catch(() => "");
+    if (!contents.trim()) {
+      return [];
+    }
+
+    const entries = contents
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          const parsed = JSON.parse(line) as Partial<SunoBudgetResetEntry>;
+          return typeof parsed.timestamp === "string"
+            && typeof parsed.reason === "string"
+            && Number.isFinite(parsed.consumedBefore)
+            ? {
+                timestamp: parsed.timestamp,
+                consumedBefore: Number(parsed.consumedBefore),
+                reason: parsed.reason
+              }
+            : undefined;
+        } catch {
+          return undefined;
+        }
+      })
+      .filter((entry): entry is SunoBudgetResetEntry => Boolean(entry));
+
+    return entries.slice(-Math.max(limit, 0)).reverse();
   }
 
   async reserve(

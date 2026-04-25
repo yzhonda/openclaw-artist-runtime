@@ -204,6 +204,12 @@ Round 49 now locks the cheap boundary cases in mock-only tests:
   without exposing the runtime directory over HTTP.
 - If no imported files have been recorded yet, the Console keeps the explicit
   placeholder `No imported assets yet.`
+- Round 78 also indexes the local `runtime/suno/<runId>/` directory and exposes
+  the latest mp3/m4a artifacts in the Console. The index is read-only and shows
+  `runId`, optional `songId`, file size, format, created timestamp, and path.
+- Failed import URLs are surfaced separately as `failedUrls[]` with a compact
+  reason (`404`, `network`, or `extraction_failed`) so partial imports can be
+  triaged without re-running the whole Suno job.
 
 ## Credit budget
 
@@ -283,6 +289,9 @@ Tracker behavior is intentionally simple and defensive:
 - after a successful write, stale `budget.json.tmp` leftovers are removed
 - manual resets append a local audit line to `runtime/suno/budget-reset.jsonl`
   with `{ timestamp, consumedBefore, reason }`
+- `/api/status.suno.budget.resetHistory` reads the most recent reset audit
+  lines, skips malformed jsonl rows, and the Producer Console shows the latest
+  reset timestamp / previous consumed value / reason next to the budget card.
 
 Recommended operator edit flow:
 
@@ -318,6 +327,10 @@ Every action here is operator-run on the local machine. Keep the same security
 boundary as `SECURITY.md` / `PRIVACY.md`: do not paste profile contents,
 cookies, session tokens, screenshots, or chat transcripts into PRs, logs, or
 shared threads.
+
+When `/api/status.suno.profile.stale` is true, the Producer Console shows a
+manual-recovery banner. It points operators at `scripts/suno-profile-diagnose.sh`
+but never runs that script from the browser; diagnostics remain local CLI work.
 
 ### Scenario A: profile corruption
 

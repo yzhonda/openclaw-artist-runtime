@@ -85,6 +85,11 @@ describe("suno imported asset status surface", () => {
     const sunoStatus = await buildSunoStatusResponse({ artist: { workspaceRoot: prepared.root } });
 
     expect(status.recentSong?.songId).toBe("song-001");
+    expect(status.recentSong?.lastImportOutcome).toMatchObject({
+      runId: prepared.runId,
+      urlCount: 2,
+      failedUrls: []
+    });
     expect(status.lastSunoRun?.runId).toBe(prepared.runId);
     expect(status.sunoWorker.lastImportOutcome).toMatchObject({
       runId: prepared.runId,
