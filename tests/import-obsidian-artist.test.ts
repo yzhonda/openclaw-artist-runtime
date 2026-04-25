@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 // @ts-expect-error -- importing a .mjs script is fine for vitest's runtime check.
-import { buildArtistMd, buildSocialVoiceMd, parseFrontmatter, splitSections, stripSoundCloudLines } from "../scripts/import-obsidian-artist.mjs";
+import { buildArtistMd, buildSocialVoiceMd, extractSpotifyProfileSection, parseFrontmatter, splitSections, stripSoundCloudLines } from "../scripts/import-obsidian-artist.mjs";
 
 const SAMPLE = `---
 name: "test::artist"
@@ -127,5 +127,58 @@ describe("import-obsidian-artist parser", () => {
     expect(out).toContain("Some prose mentioning SoundCloud is allowed.");
     expect(out).toContain("- Spotify: https://example");
     expect(out).not.toMatch(/^\s*-\s*SoundCloud\s*:/im);
+  });
+
+  it("extractSpotifyProfileSection returns body of an existing workspace SOCIAL_VOICE.md", () => {
+    const existing = [
+      "# SOCIAL_VOICE.md",
+      "",
+      "## Voice",
+      "",
+      "Short. Precise.",
+      "",
+      "## Spotify Profile (imported)",
+      "",
+      "### Bio",
+      "Imported bio line",
+      "",
+      "### URLs",
+      "- Spotify: https://open.spotify.com/artist/manually-edited",
+      "- X: https://x.com/used00honda (handle: @used00honda)"
+    ].join("\n");
+    const extracted = extractSpotifyProfileSection(existing);
+    expect(extracted).toContain("Imported bio line");
+    expect(extracted).toContain("manually-edited");
+    expect(extracted).toContain("@used00honda");
+    expect(extracted).not.toContain("## Voice");
+  });
+
+  it("extractSpotifyProfileSection returns null when the section is absent", () => {
+    const existing = [
+      "# SOCIAL_VOICE.md",
+      "",
+      "## Voice",
+      "",
+      "Short."
+    ].join("\n");
+    expect(extractSpotifyProfileSection(existing)).toBeNull();
+  });
+
+  it("buildSocialVoiceMd preserves the existing Spotify Profile section when provided (re-import safety)", () => {
+    const { body } = parseFrontmatter(SAMPLE);
+    const sections = splitSections(body);
+    const handcrafted = [
+      "### Bio",
+      "Manually curated bio in workspace",
+      "",
+      "### URLs",
+      "- Spotify: https://open.spotify.com/artist/REAL_URL",
+      "- X: https://x.com/used00honda (handle: @used00honda, bird connector tested)"
+    ].join("\n");
+    const md = buildSocialVoiceMd({ sections, existingSpotifyProfile: handcrafted });
+    expect(md).toContain("Manually curated bio in workspace");
+    expect(md).toContain("REAL_URL");
+    expect(md).toContain("https://x.com/used00honda");
+    expect(md).not.toContain("https://open.spotify.com/artist/example");
   });
 });
