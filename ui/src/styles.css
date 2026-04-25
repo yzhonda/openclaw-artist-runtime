@@ -219,6 +219,15 @@ textarea {
   margin-bottom: 12px;
 }
 
+.section-title-archive {
+  margin-top: 28px;
+}
+
+.archive-hint {
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
 .list {
   display: grid;
   gap: 10px;
