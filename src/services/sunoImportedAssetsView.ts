@@ -32,3 +32,11 @@ export function buildImportedAssetRows(outcome?: ImportedAssetsViewSource): Suno
 export function importedAssetsPlaceholder(outcome?: ImportedAssetsViewSource): string | null {
   return buildImportedAssetRows(outcome).length === 0 ? "No imported assets yet." : null;
 }
+
+export function filterImportedAssetsByUrlPrefix(rows: SunoImportedAssetView[], prefix: string): SunoImportedAssetView[] {
+  const normalized = prefix.trim();
+  if (!normalized) {
+    return rows;
+  }
+  return rows.filter((row) => row.url.startsWith(normalized));
+}

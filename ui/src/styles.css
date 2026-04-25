@@ -607,6 +607,13 @@ textarea {
   margin-top: 10px;
 }
 
+.asset-filter {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 .asset-row {
   padding-top: 10px;
   border-top: 1px solid rgba(216, 204, 189, 0.8);
