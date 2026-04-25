@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
-import type { AutopilotRunState, AutopilotStage, AutopilotStatus, ArtistRuntimeConfig, SongState } from "../types.js";
+import type { AutopilotRunState, AutopilotStage, AutopilotStatus, ArtistRuntimeConfig, SocialPublishLedgerEntry, SocialPublishResult, SongState } from "../types.js";
 import { listSongStates, readSongState, updateSongState } from "./artistState.js";
 import { createSongIdea } from "./songIdeation.js";
 import { draftLyrics } from "./lyricsDrafting.js";
@@ -10,6 +10,19 @@ import { createAndPersistSunoPromptPack } from "./sunoPromptPackFiles.js";
 import { generateSunoRun } from "./sunoRuns.js";
 import { publishSocialAction } from "./socialPublishing.js";
 import { selectTake } from "./takeSelection.js";
+
+export function isPublishBlockedByDryRun(
+  result: Pick<SocialPublishResult, "accepted" | "dryRun">,
+  entry: Pick<SocialPublishLedgerEntry, "policyDecision">
+): boolean {
+  if (result.accepted) {
+    return false;
+  }
+  if (result.dryRun === true) {
+    return true;
+  }
+  return entry.policyDecision?.policyDecision === "deny_dry_run";
+}
 
 const defaultAutopilotState: AutopilotRunState = {
   stage: "idle",
@@ -361,7 +374,7 @@ export class ArtistAutopilotService {
             config,
             action: "publish"
           });
-          if (config.autopilot.dryRun && published.result.reason.includes("dry-run")) {
+          if (config.autopilot.dryRun && isPublishBlockedByDryRun(published.result, published.entry)) {
             await updateSongState(input.workspaceRoot, song.songId, {
               status: "published",
               reason: `dry-run publish simulated: ${published.result.reason}`

@@ -1142,18 +1142,20 @@ async function builtProducerConsoleHtml(projectRoot = PLUGIN_ROOT): Promise<stri
     const cssChunks = await Promise.all(cssMatches.map(async (href) => readFile(join(uiRoot, stripUiBasePath(href)), "utf8")));
     const scriptChunks = await Promise.all(scriptMatches.map(async (src) => readFile(join(uiRoot, stripUiBasePath(src)), "utf8")));
 
+    const inlineStyles = `<style>${cssChunks.join("\n")}</style></head>`;
+    const inlineScripts = `<script type="module">${scriptChunks.join("\n")}</script></body>`;
     return indexHtml
       .replace(/<link[^>]+href="[^"]+\.css"[^>]*>/g, "")
       .replace(/<script[^>]+src="[^"]+\.js"[^>]*><\/script>/g, "")
-      .replace("</head>", `<style>${cssChunks.join("\n")}</style></head>`)
-      .replace("</body>", `<script type="module">${scriptChunks.join("\n")}</script></body>`);
+      .replace("</head>", () => inlineStyles)
+      .replace("</body>", () => inlineScripts);
   } catch {
     return undefined;
   }
 }
 
-export async function producerConsoleHtml(): Promise<string> {
-  const built = await builtProducerConsoleHtml();
+export async function producerConsoleHtml(projectRoot = PLUGIN_ROOT): Promise<string> {
+  const built = await builtProducerConsoleHtml(projectRoot);
   if (built) {
     return built;
   }

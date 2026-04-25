@@ -1,8 +1,12 @@
 import {
   instagramAuthorityModes,
+  sunoDriverModes,
+  sunoSubmitModes,
   tiktokAuthorityModes,
   xAuthorityModes,
   type InstagramAuthority,
+  type SunoDriverMode,
+  type SunoSubmitMode,
   type TikTokAuthority,
   type XAuthority
 } from "../../src/types";
@@ -12,6 +16,8 @@ export type ConfigEditorSource = {
     suno: {
       dailyCreditLimit: number;
       monthlyCreditLimit: number;
+      driver: SunoDriverMode;
+      submitMode: SunoSubmitMode;
     };
   };
   autopilot: {
@@ -33,6 +39,8 @@ export type ConfigEditorSource = {
 export type ConfigDraft = {
   dailyCreditLimit: string;
   monthlyCreditLimit: string;
+  sunoDriver: SunoDriverMode;
+  sunoSubmitMode: SunoSubmitMode;
   autopilotEnabled: boolean;
   dryRun: boolean;
   songsPerWeek: string;
@@ -54,6 +62,8 @@ export type ConfigUpdatePatch = {
     suno: {
       dailyCreditLimit: number;
       monthlyCreditLimit: number;
+      driver: SunoDriverMode;
+      submitMode: SunoSubmitMode;
     };
   };
   autopilot: {
@@ -84,6 +94,8 @@ export function buildConfigDraft(source: ConfigEditorSource): ConfigDraft {
   return {
     dailyCreditLimit: String(source.music.suno.dailyCreditLimit),
     monthlyCreditLimit: String(source.music.suno.monthlyCreditLimit),
+    sunoDriver: source.music.suno.driver,
+    sunoSubmitMode: source.music.suno.submitMode,
     autopilotEnabled: source.autopilot.enabled,
     dryRun: source.autopilot.dryRun,
     songsPerWeek: String(source.autopilot.songsPerWeek),
@@ -135,11 +147,21 @@ export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
     throw new Error("tiktokAuthority must be one of the supported TikTok authority modes");
   }
 
+  if (!sunoDriverModes.includes(draft.sunoDriver)) {
+    throw new Error("sunoDriver must be one of the supported Suno driver modes");
+  }
+
+  if (!sunoSubmitModes.includes(draft.sunoSubmitMode)) {
+    throw new Error("sunoSubmitMode must be one of the supported Suno submit modes");
+  }
+
   return {
     music: {
       suno: {
         dailyCreditLimit,
-        monthlyCreditLimit
+        monthlyCreditLimit,
+        driver: draft.sunoDriver,
+        submitMode: draft.sunoSubmitMode
       }
     },
     autopilot: {
@@ -152,7 +174,8 @@ export function buildConfigUpdatePatch(draft: ConfigDraft): ConfigUpdatePatch {
       liveGoArmed: draft.distributionLiveGoArmed,
       platforms: {
         x: { enabled: draft.xEnabled, liveGoArmed: draft.xLiveGoArmed, authority: draft.xAuthority },
-        instagram: { enabled: draft.instagramEnabled, liveGoArmed: draft.instagramLiveGoArmed, authority: draft.instagramAuthority },
+        // Instagram is frozen by #4 boundary; arm flags are clamped to false even if the draft has them on.
+        instagram: { enabled: draft.instagramEnabled, liveGoArmed: false, authority: draft.instagramAuthority },
         // TikTok stays frozen in the UI lane until the operator account exists.
         tiktok: { enabled: draft.tiktokEnabled, liveGoArmed: false, authority: draft.tiktokAuthority }
       }
