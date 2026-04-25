@@ -105,6 +105,11 @@ describe("import-obsidian-song parser", () => {
     expect(md).toContain("- Song ID: where-it-played");
   });
 
+  it("buildSongMd preserves the scheduled status for pre-release catalog entries", () => {
+    const md = buildSongMd({ songId: "where-it-played", title: "Where It Played", status: "scheduled" });
+    expect(md).toContain("- Status: scheduled");
+  });
+
   it("readExistingSongStatus reads the Status line from an existing song.md", async () => {
     const dir = await mkdtemp(join(tmpdir(), "song-status-"));
     const path = join(dir, "song.md");

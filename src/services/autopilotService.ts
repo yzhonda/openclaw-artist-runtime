@@ -145,7 +145,7 @@ function stageFromSong(song?: SongState): AutopilotStage {
 
 async function currentSong(root: string): Promise<SongState | undefined> {
   const songs = await listSongStates(root);
-  return songs.find((song) => song.status !== "published" && song.status !== "archived" && song.status !== "failed");
+  return songs.find((song) => song.status !== "scheduled" && song.status !== "published" && song.status !== "archived" && song.status !== "failed");
 }
 
 async function ensureLyrics(root: string, song: SongState): Promise<SongState> {
