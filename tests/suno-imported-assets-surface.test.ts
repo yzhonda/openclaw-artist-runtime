@@ -7,7 +7,7 @@ import { ensureArtistWorkspace } from "../src/services/artistWorkspace";
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
 import { SunoBrowserWorker, type SunoBrowserDriver } from "../src/services/sunoBrowserWorker";
 import { generateSunoRun, importSunoResults } from "../src/services/sunoRuns";
-import { buildImportedAssetRows, importedAssetsPlaceholder } from "../ui/src/SunoOutcomeCard";
+import { buildImportedAssetRows, importedAssetsPlaceholder } from "../src/services/sunoImportedAssetsView";
 
 async function prepareImportedAssetWorkspace(urls: string[]) {
   const root = mkdtempSync(join(tmpdir(), "artist-runtime-imported-assets-"));
