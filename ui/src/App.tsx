@@ -1052,7 +1052,7 @@ export function App() {
     </article>
   );
 
-  const isArchivedSong = (status: string) => status === "published" || status === "archived" || status === "failed";
+  const isArchivedSong = (status: string) => status === "scheduled" || status === "published" || status === "archived" || status === "failed";
   const activeSongs = songs.filter((song) => !isArchivedSong(song.status));
   const archiveSongs = songs.filter((song) => isArchivedSong(song.status));
   const renderSongRow = (song: SongSummary) => (
@@ -1074,7 +1074,7 @@ export function App() {
       {archiveSongs.length > 0 ? (
         <>
           <div className="section-title section-title-archive">Archive</div>
-          <div className="muted archive-hint">完成・公開済 (published) や撤退済 (archived/failed) はここに集まります。autopilot は触りません。</div>
+          <div className="muted archive-hint">配信予定 (scheduled)・完成公開済 (published)・撤退済 (archived/failed) はここに集まります。autopilot は触りません。</div>
           <div className="list">
             {archiveSongs.map(renderSongRow)}
           </div>
