@@ -25,14 +25,36 @@ The producer chooses:
 After publication, the target install command is:
 
 ```bash
-openclaw plugins install clawhub:@your-org/openclaw-artist-runtime
+openclaw plugins install clawhub:@yzhonda/openclaw-artist-runtime
 ```
 
 or, if using npm fallback:
 
 ```bash
-openclaw plugins install npm:@your-org/openclaw-artist-runtime
+openclaw plugins install npm:@yzhonda/openclaw-artist-runtime
 ```
+
+## For operators
+
+If you installed this plugin through OpenClaw or npm, the published tarball
+contains everything needed to run and operate the artist daemon. Start here:
+
+- `docs/OPERATOR_QUICKSTART.md` — gateway start, probes, arm flags, dry-run
+  verification, and the explicit live-publish handoff boundary.
+- `docs/PRODUCER_CONSOLE.md` — Producer Console reference for the bundled UI
+  and the fallback inline shell.
+- `docs/OPERATOR_RUNBOOK.md` — manual doctor, log rotation, and runtime state
+  snapshot helpers.
+- `docs/TROUBLESHOOTING.md` — symptom-first recovery decision tree linked to
+  reason-code anchors.
+- `docs/ERRORS.md` — compact reason-code catalog for Console badges, logs, and
+  incident notes.
+- `docs/CONNECTOR_AUTH.md` and `docs/GATEWAY_AUTH.md` — credential probes for
+  X (Bird), Instagram, TikTok, and the gateway auth surface.
+- `docs/API_ROUTES.md` — live plugin HTTP route catalog.
+
+For a security-sensitive report, follow `SECURITY.md`. For data retention and
+local-state policy, see `PRIVACY.md`.
 
 ## Current status
 
@@ -91,21 +113,7 @@ dispatch under the current OpenClaw Gateway matcher, and CI regression gates on
 - Producer Console uses a bundled React app from `ui/dist/` when available and falls
   back to an inline inspection shell when the bundle is missing or stale.
 
-See `CHANGELOG.md` for the active feature set. For implementation details and
-contributor onboarding, start with `AGENTS.md`, then `CODEX_START_HERE.md`, then the
-docs in order. For the live plugin HTTP surface, use `docs/API_ROUTES.md` as the
-route catalog.
-
-Operator runbooks:
-
-- `docs/OPERATOR_QUICKSTART.md` — gateway start, probes, arm flags, dry-run
-  verification, and the explicit live-publish handoff boundary.
-- `docs/TROUBLESHOOTING.md` — symptom-first recovery decision tree linked to
-  reason-code anchors.
-- `docs/ERRORS.md` — compact reason-code catalog for Console badges, logs, and
-  incident notes.
-- `docs/OPERATOR_RUNBOOK.md` — manual doctor, log rotation, and runtime state
-  snapshot helpers.
+See `CHANGELOG.md` for the active feature set.
 
 ## Key package files
 
@@ -165,12 +173,33 @@ Every Suno run must persist the complete prompt lineage before any generation ac
 - take evaluation;
 - social derivative prompts.
 
-## Development
+## Producer Console bundle
+
+The plugin serves a built Producer Console from `ui/dist/` when present.
+If the bundle is missing, the plugin falls back to a minimal inline Console shell for safe inspection-only use.
+The bundled Console includes the config editor, platform authority selectors,
+ticker/status cards, recent X result surface, Suno outcome cards, and
+auto-refresh polling; the fallback Console keeps the same core control tower
+actions available for safe operation.
+
+To build just the Console:
 
 ```bash
+npm run build:ui
+```
+
+## For contributors
+
+Contributors should clone the repository (the published tarball intentionally
+omits source, internal specs, and developer scripts).
+
+```bash
+git clone https://github.com/yzhonda/openclaw-artist-runtime.git
+cd openclaw-artist-runtime
 npm install
 npm run typecheck
 npm test
+npm run lint
 npm run build
 npm run pack:verify
 ```
@@ -190,60 +219,23 @@ scripts/openclaw-local-write-smoke.sh
 scripts/openclaw-local-gateway stop
 ```
 
-Before public distribution, update:
+Internal entry points:
 
-- package scope/name;
+- `AGENTS.md` and `CODEX_START_HERE.md` — agent contribution guides.
+- `docs/full-spec/` — original detailed engineering specification
+  (`PRODUCT_SPEC.md`, `ARCHITECTURE.md`, `SUNO_SPEC.md`,
+  `SOCIAL_CONNECTORS_SPEC.md`, `PROMPT_LEDGER_SPEC.md`).
+- `docs/codex-detailed-specs/` — supplementary specs.
+- `MARKETPLACE.md` and `PUBLISHING.md` — marketplace listing and pre-publish checks.
+
+Before tagging a public release, update:
+
 - repository URLs;
 - author/license metadata;
 - compatibility versions;
 - OAuth application IDs and documentation;
 - marketplace screenshots and demo flow.
 
-## Producer Console bundle
-
-The plugin serves a built Producer Console from `ui/dist/` when present.
-If the bundle is missing, the plugin falls back to a minimal inline Console shell for safe inspection-only use.
-The bundled Console includes the config editor, platform authority selectors,
-ticker/status cards, recent X result surface, Suno outcome cards, and
-auto-refresh polling; the fallback Console keeps the same core control tower
-actions available for safe operation.
-
-To build just the Console:
-
-```bash
-npm run build:ui
-```
-
-## Full implementation specification
-
-This distributable package intentionally includes the original detailed engineering specification under `docs/full-spec/`. Do not treat those files as extra noise: they preserve the product decisions needed for Codex/agentic development.
-
-For implementation, start with:
-
-```txt
-AGENTS.md
-CODEX_START_HERE.md
-docs/full-spec/PRODUCT_SPEC.md
-docs/full-spec/ARCHITECTURE.md
-docs/full-spec/SUNO_SPEC.md
-docs/full-spec/SOCIAL_CONNECTORS_SPEC.md
-docs/full-spec/PROMPT_LEDGER_SPEC.md
-```
-
-For marketplace/publication, start with:
-
-```txt
-CAPABILITIES.md
-SECURITY.md
-PRIVACY.md
-MARKETPLACE.md
-PUBLISHING.md
-```
-
-For the plugin HTTP/API surface, start with:
-
-```txt
-docs/API_ROUTES.md
-```
-
-The package is deliberately larger than a minimal plugin sample because it is meant to preserve enough detail for a coding agent to continue implementation without access to the original conversation.
+Bug reports and feature requests use the templates under `.github/ISSUE_TEMPLATE/`.
+Pull requests follow `.github/PULL_REQUEST_TEMPLATE.md`. Security-sensitive findings
+must use GitHub Security Advisories rather than public issues.
