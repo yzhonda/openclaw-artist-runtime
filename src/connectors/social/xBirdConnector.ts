@@ -152,6 +152,7 @@ function looksLikeRateLimitFailure(output: string): boolean {
   return /(429|rate limit|too many requests|spam|temporarily locked)/i.test(output);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for the guarded live publish path; current runtime remains fail-closed.
 function hashText(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -161,6 +162,7 @@ function parseTweetUrl(output: string): string | undefined {
   return match?.[0];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for parsing live bird publish output after explicit operator GO.
 function parseTweetId(output: string): string | undefined {
   const fromUrl = parseTweetUrl(output)?.match(/status\/(\d+)/i)?.[1];
   if (fromUrl) {
@@ -178,10 +180,12 @@ function buildCombinedOutput(result: CommandResult): string {
   return [result.stdout, result.stderr].filter(Boolean).join("\n");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for future publish guard telemetry without changing current dry-run behavior.
 function resolveRecentPublishes(state: PublishGuardState, limit: number): PublishRecord[] {
   return state.recentPublishes.slice(-limit);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for guarded live publish enforcement; not invoked while live publish stays blocked.
 function checkPublishGuards(
   recentPublishes: PublishRecord[],
   textDigest: string,
@@ -211,6 +215,7 @@ function checkPublishGuards(
   return undefined;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for live publish failure mapping after explicit operator GO.
 function buildPublishFailure(result: CommandResult): SocialPublishResult {
   const combinedOutput = buildCombinedOutput(result);
   if (result.errorCode === "ENOENT") {

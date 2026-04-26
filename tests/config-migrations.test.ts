@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { defaultArtistRuntimeConfig } from "../src/config/defaultConfig";
-import { CURRENT_CONFIG_SCHEMA_VERSION, migrateConfig, mockV1ToV2AddSchemaVersion, mockV2ToV3RenamePattern } from "../src/config/migrations";
+import { CURRENT_CONFIG_SCHEMA_VERSION, mockV1ToV2AddSchemaVersion, mockV2ToV3RenamePattern } from "../src/config/migrations";
 import { validateConfig } from "../src/config/schema";
 import { readResolvedConfig } from "../src/services/runtimeConfig";
 

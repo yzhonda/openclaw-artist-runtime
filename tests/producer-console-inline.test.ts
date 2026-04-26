@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -19,12 +19,12 @@ function makeFakeProjectRoot(jsContent: string, cssContent = "/* css */"): strin
   for (const name of ["App.tsx", "main.tsx", "styles.css"]) {
     const path = join(srcDir, name);
     writeFileSync(path, "", "utf8");
-    require("node:fs").utimesSync(path, past, past);
+    utimesSync(path, past, past);
   }
   for (const name of ["index.html", "package.json", "vite.config.ts"]) {
     const path = join(root, "ui", name);
     writeFileSync(path, "", "utf8");
-    require("node:fs").utimesSync(path, past, past);
+    utimesSync(path, past, past);
   }
   return root;
 }

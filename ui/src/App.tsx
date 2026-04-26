@@ -588,7 +588,7 @@ export function App() {
 
   useEffect(() => {
     void refresh();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line -- Initial refresh intentionally runs once on mount.
 
   useEffect(() => {
     const intervalId = setInterval(() => setNowMs(Date.now()), 1000);
@@ -610,7 +610,7 @@ export function App() {
       void refresh(selectedSongId);
     }, 3000);
     return () => clearInterval(intervalId);
-  }, [busy, configDirty, selectedSongId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [busy, configDirty, selectedSongId]); // eslint-disable-line -- Refresh captures the latest draft sync policy without adding a hook plugin dependency.
 
   const runAction = async (action: "pause" | "resume" | "run-cycle" | "ideate") => {
     setBusy(action);

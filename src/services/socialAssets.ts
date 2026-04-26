@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import type { ArtistRuntimeConfig, SocialAssetRecord, SocialPlatform } from "../types.js";
