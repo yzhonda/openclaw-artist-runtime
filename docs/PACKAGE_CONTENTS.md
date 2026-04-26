@@ -102,6 +102,8 @@ follow `AGENTS.md` and the entries in `docs/full-spec/` to understand the
 runtime. The README "For contributors" section enumerates the entry
 points.
 
+<a id="excluded-paths-for-distribution"></a>
+
 ## Excluded paths (must never ship)
 
 These paths must stay out of the npm / ClawHub tarball, public PR
