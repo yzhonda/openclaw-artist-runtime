@@ -47,6 +47,8 @@
     "build:ui": "npm --prefix ui install --package-lock=false --include=dev --no-fund --no-audit && npm --prefix ui run build",
     "build": "npm run build:runtime && npm run build:ui",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src tests scripts ui/src --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\" \"scripts/**/*.{js,mjs}\" \"ui/src/**/*.{ts,tsx,css}\" \"*.{json,md}\" \"docs/**/*.md\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "boundary-grep": "node ./scripts/boundary-grep.mjs",
@@ -84,7 +86,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
     "@vitest/coverage-v8": "^2.1.9",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-prettier": "^5.5.5",
+    "prettier": "^3.8.3",
     "typescript": "^5.9.3",
     "vitest": "^2.1.0"
   },

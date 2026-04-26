@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { ArtistRuntimeConfig, SongIdeaResult } from "../types.js";
 import { ensureSongState, readArtistMind, updateSongState, writeSongBrief } from "./artistState.js";
