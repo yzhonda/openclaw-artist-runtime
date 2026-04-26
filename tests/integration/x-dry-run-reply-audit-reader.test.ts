@@ -22,7 +22,7 @@ describe("X dry-run reply audit reader chain", () => {
         };
       }>("POST", "/plugins/artist-runtime/api/platforms/x/simulate-reply", {
         songId: song.body.songId,
-        targetUrl: "https://x.com/used00honda/status/1234567890123456789",
+        targetUrl: "https://x.com/test_artist/status/1234567890123456789",
         text: "Dry-run reply from the rust line."
       });
 
@@ -33,7 +33,7 @@ describe("X dry-run reply audit reader chain", () => {
       expect(reply.body.entry.platform).toBe("x");
       expect(reply.body.entry.dryRun).toBe(true);
       expect(reply.body.entry.replyTarget?.targetId).toBe("1234567890123456789");
-      expect(reply.body.entry.replyTarget?.resolvedFrom).toBe("https://x.com/used00honda/status/1234567890123456789");
+      expect(reply.body.entry.replyTarget?.resolvedFrom).toBe("https://x.com/test_artist/status/1234567890123456789");
 
       const events = await readDistributionEvents(gateway.workspaceRoot, 20);
       expect(events).toHaveLength(1);

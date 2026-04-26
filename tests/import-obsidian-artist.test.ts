@@ -144,12 +144,12 @@ describe("import-obsidian-artist parser", () => {
       "",
       "### URLs",
       "- Spotify: https://open.spotify.com/artist/manually-edited",
-      "- X: https://x.com/used00honda (handle: @used00honda)"
+      "- X: https://x.com/test_artist (handle: @test_artist)"
     ].join("\n");
     const extracted = extractSpotifyProfileSection(existing);
     expect(extracted).toContain("Imported bio line");
     expect(extracted).toContain("manually-edited");
-    expect(extracted).toContain("@used00honda");
+    expect(extracted).toContain("@test_artist");
     expect(extracted).not.toContain("## Voice");
   });
 
@@ -173,12 +173,12 @@ describe("import-obsidian-artist parser", () => {
       "",
       "### URLs",
       "- Spotify: https://open.spotify.com/artist/REAL_URL",
-      "- X: https://x.com/used00honda (handle: @used00honda, bird connector tested)"
+      "- X: https://x.com/test_artist (handle: @test_artist, bird connector tested)"
     ].join("\n");
     const md = buildSocialVoiceMd({ sections, existingSpotifyProfile: handcrafted });
     expect(md).toContain("Manually curated bio in workspace");
     expect(md).toContain("REAL_URL");
-    expect(md).toContain("https://x.com/used00honda");
+    expect(md).toContain("https://x.com/test_artist");
     expect(md).not.toContain("https://open.spotify.com/artist/example");
   });
 });

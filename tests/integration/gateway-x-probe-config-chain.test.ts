@@ -55,7 +55,7 @@ describe("gateway X probe config chain", () => {
     const gateway = await createInProcessGateway();
     spawnMock.mockImplementation(createSpawnMock([
       { code: 0, stdout: "bird help" },
-      { code: 0, stdout: "@used00honda (used::honda)" }
+      { code: 0, stdout: "@test_artist (test::artist)" }
     ]));
 
     try {
@@ -69,7 +69,7 @@ describe("gateway X probe config chain", () => {
       expect(probe.body.status.connected).toBe(true);
       expect(probe.body.status.authStatus).toBe("tested");
       expect(probe.body.status.lastTestedAt).toBeTypeOf("number");
-      expect(probe.body.status.accountLabel).toContain("@used00honda");
+      expect(probe.body.status.accountLabel).toContain("@test_artist");
 
       const overridePath = join(gateway.workspaceRoot, "runtime", "config-overrides.json");
       const override = JSON.parse(await readFile(overridePath, "utf8")) as {

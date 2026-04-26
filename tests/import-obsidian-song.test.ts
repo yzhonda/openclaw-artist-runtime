@@ -14,8 +14,8 @@ import {
 } from "../scripts/import-obsidian-song.mjs";
 
 const STYLE_SAMPLE = `---
-title: "Where It Played"
-artist: "[[artists/used-honda]]"
+title: "Test Song"
+artist: "[[artists/test-artist]]"
 reference: "Squarepusher - Beep Street"
 tags: [style, suno]
 ---
@@ -70,9 +70,9 @@ describe("import-obsidian-song parser", () => {
   });
 
   it("builds song.md with state markers and the correct status", () => {
-    const md = buildSongMd({ songId: "where-it-played", title: "Where It Played", status: "lyrics" });
-    expect(md).toContain("# Where It Played");
-    expect(md).toContain("- Song ID: where-it-played");
+    const md = buildSongMd({ songId: "test-song-slug", title: "Test Song", status: "lyrics" });
+    expect(md).toContain("# Test Song");
+    expect(md).toContain("- Song ID: test-song-slug");
     expect(md).toContain("- Status: lyrics");
     expect(md).toContain("artist-runtime:song-state:start");
     expect(md).toContain("artist-runtime:song-state:end");
@@ -80,11 +80,11 @@ describe("import-obsidian-song parser", () => {
 
   it("builds brief.md including title, reference, and a style summary", () => {
     const brief = buildBriefMd({
-      title: "Where It Played",
+      title: "Test Song",
       reference: "Squarepusher - Beep Street",
       styleSummary: "Drill n bass electronic fusion rap"
     });
-    expect(brief).toContain("# Brief for Where It Played");
+    expect(brief).toContain("# Brief for Test Song");
     expect(brief).toContain("Squarepusher - Beep Street");
     expect(brief).toContain("Drill n bass electronic fusion rap");
   });
@@ -100,13 +100,13 @@ describe("import-obsidian-song parser", () => {
   });
 
   it("buildSongMd preserves an explicit status (e.g. published) for already-released catalog entries", () => {
-    const md = buildSongMd({ songId: "where-it-played", title: "Where It Played", status: "published" });
+    const md = buildSongMd({ songId: "test-song-slug", title: "Test Song", status: "published" });
     expect(md).toContain("- Status: published");
-    expect(md).toContain("- Song ID: where-it-played");
+    expect(md).toContain("- Song ID: test-song-slug");
   });
 
   it("buildSongMd preserves the scheduled status for pre-release catalog entries", () => {
-    const md = buildSongMd({ songId: "where-it-played", title: "Where It Played", status: "scheduled" });
+    const md = buildSongMd({ songId: "test-song-slug", title: "Test Song", status: "scheduled" });
     expect(md).toContain("- Status: scheduled");
   });
 
@@ -117,10 +117,10 @@ describe("import-obsidian-song parser", () => {
       await writeFile(
         path,
         [
-          "# Where It Played",
+          "# Test Song",
           "",
           "<!-- artist-runtime:song-state:start -->",
-          "- Song ID: where-it-played",
+          "- Song ID: test-song-slug",
           "- Status: published",
           "- Run Count: 0",
           "<!-- artist-runtime:song-state:end -->",

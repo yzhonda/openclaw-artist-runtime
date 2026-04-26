@@ -121,22 +121,22 @@ describe("XBirdConnector.checkConnection", () => {
   });
 
   it("passes OPENCLAW_X_FIREFOX_PROFILE to bird whoami but not the help probe", async () => {
-    process.env.OPENCLAW_X_FIREFOX_PROFILE = "rlff0kyr.artist-x";
+    process.env.OPENCLAW_X_FIREFOX_PROFILE = "test-profile.artist-x";
     const calls: SpawnCall[] = [];
     const connector = new XBirdConnector(
       createSpawnMock([
         { code: 0, stdout: "bird help" },
-        { code: 0, stdout: "@used00honda" }
+        { code: 0, stdout: "@test_artist" }
       ], calls)
     );
 
     await expect(connector.checkConnection()).resolves.toMatchObject({
       connected: true,
-      accountLabel: "@used00honda"
+      accountLabel: "@test_artist"
     });
     expect(calls.map((call) => call.args)).toEqual([
       ["--help"],
-      ["--firefox-profile", "rlff0kyr.artist-x", "whoami", "--plain"]
+      ["--firefox-profile", "test-profile.artist-x", "whoami", "--plain"]
     ]);
   });
 });
@@ -284,11 +284,11 @@ describe("XBirdConnector.publish", () => {
   });
 
   it("passes OPENCLAW_X_FIREFOX_PROFILE to all dry-run stage bird calls", async () => {
-    process.env.OPENCLAW_X_FIREFOX_PROFILE = "rlff0kyr.artist-x";
+    process.env.OPENCLAW_X_FIREFOX_PROFILE = "test-profile.artist-x";
     const calls: SpawnCall[] = [];
     const connector = new XBirdConnector(
       createSpawnMock([
-        { code: 0, stdout: "@used00honda" },
+        { code: 0, stdout: "@test_artist" },
         { code: 0, stdout: "composed" },
         { code: 0, stdout: "dry-run ok" }
       ], calls),
@@ -309,9 +309,9 @@ describe("XBirdConnector.publish", () => {
       reason: "dry-run blocks publish"
     });
     expect(calls.map((call) => call.args)).toEqual([
-      ["--firefox-profile", "rlff0kyr.artist-x", "whoami", "--plain"],
-      ["--firefox-profile", "rlff0kyr.artist-x", "--plain", "compose", "artist signal under ash"],
-      ["--firefox-profile", "rlff0kyr.artist-x", "--plain", "tweet", "--dry-run", "artist signal under ash"]
+      ["--firefox-profile", "test-profile.artist-x", "whoami", "--plain"],
+      ["--firefox-profile", "test-profile.artist-x", "--plain", "compose", "artist signal under ash"],
+      ["--firefox-profile", "test-profile.artist-x", "--plain", "tweet", "--dry-run", "artist signal under ash"]
     ]);
   });
 });

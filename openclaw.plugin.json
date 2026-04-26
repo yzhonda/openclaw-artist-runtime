@@ -3,7 +3,7 @@
   "id": "artist-runtime",
   "name": "Artist Runtime",
   "description": "Runs OpenClaw as a public autonomous AI musician using Suno and social distribution.",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "main": "./dist/index.js",
   "kind": "tool",
   "categories": [
