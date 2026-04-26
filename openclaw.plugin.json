@@ -22,8 +22,8 @@
     "autopilot"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/your-org/openclaw-artist-runtime",
-  "repository": "https://github.com/your-org/openclaw-artist-runtime",
+  "homepage": "https://github.com/yzhonda/openclaw-artist-runtime",
+  "repository": "https://github.com/yzhonda/openclaw-artist-runtime",
   "capabilities": {
     "tools": [
       "artist_song_ideate",
