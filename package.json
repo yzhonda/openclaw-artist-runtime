@@ -85,7 +85,7 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^25.6.0",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
     "@vitest/coverage-v8": "^2.1.9",
@@ -93,7 +93,7 @@
     "eslint-config-prettier": "^9.1.2",
     "eslint-plugin-prettier": "^5.5.5",
     "prettier": "^3.8.3",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "vitest": "^2.1.0"
   },
   "overrides": {
