@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-26
+
+First public-release candidate. Bundles the working dry-run runtime,
+Producer Console, Suno browser worker scaffolding, social connector
+skeletons, and the Plan v9 public-release readiness pass (sanitized
+defaults, narrowed marketplace tarball, ESLint/Prettier baseline,
+dependabot, branch protection, CodeQL, release workflow, and an
+operator/contributor split README).
+
 ### Added
 - Added `scripts/import-obsidian-artist.mjs` to migrate an artist persona from an Obsidian-style vault into the runtime workspace. Backs up existing `ARTIST.md`, `artist/SOCIAL_VOICE.md`, and `artist/cover.png` before writing, supports `--dry-run` and `--force`, and ships parser-level unit tests.
 - Added `scripts/import-obsidian-song.mjs` to migrate a single song folder (lyrics, lyrics-suno, yaml-suno, style with embedded Sliders table, optional references) from an Obsidian-style vault into the runtime workspace. Builds `song.md` with state markers, `brief.md`, `lyrics/lyrics.v1.md`, `lyrics/yaml-suno.md`, `lyrics/lyrics-suno.md`, `suno/style.md`, `suno/exclude.md`, and `suno/sliders.json`. Backs up existing target files before writing; supports `--dry-run`, `--force`, `--song`, and `--song-id`.
