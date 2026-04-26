@@ -104,3 +104,23 @@ The implementation must provide documented deletion paths for:
 ## Producer control
 
 The producer must be able to pause autopilot and disable distribution from Producer Console without deleting the artist's creative archive.
+
+## Retention policy summary
+
+Artist Runtime does not auto-delete operator-side data. Retention is
+operator-managed by design — the runtime keeps records in local workspace
+storage until the operator explicitly removes them.
+
+| Data class | Default retention | Auto-delete? |
+|---|---|---|
+| Workspace creative files (`ARTIST.md`, songs, lyrics, briefs) | Indefinite (operator-managed) | No |
+| Prompt Ledger JSONL | Indefinite (operator-managed) | No |
+| Audit logs (route, distribution, social-publish) | Indefinite (operator-managed) | No |
+| Imported Suno artifacts under `runtime/suno/<runId>/` | Indefinite (operator-managed) | No |
+| Connector status metadata (last-tested timestamps, account labels) | Indefinite (operator-managed) | No |
+| Connector environment-variable secrets | Read at runtime only, never persisted to workspace files or audit logs | N/A |
+| Browser-profile cookies/tokens under `.openclaw-browser-profiles/` | Operator-machine local only, never bundled or copied; lifetime is whatever the platform's session allows | No (operator deletes the profile directory to clear) |
+
+If the operator decides to remove an item, manual deletion of the
+corresponding workspace path is the expected flow. This package does not ship
+scheduled deletion tasks, retention timers, or automatic shredding behavior.

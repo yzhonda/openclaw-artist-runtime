@@ -18,9 +18,9 @@ const REPO_ROOT = resolve(HERE, "..");
 
 function parseArgs(argv) {
   const opts = {
-    source: "/Users/usedhonda/projects/obsidian/music",
+    source: process.env.OPENCLAW_OBSIDIAN_SOURCE || "~/obsidian-music-vault",
     target: process.env.OPENCLAW_LOCAL_WORKSPACE || join(REPO_ROOT, ".local/openclaw/workspace"),
-    song: "where-it-played",
+    song: process.env.OPENCLAW_DEFAULT_SONG_SLUG || "my-song",
     songId: undefined,
     dryRun: false,
     force: false

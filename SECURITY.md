@@ -6,7 +6,14 @@ Only the latest minor version is supported until the implementation stabilizes.
 
 ## Reporting vulnerabilities
 
-Report security issues privately through the repository security advisory feature or a dedicated security email before public disclosure.
+Report security issues privately through GitHub Security Advisories on this
+repository (Security tab → "Report a vulnerability" → "Privately report a
+vulnerability"). Do not file public GitHub issues for security topics.
+
+We aim to acknowledge new reports within 5 business days. Resolution timing
+depends on severity; high-severity issues are prioritised. After a fix lands
+we publish coordinated advisory notes through the same Security Advisories
+flow before any public discussion.
 
 ## Security model
 
