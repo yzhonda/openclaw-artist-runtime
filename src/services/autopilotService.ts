@@ -1,7 +1,13 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import type { AutopilotRunState, AutopilotStage, AutopilotStatus, ArtistRuntimeConfig, SocialPublishLedgerEntry, SocialPublishResult, SongState } from "../types.js";
+import { AutopilotControlService } from "./autopilotControlService.js";
+import {
+  defaultAutopilotRunState,
+  readAutopilotState,
+  writeAutopilotState
+} from "./autopilotRecovery.js";
 import { listSongStates, readSongState, updateSongState } from "./artistState.js";
 import { createSongIdea } from "./songIdeation.js";
 import { draftLyrics } from "./lyricsDrafting.js";
@@ -24,14 +30,6 @@ export function isPublishBlockedByDryRun(
   return entry.policyDecision?.policyDecision === "deny_dry_run";
 }
 
-const defaultAutopilotState: AutopilotRunState = {
-  stage: "idle",
-  paused: false,
-  retryCount: 0,
-  cycleCount: 0,
-  updatedAt: new Date().toISOString()
-};
-
 export interface AutopilotTickInput {
   enabled: boolean;
   dryRun: boolean;
@@ -51,44 +49,20 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function getAutopilotStatePath(root: string): string {
-  return join(root, "runtime", "autopilot-state.json");
-}
-
-async function writeAutopilotState(root: string, state: AutopilotRunState): Promise<AutopilotRunState> {
-  const nextState = { ...state, updatedAt: nowIso() };
-  await mkdir(join(root, "runtime"), { recursive: true });
-  await writeFile(getAutopilotStatePath(root), `${JSON.stringify(nextState, null, 2)}\n`, "utf8");
-  return nextState;
+export async function writeAutopilotRunState(root: string, state: AutopilotRunState): Promise<AutopilotRunState> {
+  return writeAutopilotState(root, state);
 }
 
 export async function readAutopilotRunState(root: string): Promise<AutopilotRunState> {
-  const contents = await readFile(getAutopilotStatePath(root), "utf8").catch(() => "");
-  if (!contents) {
-    return { ...defaultAutopilotState };
-  }
-  return { ...defaultAutopilotState, ...(JSON.parse(contents) as Partial<AutopilotRunState>) };
+  return readAutopilotState(root);
 }
 
 export async function pauseAutopilot(root: string, reason = "paused by operator"): Promise<AutopilotRunState> {
-  const current = await readAutopilotRunState(root);
-  return writeAutopilotState(root, {
-    ...current,
-    paused: true,
-    pausedReason: reason,
-    stage: "paused"
-  });
+  return new AutopilotControlService().pause(root, reason);
 }
 
 export async function resumeAutopilot(root: string): Promise<AutopilotRunState> {
-  const current = await readAutopilotRunState(root);
-  return writeAutopilotState(root, {
-    ...current,
-    paused: false,
-    pausedReason: undefined,
-    hardStopReason: undefined,
-    stage: "idle"
-  });
+  return new AutopilotControlService().resume(root);
 }
 
 function nextActionForStage(stage: AutopilotStage): string {
@@ -216,7 +190,7 @@ export class ArtistAutopilotService {
     const config = applyConfigDefaults(input.config);
     const existing = await readAutopilotRunState(input.workspaceRoot);
     if (!config.autopilot.enabled) {
-      return writeAutopilotState(input.workspaceRoot, {
+      return writeAutopilotRunState(input.workspaceRoot, {
         ...existing,
         stage: "idle",
         blockedReason: "autopilot disabled by config",
@@ -224,7 +198,7 @@ export class ArtistAutopilotService {
       });
     }
     if (existing.paused) {
-      return writeAutopilotState(input.workspaceRoot, {
+      return writeAutopilotRunState(input.workspaceRoot, {
         ...existing,
         stage: "paused",
         blockedReason: existing.pausedReason ?? "paused by operator",
@@ -232,7 +206,7 @@ export class ArtistAutopilotService {
       });
     }
     if (existing.hardStopReason) {
-      return writeAutopilotState(input.workspaceRoot, {
+      return writeAutopilotRunState(input.workspaceRoot, {
         ...existing,
         stage: "failed_closed",
         blockedReason: existing.hardStopReason,
@@ -259,7 +233,7 @@ export class ArtistAutopilotService {
       && config.autopilot.dryRun
       && existing.blockedReason?.includes("dry-run")
     ) {
-      return writeAutopilotState(input.workspaceRoot, {
+      return writeAutopilotRunState(input.workspaceRoot, {
         ...baseState,
         currentSongId: existing.currentSongId,
         stage: "completed",
@@ -277,7 +251,7 @@ export class ArtistAutopilotService {
       && config.autopilot.dryRun
       && existing.blockedReason?.includes("dry-run")
     ) {
-      return writeAutopilotState(input.workspaceRoot, {
+      return writeAutopilotRunState(input.workspaceRoot, {
         ...baseState,
         currentSongId: song.songId,
         stage: "completed",
@@ -289,13 +263,13 @@ export class ArtistAutopilotService {
     }
 
     if (existing.runId === runId && existing.lastSuccessfulStage === stage && stage !== "planning") {
-      return writeAutopilotState(input.workspaceRoot, baseState);
+      return writeAutopilotRunState(input.workspaceRoot, baseState);
     }
 
     try {
       if (!song) {
         const idea = await createSongIdea({ workspaceRoot: input.workspaceRoot, config });
-        return writeAutopilotState(input.workspaceRoot, {
+        return writeAutopilotRunState(input.workspaceRoot, {
           ...baseState,
           currentSongId: idea.songId,
           stage: "planning",
@@ -309,7 +283,7 @@ export class ArtistAutopilotService {
       switch (stage) {
         case "prompt_pack": {
           await createPromptPackForSong(input.workspaceRoot, song, config);
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "prompt_pack",
@@ -321,7 +295,7 @@ export class ArtistAutopilotService {
         }
         case "suno_generation": {
           const run = await generateSunoRun({ workspaceRoot: input.workspaceRoot, songId: song.songId, config });
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "suno_generation",
@@ -333,7 +307,7 @@ export class ArtistAutopilotService {
         }
         case "take_selection": {
           await selectTake({ workspaceRoot: input.workspaceRoot, songId: song.songId });
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "take_selection",
@@ -345,7 +319,7 @@ export class ArtistAutopilotService {
         }
         case "asset_generation": {
           await prepareSocialAssets({ workspaceRoot: input.workspaceRoot, songId: song.songId, config });
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "asset_generation",
@@ -380,7 +354,7 @@ export class ArtistAutopilotService {
               reason: `dry-run publish simulated: ${published.result.reason}`
             });
           }
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "publishing",
@@ -391,7 +365,7 @@ export class ArtistAutopilotService {
           });
         }
         case "completed": {
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "completed",
@@ -402,7 +376,7 @@ export class ArtistAutopilotService {
           });
         }
         case "failed_closed": {
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             currentSongId: song.songId,
             stage: "failed_closed",
@@ -411,7 +385,7 @@ export class ArtistAutopilotService {
           });
         }
         default:
-          return writeAutopilotState(input.workspaceRoot, {
+          return writeAutopilotRunState(input.workspaceRoot, {
             ...baseState,
             stage: "planning",
             blockedReason: undefined,
@@ -422,7 +396,7 @@ export class ArtistAutopilotService {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return writeAutopilotState(input.workspaceRoot, {
+      return writeAutopilotRunState(input.workspaceRoot, {
         ...baseState,
         stage: "failed_closed",
         hardStopReason: message,
@@ -443,7 +417,7 @@ export class ArtistAutopilotService {
   }
 
   async status(enabled = false, dryRun = true, workspaceRoot?: string): Promise<AutopilotStatus> {
-    const state = workspaceRoot ? await readAutopilotRunState(workspaceRoot) : { ...defaultAutopilotState };
+    const state = workspaceRoot ? await readAutopilotRunState(workspaceRoot) : { ...defaultAutopilotRunState };
     const stage = enabled ? state.stage : "idle";
     return {
       enabled,

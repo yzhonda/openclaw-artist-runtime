@@ -685,10 +685,10 @@ export interface AutopilotStatus {
   currentRunId?: string;
   currentSongId?: string;
   lastSuccessfulStage?: AutopilotStage;
-  pausedReason?: string;
-  hardStopReason?: string;
-  blockedReason?: string;
-  lastError?: string;
+  pausedReason?: string | null;
+  hardStopReason?: string | null;
+  blockedReason?: string | null;
+  lastError?: string | null;
   retryCount?: number;
 }
 
@@ -697,10 +697,10 @@ export interface AutopilotRunState {
   currentSongId?: string;
   stage: AutopilotStage;
   paused: boolean;
-  pausedReason?: string;
-  hardStopReason?: string;
-  blockedReason?: string;
-  lastError?: string;
+  pausedReason?: string | null;
+  hardStopReason?: string | null;
+  blockedReason?: string | null;
+  lastError?: string | null;
   lastSuccessfulStage?: AutopilotStage;
   retryCount: number;
   cycleCount: number;
