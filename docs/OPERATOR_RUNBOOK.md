@@ -159,6 +159,35 @@ module for tests and non-OpenClaw harnesses, but production should not start a
 second Telegram long-poll worker against the same bot token. OpenClaw owns the
 polling loop.
 
+## Persona migrate with operator intent (Plan v9.9)
+
+Use this when `/persona check` reports missing or thin fields, but the imported
+Obsidian sections already contain enough direction for the artist. Add the
+operator guidance directly after `/persona migrate`; the preview will keep the
+normal backup and marker plan, then add draft values for the missing fields.
+
+Examples:
+
+```text
+/persona migrate make the social voice short, unsalesy, and blunt. Use the SOUL prose for refusal style.
+/persona migrate socialVoice: keep as-is, skip. Draft soul-refusal from the imported Listener section.
+```
+
+The preview includes:
+
+- `Operator intent`, normalized to a single line so it is readable in Telegram.
+- `Proposed drafts`, generated through the configured debug AI review provider.
+  The distributed default remains `aiReview.provider="mock"`, which produces
+  explicit placeholder drafts and performs no external model call.
+- `skip per operator intent` for field-specific directives such as
+  `socialVoice: keep as-is, skip`.
+
+Send `/confirm migrate` only after the preview looks right. Confirmation writes
+the proposed draft values into the Telegram-managed ARTIST/SOUL marker blocks,
+creates the usual backups first, and still preserves custom imported sections
+outside the managed blocks. If no intent is supplied, `/persona migrate` keeps
+the older placeholder fallback behavior.
+
 ### Debug AI review command
 
 `/review <songId>` is a Telegram debug command for inspecting a song's current
