@@ -115,6 +115,26 @@ Telegram-managed ARTIST/SOUL marker blocks by default. Use
 `--no-preserve-telegram-persona` only when the operator intentionally wants the
 Obsidian import to replace the managed persona blocks.
 
+## Persona audit & migrate (Plan v9.7)
+
+Use this flow after importing an existing Obsidian artist file that has no
+Telegram-managed markers or is missing some of the lean persona fields.
+
+1. Send `/persona check` to see which ARTIST/SOUL fields are filled, thin, or
+   missing. Custom Obsidian sections are reported separately and are not deleted.
+2. If only a few fields need work, send `/persona check fill` and answer the
+   chained prompts. Each field still uses preview plus `/confirm`; `/skip`
+   leaves the current field unchanged and moves to the next candidate.
+3. If the imported files should become marker-managed, send `/persona migrate`.
+   Review the backup paths, marker sections, custom sections, and warnings.
+4. Send `/confirm migrate` only after the preview is expected. The migrator
+   writes backups first, inserts Telegram-managed marker blocks, preserves
+   custom sections outside those blocks, and leaves songs, ledgers, budgets,
+   profiles, and publish gates untouched.
+5. Optional: send `/persona check suggest` for a mock-safe suggestion pass. The
+   default provider is still `mock`; no external AI provider is called unless a
+   future operator-selected provider is explicitly configured.
+
 ### Debug AI review command
 
 `/review <songId>` is a Telegram debug command for inspecting a song's current
