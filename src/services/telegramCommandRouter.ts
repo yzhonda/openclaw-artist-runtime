@@ -5,8 +5,20 @@ import { AutopilotControlService } from "./autopilotControlService.js";
 import { formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiReviewService.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
+import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
 
-export type TelegramCommandKind = "help" | "status" | "songs" | "song" | "regen" | "review" | "pause" | "resume" | "unknown" | "free_text";
+export type TelegramCommandKind =
+  | "help"
+  | "status"
+  | "songs"
+  | "song"
+  | "regen"
+  | "review"
+  | "pause"
+  | "resume"
+  | "setup"
+  | "unknown"
+  | "free_text";
 
 export interface TelegramRouteInput {
   text: string;
@@ -62,9 +74,30 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/song <songId> - show song detail",
         "/regen <songId> - queue a dry-run regeneration note",
         "/review <songId> - run a debug-only mock AI review",
+        "/setup - start Telegram artist persona setup",
         "/pause - pause autopilot",
         "/resume - resume autopilot",
         "/help - show this help"
+      ].join("\n"),
+      shouldStoreFreeText: false
+    };
+  }
+
+  if (command === "/setup") {
+    if (!input.workspaceRoot) {
+      return { kind: "setup", responseText: "Persona setup unavailable: workspace root missing.", shouldStoreFreeText: false };
+    }
+    await createTelegramPersonaSession(input.workspaceRoot, {
+      mode: "setup_artist",
+      chatId: input.chatId,
+      userId: input.fromUserId
+    });
+    return {
+      kind: "setup",
+      responseText: [
+        "Artist persona setup started.",
+        "Phase 1 created the local setup session. Phase 2 will add the lean question flow.",
+        "Send /cancel to stop this setup session."
       ].join("\n"),
       shouldStoreFreeText: false
     };

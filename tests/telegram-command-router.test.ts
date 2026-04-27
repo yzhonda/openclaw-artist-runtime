@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { ensureSongState, updateSongState, writeSongBrief } from "../src/services/artistState";
 import { readAutopilotRunState } from "../src/services/autopilotService";
 import { classifyTelegramFreeText, readTelegramInbox, routeTelegramCommand } from "../src/services/telegramCommandRouter";
+import { readTelegramPersonaSession } from "../src/services/telegramPersonaSession";
 
 const baseInput = {
   fromUserId: 123,
@@ -90,6 +91,22 @@ describe("telegram command router", () => {
     expect(result.kind).toBe("regen");
     expect(result.responseText).toContain("No Suno create was started");
     expect(inbox[0]).toMatchObject({ type: "regen_requested", songId: "song-001" });
+  });
+
+  it("starts a persona setup session without writing persona files", async () => {
+    const root = makeRoot();
+    const result = await routeTelegramCommand({ ...baseInput, text: "/setup", workspaceRoot: root });
+    const session = await readTelegramPersonaSession(root);
+
+    expect(result.kind).toBe("setup");
+    expect(result.responseText).toContain("Artist persona setup started");
+    expect(session).toMatchObject({
+      active: true,
+      mode: "setup_artist",
+      stepIndex: 0,
+      chatId: baseInput.chatId,
+      userId: baseInput.fromUserId
+    });
   });
 
   it("pauses and resumes autopilot through the control service", async () => {

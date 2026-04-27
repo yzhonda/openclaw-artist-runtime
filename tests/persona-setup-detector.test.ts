@@ -1,0 +1,76 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { readPersonaSetupStatus } from "../src/services/personaSetupDetector";
+
+function makeRoot(): string {
+  return mkdtempSync(join(tmpdir(), "artist-runtime-persona-detector-"));
+}
+
+async function writeCompletedMarker(root: string): Promise<void> {
+  await mkdir(join(root, "runtime"), { recursive: true });
+  await writeFile(
+    join(root, "runtime", "persona-completed.json"),
+    `${JSON.stringify({ completedAt: "2026-04-27T00:00:00.000Z", source: "telegram", version: 1 })}\n`,
+    "utf8"
+  );
+}
+
+describe("persona setup detector", () => {
+  it("requires setup when ARTIST.md is missing and no completion marker exists", async () => {
+    const status = await readPersonaSetupStatus(makeRoot());
+
+    expect(status.needsSetup).toBe(true);
+    expect(status.completed).toBe(false);
+    expect(status.reasons).toContain("missing_completion_marker");
+    expect(status.reasons).toContain("missing_artist_file");
+  });
+
+  it("requires setup when the default TBD fields remain", async () => {
+    const root = makeRoot();
+    await writeCompletedMarker(root);
+    await writeFile(
+      join(root, "ARTIST.md"),
+      ["# ARTIST.md", "", "Artist name: TBD", "", "```yaml", "name: TBD", "```"].join("\n"),
+      "utf8"
+    );
+
+    const status = await readPersonaSetupStatus(root);
+
+    expect(status.needsSetup).toBe(true);
+    expect(status.reasons).toEqual(expect.arrayContaining(["artist_name_tbd", "suno_profile_name_tbd"]));
+  });
+
+  it("treats a completion marker plus customized ARTIST.md as complete", async () => {
+    const root = makeRoot();
+    await writeCompletedMarker(root);
+    await writeFile(
+      join(root, "ARTIST.md"),
+      ["# ARTIST.md", "", "Artist name: Neon Relay", "", "```yaml", "name: Neon Relay", "```"].join("\n"),
+      "utf8"
+    );
+
+    const status = await readPersonaSetupStatus(root);
+
+    expect(status.needsSetup).toBe(false);
+    expect(status.completed).toBe(true);
+    expect(status.reasons).toEqual([]);
+  });
+
+  it("can identify an unchanged template by hash", async () => {
+    const root = makeRoot();
+    const templatePath = join(root, "template-ARTIST.md");
+    const template = "# ARTIST.md\n\nArtist name: Custom-looking template\n";
+    await writeCompletedMarker(root);
+    await writeFile(templatePath, template, "utf8");
+    await writeFile(join(root, "ARTIST.md"), template, "utf8");
+
+    const status = await readPersonaSetupStatus(root, { templateArtistPath: templatePath });
+
+    expect(status.needsSetup).toBe(true);
+    expect(status.reasons).toContain("matches_default_template_hash");
+  });
+});
+

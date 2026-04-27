@@ -155,6 +155,49 @@ export interface TelegramConfig {
   acceptFreeText: boolean;
 }
 
+export type PersonaField =
+  | "name"
+  | "identity"
+  | "sound"
+  | "themes"
+  | "lyrics"
+  | "social"
+  | "soul-tone"
+  | "soul-refusal";
+
+export type TelegramPersonaSessionMode = "setup_artist" | "setup_soul" | "edit_field" | "reset_confirm";
+
+export interface PersonaAnswers {
+  name: string;
+  identity: string;
+  sound: string;
+  themes: string;
+  lyrics: string;
+  social: string;
+  "soul-tone": string;
+  "soul-refusal": string;
+}
+
+export interface TelegramPersonaSessionHistoryEntry {
+  stepIndex: number;
+  field: PersonaField;
+  previous?: string;
+}
+
+export interface TelegramPersonaSession {
+  active: boolean;
+  mode: TelegramPersonaSessionMode;
+  stepIndex: number;
+  field?: PersonaField;
+  pending: Partial<PersonaAnswers>;
+  history: TelegramPersonaSessionHistoryEntry[];
+  startedAt: number;
+  updatedAt: number;
+  chatId: number;
+  userId: number;
+  expiresAt: number;
+}
+
 export interface AiReviewConfig {
   provider: AiReviewProvider;
 }

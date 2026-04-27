@@ -133,6 +133,73 @@ describe("telegram bot worker", () => {
     expect(state.offset).toBe(11);
   });
 
+  it("announces persona setup once on the first owner message when persona is incomplete", async () => {
+    const root = makeRoot();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          result: [
+            {
+              update_id: 20,
+              message: {
+                message_id: 1,
+                text: "/status",
+                chat: { id: 555 },
+                from: { id: 123 }
+              }
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ ok: true, result: { message_id: 2, text: "ok", chat: { id: 555 } } }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          result: [
+            {
+              update_id: 21,
+              message: {
+                message_id: 3,
+                text: "/status",
+                chat: { id: 555 },
+                from: { id: 123 }
+              }
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ ok: true, result: { message_id: 4, text: "ok", chat: { id: 555 } } }));
+    const worker = new TelegramBotWorker({
+      root,
+      config: enabledConfig,
+      token: "token",
+      ownerUserIds: new Set(["123"]),
+      fetchImpl,
+      getAutopilotStatus: async () => ({
+        enabled: true,
+        dryRun: true,
+        stage: "planning",
+        nextAction: "decide_next_song"
+      })
+    });
+
+    await worker.pollOnce();
+    await worker.pollOnce();
+
+    const firstReply = JSON.parse(fetchImpl.mock.calls[1][1].body as string) as { text: string };
+    const secondReply = JSON.parse(fetchImpl.mock.calls[3][1].body as string) as { text: string };
+    expect(firstReply.text).toContain("Artist persona is not set up yet");
+    expect(secondReply.text).not.toContain("Artist persona is not set up yet");
+    const state = JSON.parse(await readFile(join(root, "runtime", "telegram-state.json"), "utf8")) as {
+      offset: number;
+      personaSetupAnnouncedAt: number;
+    };
+    expect(state.offset).toBe(22);
+    expect(state.personaSetupAnnouncedAt).toBeGreaterThan(0);
+  });
+
   it("captures long-poll errors without crashing", async () => {
     const fetchImpl = vi.fn().mockRejectedValueOnce(new Error("network down"));
     const worker = new TelegramBotWorker({

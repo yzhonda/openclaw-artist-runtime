@@ -1,9 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AiReviewProvider, AutopilotStatus, TelegramConfig } from "../types.js";
+import { readPersonaSetupStatus } from "./personaSetupDetector.js";
 import { getTelegramOwnerUserIds } from "./telegramAuth.js";
 import { TelegramClient, type TelegramFetch, type TelegramUpdate } from "./telegramClient.js";
 import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } from "./telegramCommandRouter.js";
+import { handleTelegramPersonaSessionMessage, readTelegramPersonaSession } from "./telegramPersonaSession.js";
 
 export interface TelegramBotWorkerOptions {
   root: string;
@@ -27,6 +29,7 @@ export interface TelegramPollResult {
 
 interface TelegramWorkerState {
   offset?: number;
+  personaSetupAnnouncedAt?: number;
 }
 
 function statePath(root: string): string {
@@ -40,7 +43,10 @@ async function readState(root: string): Promise<TelegramWorkerState> {
   }
   try {
     const parsed = JSON.parse(contents) as Partial<TelegramWorkerState>;
-    return Number.isInteger(parsed.offset) ? { offset: parsed.offset } : {};
+    return {
+      ...(Number.isInteger(parsed.offset) ? { offset: parsed.offset } : {}),
+      ...(Number.isFinite(parsed.personaSetupAnnouncedAt) ? { personaSetupAnnouncedAt: parsed.personaSetupAnnouncedAt } : {})
+    };
   } catch {
     return {};
   }
@@ -101,7 +107,7 @@ export class TelegramBotWorker {
         }
       }
       if (nextOffset !== undefined) {
-        await writeState(this.options.root, { offset: nextOffset });
+        await writeState(this.options.root, { ...(await readState(this.options.root)), offset: nextOffset });
       }
       this.backoffMs = 0;
       return { enabled: true, fetched: true, processed, nextOffset };
@@ -160,14 +166,18 @@ export class TelegramBotWorker {
       return false;
     }
 
-    const route = await routeTelegramCommand({
-      text,
-      fromUserId: from.id,
-      chatId: message.chat.id,
-      workspaceRoot: this.options.root,
-      autopilotStatus: await this.options.getAutopilotStatus?.(),
-      aiReviewProvider: this.options.aiReviewProvider
-    });
+    const session = await readTelegramPersonaSession(this.options.root);
+    const sessionResponse = session ? await handleTelegramPersonaSessionMessage(this.options.root, text) : undefined;
+    const route = sessionResponse
+      ? { shouldStoreFreeText: false, responseText: sessionResponse }
+      : await routeTelegramCommand({
+          text,
+          fromUserId: from.id,
+          chatId: message.chat.id,
+          workspaceRoot: this.options.root,
+          autopilotStatus: await this.options.getAutopilotStatus?.(),
+          aiReviewProvider: this.options.aiReviewProvider
+        });
     if (route.shouldStoreFreeText) {
       await storeTelegramInbox(this.options.root, {
         type: "free_text",
@@ -178,7 +188,25 @@ export class TelegramBotWorker {
         timestamp: Date.now()
       });
     }
-    await client.sendMessage(message.chat.id, route.responseText);
+    const responseText = await this.withPersonaSetupAnnouncement(route.responseText);
+    await client.sendMessage(message.chat.id, responseText);
     return true;
+  }
+
+  private async withPersonaSetupAnnouncement(responseText: string): Promise<string> {
+    const state = await readState(this.options.root);
+    if (state.personaSetupAnnouncedAt) {
+      return responseText;
+    }
+    const status = await readPersonaSetupStatus(this.options.root);
+    if (!status.needsSetup) {
+      return responseText;
+    }
+    await writeState(this.options.root, { ...state, personaSetupAnnouncedAt: Date.now() });
+    return [
+      "Artist persona is not set up yet. Send /setup to create it in Telegram.",
+      "",
+      responseText
+    ].join("\n");
   }
 }
