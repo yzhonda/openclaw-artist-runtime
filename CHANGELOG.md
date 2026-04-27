@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Plan v9.6 completes the Telegram artist-persona first-run experience: `/setup` now drives a lean ARTIST.md wizard, `/setup soul` writes a SOUL.md mini profile, `/persona show|fields|edit|reset` manages Telegram-owned persona blocks, Obsidian artist import preserves Telegram-managed ARTIST/SOUL markers by default, and Telegram worker startup can remind a known owner chat when persona setup is still incomplete. Breaking changes: none. New npm dependencies: none. Distribution check: `npm pack --dry-run --json` reports 228,755 bytes, up 11,898 bytes (+5.49%) from the Plan v9.5 baseline of 216,857 bytes and within the 265,121-byte R6 budget.
 - Plan v9.5 finalizes the autopilot revival and Telegram bridge dogfood pass: RuntimeEventBus stage/state/take notifications, owner-only Telegram commands, local free-text inbox staging, debug-only `/review <songId>` mock AI review, and final pre-release distribution gate coverage.
 
 ## [0.3.0] - 2026-04-26

@@ -83,6 +83,38 @@ whether it is set. To disable Telegram again, set `telegram.enabled=false` or
 remove either local environment value, then restart the Gateway process that
 owns the environment.
 
+## First-run experience: Telegram artist persona
+
+Use this after plugin install, before turning the revived autopilot into a real
+production loop. The goal is a lean first-run path where the artist identity is
+created from Telegram while all external side effects remain opt-in.
+
+1. Install and enable the plugin as usual. Keep the distributed safety defaults:
+   `telegram.enabled=false`, `autopilot.dryRun=true`, and `aiReview.provider`
+   left at the mock/default provider.
+2. Configure Telegram as described above: create the bot with BotFather, put
+   `TELEGRAM_BOT_TOKEN` and `TELEGRAM_OWNER_USER_IDS` in the local environment,
+   then set `telegram.enabled=true`. Only the allowlisted owner can drive the
+   setup conversation.
+3. Send `/setup` to the bot. Answer the six lean ARTIST questions, review the
+   preview, then send `/confirm`. This writes only the Telegram-managed
+   `ARTIST.md` block and the local `runtime/persona-completed.json` marker.
+4. Optional: send `/setup soul` and answer the two SOUL questions for the
+   producer-facing conversational voice. `/persona show` summarizes the current
+   ARTIST/SOUL fields, `/persona edit <field>` edits one managed field after a
+   preview, and `/persona reset` requires `/confirm reset` before removing only
+   Telegram-managed persona blocks.
+
+After the persona is saved, start or resume autopilot in the usual staged way:
+keep `autopilot.dryRun=true` for the first cycle, watch Telegram stage events,
+and only consider real Suno or social side effects under their existing operator
+GO rules.
+
+Obsidian importer coexistence: `scripts/import-obsidian-artist.mjs` preserves
+Telegram-managed ARTIST/SOUL marker blocks by default. Use
+`--no-preserve-telegram-persona` only when the operator intentionally wants the
+Obsidian import to replace the managed persona blocks.
+
 ### Debug AI review command
 
 `/review <songId>` is a Telegram debug command for inspecting a song's current
