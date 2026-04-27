@@ -77,6 +77,9 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     notifyStages: true,
     acceptFreeText: true
   },
+  aiReview: {
+    provider: "mock"
+  },
   safety: {
     auditLog: true,
     failClosed: true,

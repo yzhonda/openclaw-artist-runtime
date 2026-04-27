@@ -2,6 +2,7 @@ import { defaultArtistRuntimeConfig } from "./defaultConfig.js";
 import { CURRENT_CONFIG_SCHEMA_VERSION, migrateConfig } from "./migrations.js";
 import {
   dailySharingModes,
+  aiReviewProviders,
   instagramAuthorityModes,
   officialReleaseModes,
   platformAuthStatuses,
@@ -113,6 +114,9 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
   if (config.telegram) {
     Object.assign(merged.telegram, config.telegram);
   }
+  if (config.aiReview) {
+    Object.assign(merged.aiReview, config.aiReview);
+  }
   if (config.safety) {
     Object.assign(merged.safety, config.safety);
   }
@@ -127,7 +131,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     return { ok: false, errors: ["config must be an object"], warnings };
   }
 
-  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "safety"], errors);
+  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "aiReview", "safety"], errors);
 
   if ("schemaVersion" in config && !isIntegerInRange(config.schemaVersion, 1, CURRENT_CONFIG_SCHEMA_VERSION)) {
     errors.push(`config.schemaVersion must be an integer between 1 and ${CURRENT_CONFIG_SCHEMA_VERSION}`);
@@ -310,6 +314,17 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
       }
       if ("acceptFreeText" in config.telegram && typeof config.telegram.acceptFreeText !== "boolean") {
         errors.push("config.telegram.acceptFreeText must be a boolean");
+      }
+    }
+  }
+
+  if ("aiReview" in config) {
+    if (!isRecord(config.aiReview)) {
+      errors.push("config.aiReview must be an object");
+    } else {
+      validateKnownKeys("config.aiReview", config.aiReview, ["provider"], errors);
+      if ("provider" in config.aiReview) {
+        validateEnum("config.aiReview.provider", config.aiReview.provider, aiReviewProviders, errors);
       }
     }
   }

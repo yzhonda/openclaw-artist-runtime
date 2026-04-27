@@ -465,6 +465,18 @@ Use this when a live create attempt returns `accepted: false` with
   `runtime/suno/profile-snapshots/` entries older than 365 days. Fresh snapshots
   and the snapshot root itself are left intact.
 
+## Debug AI review
+
+The Telegram `/review <songId>` command is debug-only. It reads the song brief,
+latest lyrics, Suno take metadata, selected take, and prompt-pack summary, then
+writes a review record under `runtime/debug-ai-reviews/`. The default provider
+is `mock`, so no external model is called and no take selection is changed.
+
+Review output is intentionally outside the Suno/autopilot control path. It does
+not alter `selected-take.json`, does not trigger Suno create/import, and does
+not participate in the publish gate. Treat the saved JSON as local operator
+debug evidence.
+
 ## Troubleshooting
 
 - Login probe says `login_required`: follow Scenario B.

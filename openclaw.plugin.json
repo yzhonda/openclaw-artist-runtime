@@ -319,6 +319,21 @@
           }
         }
       },
+      "aiReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "mock",
+              "openclaw"
+            ],
+            "default": "mock",
+            "description": "Debug-only AI review provider. 'mock' never calls an external model; 'openclaw' is reserved until a provider is configured."
+          }
+        }
+      },
       "safety": {
         "type": "object",
         "additionalProperties": false,
@@ -641,6 +656,10 @@
     "telegram.acceptFreeText": {
       "label": "Telegram free-text inbox",
       "help": "Allow owner free-text messages to be staged for a later operator inbox path."
+    },
+    "aiReview.provider": {
+      "label": "Debug AI review provider",
+      "help": "Debug-only review provider for /review. Mock is safe and does not affect take selection or publishing."
     },
     "safety.auditLog": {
       "label": "Audit log",

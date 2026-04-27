@@ -249,6 +249,21 @@
         }
       }
     },
+    "aiReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "mock",
+            "openclaw"
+          ],
+          "default": "mock",
+          "description": "Debug-only AI review provider. 'mock' never calls an external model; 'openclaw' is reserved until a provider is configured."
+        }
+      }
+    },
     "safety": {
       "type": "object",
       "additionalProperties": false,
@@ -294,32 +309,32 @@
     "xPlatform": {
       "type": "object",
       "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "liveGoArmed": {
-            "type": "boolean",
-            "default": false
-          },
-          "authStatus": {
-            "type": "string",
-            "enum": [
-              "unconfigured",
-              "configured",
-              "tested",
-              "failed"
-            ],
-            "default": "unconfigured"
-          },
-          "lastTestedAt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "connector": {
-            "type": "string",
-            "const": "bird",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "liveGoArmed": {
+          "type": "boolean",
+          "default": false
+        },
+        "authStatus": {
+          "type": "string",
+          "enum": [
+            "unconfigured",
+            "configured",
+            "tested",
+            "failed"
+          ],
+          "default": "unconfigured"
+        },
+        "lastTestedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connector": {
+          "type": "string",
+          "const": "bird",
           "default": "bird"
         },
         "authority": {
@@ -361,40 +376,40 @@
     "visualPlatform": {
       "type": "object",
       "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "liveGoArmed": {
-            "type": "boolean",
-            "default": false
-          },
-          "authStatus": {
-            "type": "string",
-            "enum": [
-              "unconfigured",
-              "configured",
-              "tested",
-              "failed"
-            ],
-            "default": "unconfigured"
-          },
-          "lastTestedAt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "liveRehearsalArmed": {
-            "type": "boolean",
-            "default": false
-          },
-          "accessTokenExpiresAt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "connector": {
-            "type": "string",
-            "const": "instagram_content_publishing",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "liveGoArmed": {
+          "type": "boolean",
+          "default": false
+        },
+        "authStatus": {
+          "type": "string",
+          "enum": [
+            "unconfigured",
+            "configured",
+            "tested",
+            "failed"
+          ],
+          "default": "unconfigured"
+        },
+        "lastTestedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "liveRehearsalArmed": {
+          "type": "boolean",
+          "default": false
+        },
+        "accessTokenExpiresAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connector": {
+          "type": "string",
+          "const": "instagram_content_publishing",
           "default": "instagram_content_publishing"
         },
         "authority": {
@@ -427,32 +442,32 @@
     "videoPlatform": {
       "type": "object",
       "additionalProperties": false,
-        "properties": {
-          "enabled": {
-            "type": "boolean",
-            "default": false
-          },
-          "liveGoArmed": {
-            "type": "boolean",
-            "default": false
-          },
-          "authStatus": {
-            "type": "string",
-            "enum": [
-              "unconfigured",
-              "configured",
-              "tested",
-              "failed"
-            ],
-            "default": "unconfigured"
-          },
-          "lastTestedAt": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "connector": {
-            "type": "string",
-            "const": "tiktok_content_posting",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "liveGoArmed": {
+          "type": "boolean",
+          "default": false
+        },
+        "authStatus": {
+          "type": "string",
+          "enum": [
+            "unconfigured",
+            "configured",
+            "tested",
+            "failed"
+          ],
+          "default": "unconfigured"
+        },
+        "lastTestedAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connector": {
+          "type": "string",
+          "const": "tiktok_content_posting",
           "default": "tiktok_content_posting"
         },
         "authority": {

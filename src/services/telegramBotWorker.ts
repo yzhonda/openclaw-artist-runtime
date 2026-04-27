@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AutopilotStatus, TelegramConfig } from "../types.js";
+import type { AiReviewProvider, AutopilotStatus, TelegramConfig } from "../types.js";
 import { getTelegramOwnerUserIds } from "./telegramAuth.js";
 import { TelegramClient, type TelegramFetch, type TelegramUpdate } from "./telegramClient.js";
 import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } from "./telegramCommandRouter.js";
@@ -12,6 +12,7 @@ export interface TelegramBotWorkerOptions {
   ownerUserIds?: Set<string>;
   fetchImpl?: TelegramFetch;
   getAutopilotStatus?: () => Promise<AutopilotStatus>;
+  aiReviewProvider?: AiReviewProvider;
 }
 
 export interface TelegramPollResult {
@@ -164,7 +165,8 @@ export class TelegramBotWorker {
       fromUserId: from.id,
       chatId: message.chat.id,
       workspaceRoot: this.options.root,
-      autopilotStatus: await this.options.getAutopilotStatus?.()
+      autopilotStatus: await this.options.getAutopilotStatus?.(),
+      aiReviewProvider: this.options.aiReviewProvider
     });
     if (route.shouldStoreFreeText) {
       await storeTelegramInbox(this.options.root, {

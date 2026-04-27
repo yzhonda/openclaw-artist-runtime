@@ -83,6 +83,18 @@ whether it is set. To disable Telegram again, set `telegram.enabled=false` or
 remove either local environment value, then restart the Gateway process that
 owns the environment.
 
+### Debug AI review command
+
+`/review <songId>` is a Telegram debug command for inspecting a song's current
+brief, latest lyrics, Suno take metadata, selected take, and prompt-pack summary.
+It is outside the normal autopilot path: it does not change `selected-take.json`,
+does not publish, and does not influence the autopilot publish gate.
+
+The default provider is `aiReview.provider="mock"`, which returns a placeholder
+review and writes the result to `runtime/debug-ai-reviews/<songId>-<UTC>.json`.
+If a future provider is selected but not configured, the command returns a safe
+"provider not configured" response rather than calling an external model.
+
 ## Runtime log rotation
 
 `scripts/rotate-runtime-logs.sh` rotates only top-level `runtime/*.log` files.

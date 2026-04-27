@@ -21,6 +21,7 @@ export const socialAuthorityModes = [
 export const socialRiskLevels = ["low", "medium", "high"] as const;
 export const capabilityStates = [true, false, "unknown"] as const;
 export const platformAuthStatuses = ["unconfigured", "configured", "tested", "failed"] as const;
+export const aiReviewProviders = ["mock", "openclaw"] as const;
 export const sunoWorkerStates = ["disconnected", "connecting", "connected", "generating", "importing", "login_required", "login_challenge", "captcha", "payment_prompt", "ui_mismatch", "quota_exhausted", "paused", "stopped"] as const;
 export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generation", "take_selection", "asset_generation", "publishing", "completed", "paused", "failed_closed"] as const;
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "scheduled", "published", "archived", "failed"] as const;
@@ -44,6 +45,7 @@ export type SocialRiskLevel = (typeof socialRiskLevels)[number];
 export type SocialPlatform = "x" | "instagram" | "tiktok";
 export type CapabilityState = (typeof capabilityStates)[number];
 export type PlatformAuthStatus = (typeof platformAuthStatuses)[number];
+export type AiReviewProvider = (typeof aiReviewProviders)[number];
 export type SunoWorkerState = (typeof sunoWorkerStates)[number];
 export type AutopilotStage = (typeof autopilotStages)[number];
 export type SongStatus = (typeof songStatuses)[number];
@@ -153,6 +155,10 @@ export interface TelegramConfig {
   acceptFreeText: boolean;
 }
 
+export interface AiReviewConfig {
+  provider: AiReviewProvider;
+}
+
 export interface ArtistRuntimeConfig {
   schemaVersion: number;
   artist: ArtistConfig;
@@ -160,7 +166,29 @@ export interface ArtistRuntimeConfig {
   music: MusicConfig;
   distribution: DistributionConfig;
   telegram: TelegramConfig;
+  aiReview: AiReviewConfig;
   safety: SafetyConfig;
+}
+
+export interface DebugAiReviewInput {
+  songId: string;
+  title: string;
+  brief?: string;
+  lyrics?: string;
+  takes: unknown[];
+  selectedTake?: unknown;
+  promptPackSummary?: unknown;
+}
+
+export interface DebugAiReviewResult {
+  songId: string;
+  score: number;
+  summary: string;
+  reasons: string[];
+  cautions: string[];
+  provider: AiReviewProvider | "not_configured";
+  createdAt: string;
+  outputPath?: string;
 }
 
 export interface ValidationResult<T = void> {

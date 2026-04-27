@@ -23,6 +23,7 @@ describe("telegram command router", () => {
     expect(result.kind).toBe("help");
     expect(result.responseText).toContain("/status");
     expect(result.responseText).toContain("/pause");
+    expect(result.responseText).toContain("/review");
     expect(result.shouldStoreFreeText).toBe(false);
   });
 

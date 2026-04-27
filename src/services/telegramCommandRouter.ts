@@ -1,10 +1,12 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { AutopilotStatus } from "../types.js";
+import type { AiReviewProvider, AutopilotStatus } from "../types.js";
 import { AutopilotControlService } from "./autopilotControlService.js";
+import { formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiReviewService.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
+import { readSongMaterial } from "./songMaterialReader.js";
 
-export type TelegramCommandKind = "help" | "status" | "songs" | "song" | "regen" | "pause" | "resume" | "unknown" | "free_text";
+export type TelegramCommandKind = "help" | "status" | "songs" | "song" | "regen" | "review" | "pause" | "resume" | "unknown" | "free_text";
 
 export interface TelegramRouteInput {
   text: string;
@@ -12,6 +14,7 @@ export interface TelegramRouteInput {
   chatId: number;
   workspaceRoot?: string;
   autopilotStatus?: AutopilotStatus;
+  aiReviewProvider?: AiReviewProvider;
 }
 
 export interface TelegramRouteResult {
@@ -58,6 +61,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/songs - list recent songs",
         "/song <songId> - show song detail",
         "/regen <songId> - queue a dry-run regeneration note",
+        "/review <songId> - run a debug-only mock AI review",
         "/pause - pause autopilot",
         "/resume - resume autopilot",
         "/help - show this help"
@@ -124,6 +128,24 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
       responseText: `Queued dry-run regeneration request for ${songId}. No Suno create was started.`,
       shouldStoreFreeText: false
     };
+  }
+
+  if (command === "/review") {
+    const songId = args[0];
+    if (!input.workspaceRoot || !songId) {
+      return { kind: "review", responseText: "Usage: /review <songId>", shouldStoreFreeText: false };
+    }
+    try {
+      const material = await readSongMaterial(input.workspaceRoot, songId);
+      const result = await reviewSongDebugMaterial(input.workspaceRoot, material, input.aiReviewProvider);
+      return { kind: "review", responseText: formatDebugAiReviewResult(result), shouldStoreFreeText: false };
+    } catch {
+      return {
+        kind: "review",
+        responseText: `Debug review unavailable for ${songId}: song material was not found.`,
+        shouldStoreFreeText: false
+      };
+    }
   }
 
   if (command === "/pause") {
