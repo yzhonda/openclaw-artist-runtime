@@ -100,6 +100,14 @@ async function handleSessionCommand(name: string, ctx: PluginCommandContextLike,
   return { text: response ?? "No active persona setup session. Use /setup or /persona check fill first." };
 }
 
+function logRegistration(ok: boolean, name: string): void {
+  if (ok) {
+    console.info(`[artist-runtime] registered runtime-slash command: ${name}`);
+    return;
+  }
+  console.warn(`[artist-runtime] registerCommand unavailable for: ${name}`);
+}
+
 export function registerCommands(api: unknown): void {
   const apiConfig = isRecord(api) ? (api as PluginApiWithConfig) : {};
   safeRegisterCommand(api, {
@@ -109,14 +117,14 @@ export function registerCommands(api: unknown): void {
     requireAuth: true,
     nativeProgressMessages: { telegram: "Checking artist persona..." },
     handler: (ctx) => handleRoutedCommand("persona", ctx as PluginCommandContextLike, apiConfig)
-  });
+  }, logRegistration);
   safeRegisterCommand(api, {
     name: "setup",
     description: "Start artist-runtime Telegram persona setup.",
     acceptsArgs: true,
     requireAuth: true,
     handler: (ctx) => handleRoutedCommand("setup", ctx as PluginCommandContextLike, apiConfig)
-  });
+  }, logRegistration);
   for (const name of ["confirm", "cancel", "skip", "back", "answer"]) {
     safeRegisterCommand(api, {
       name,
@@ -124,6 +132,6 @@ export function registerCommands(api: unknown): void {
       acceptsArgs: true,
       requireAuth: true,
       handler: (ctx) => handleSessionCommand(name, ctx as PluginCommandContextLike, apiConfig)
-    });
+    }, logRegistration);
   }
 }

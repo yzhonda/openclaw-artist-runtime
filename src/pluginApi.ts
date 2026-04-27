@@ -43,6 +43,7 @@ export interface PluginApiLike {
   registerHook?: (events: string | string[], handler: UnknownHandler, opts?: { name?: string; description?: string; register?: boolean }) => void;
   registerService?: (service: { id?: string; name?: string; start?: UnknownHandler; stop?: UnknownHandler }) => void;
   registerCommand?: (command: CommandRegistration) => void;
+  getPluginCommandSpecs?: (provider?: string) => Array<{ name: string; description?: string; acceptsArgs?: boolean }>;
   registerHttpRoute?: (route: {
     path: string;
     handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void;
@@ -211,8 +212,17 @@ export function safeRegisterService(api: unknown, service: ServiceRegistration):
   });
 }
 
-export function safeRegisterCommand(api: unknown, command: CommandRegistration): void {
-  asPluginApi(api).registerCommand?.(command);
+export function safeRegisterCommand(
+  api: unknown,
+  command: CommandRegistration,
+  onResult?: (ok: boolean, name: string) => void
+): void {
+  const registerCommand = asPluginApi(api).registerCommand;
+  const ok = typeof registerCommand === "function";
+  if (ok) {
+    registerCommand(command);
+  }
+  onResult?.(ok, command.name);
 }
 
 export function safeRegisterRoute(api: unknown, route: RouteRegistration): void {
