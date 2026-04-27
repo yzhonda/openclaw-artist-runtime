@@ -165,7 +165,13 @@ export type PersonaField =
   | "soul-tone"
   | "soul-refusal";
 
-export type TelegramPersonaSessionMode = "setup_artist" | "setup_soul" | "edit_field" | "reset_confirm" | "migrate_confirm";
+export type TelegramPersonaSessionMode =
+  | "setup_artist"
+  | "setup_soul"
+  | "edit_field"
+  | "reset_confirm"
+  | "migrate_confirm"
+  | "check_fill_chain";
 
 export interface PersonaAnswers {
   artistName: string;
@@ -189,6 +195,7 @@ export interface TelegramPersonaSession {
   mode: TelegramPersonaSessionMode;
   stepIndex: number;
   field?: PersonaField;
+  checkFillQueue?: PersonaField[];
   pending: Partial<PersonaAnswers>;
   history: TelegramPersonaSessionHistoryEntry[];
   startedAt: number;

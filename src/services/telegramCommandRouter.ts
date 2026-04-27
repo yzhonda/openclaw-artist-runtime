@@ -2,7 +2,8 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AiReviewProvider, AutopilotStatus } from "../types.js";
 import { AutopilotControlService } from "./autopilotControlService.js";
-import { formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiReviewService.js";
+import { createDebugAiReviewer, formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiReviewService.js";
+import { auditPersonaCompleteness, formatPersonaAuditReport, type PersonaFieldAudit } from "./personaFieldAuditor.js";
 import { readArtistPersonaSummary } from "./personaFileBuilder.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
@@ -82,7 +83,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/review <songId> - run a debug-only mock AI review",
         "/setup - start Telegram artist persona setup",
         "/setup soul - configure SOUL.md voice",
-        "/persona show|fields|edit <field>|reset|migrate - manage Telegram persona",
+        "/persona show|fields|edit <field>|check|reset|migrate - manage Telegram persona",
         "/pause - pause autopilot",
         "/resume - resume autopilot",
         "/help - show this help"
@@ -133,6 +134,41 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     if (subcommand === "show") {
       return { kind: "persona", responseText: await formatPersonaShow(input.workspaceRoot), shouldStoreFreeText: false };
     }
+    if (subcommand === "check") {
+      const mode = args[1]?.toLowerCase();
+      const report = await auditPersonaCompleteness(input.workspaceRoot);
+      if (mode === "fill") {
+        const queue = report.fields.filter(needsPersonaFill).map((field) => field.field);
+        if (queue.length === 0) {
+          return { kind: "persona", responseText: "All fields filled. Use /persona show to review it.", shouldStoreFreeText: false };
+        }
+        const [field, ...rest] = queue;
+        await createTelegramPersonaSession(input.workspaceRoot, {
+          mode: "check_fill_chain",
+          field,
+          checkFillQueue: rest,
+          chatId: input.chatId,
+          userId: input.fromUserId
+        });
+        return {
+          kind: "persona",
+          responseText: [
+            formatPersonaCheckSummary(report),
+            "",
+            `Starting fill chain. First: ${field}. Send the new value, /skip, or /cancel.`
+          ].join("\n"),
+          shouldStoreFreeText: false
+        };
+      }
+      if (mode === "suggest") {
+        return {
+          kind: "persona",
+          responseText: await formatPersonaSuggestions(report, input.aiReviewProvider),
+          shouldStoreFreeText: false
+        };
+      }
+      return { kind: "persona", responseText: formatPersonaCheckReport(report), shouldStoreFreeText: false };
+    }
     if (subcommand === "edit") {
       const field = parsePersonaEditField(args[1]);
       if (!field) {
@@ -181,7 +217,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     }
     return {
       kind: "persona",
-      responseText: "Usage: /persona show | /persona fields | /persona edit <field> | /persona reset | /persona migrate",
+      responseText: "Usage: /persona show | /persona fields | /persona edit <field> | /persona check [fill|suggest] | /persona reset | /persona migrate",
       shouldStoreFreeText: false
     };
   }
@@ -293,6 +329,49 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     responseText: "Instruction received for local artist inbox staging.",
     shouldStoreFreeText: true
   };
+}
+
+function needsPersonaFill(field: PersonaFieldAudit): boolean {
+  return field.status === "missing" || field.status === "thin";
+}
+
+function formatPersonaCheckSummary(report: Awaited<ReturnType<typeof auditPersonaCompleteness>>): string {
+  const needs = report.fields.filter(needsPersonaFill).map((field) => field.field);
+  return [
+    `Persona check: ${report.summary.filled} filled, ${report.summary.thin} thin, ${report.summary.missing} missing.`,
+    needs.length > 0 ? `Needs: ${needs.join(", ")}` : "All fields filled.",
+    report.customSections.length > 0 ? `Custom sections: ${report.customSections.join(", ")}` : undefined
+  ].filter(Boolean).join("\n");
+}
+
+function formatPersonaCheckReport(report: Awaited<ReturnType<typeof auditPersonaCompleteness>>): string {
+  const full = formatPersonaAuditReport(report);
+  if (full.length <= 1500) {
+    return full;
+  }
+  return formatPersonaCheckSummary(report);
+}
+
+async function formatPersonaSuggestions(
+  report: Awaited<ReturnType<typeof auditPersonaCompleteness>>,
+  provider?: AiReviewProvider
+): Promise<string> {
+  const reviewer = createDebugAiReviewer(provider);
+  const result = await reviewer.review({
+    songId: "persona-check",
+    title: "Persona check suggestions",
+    brief: [
+      formatPersonaCheckSummary(report),
+      report.customSections.length > 0 ? `Custom sections: ${report.customSections.join(", ")}` : undefined
+    ].filter(Boolean).join("\n"),
+    takes: []
+  });
+  return [
+    "Persona suggestion mode:",
+    result.summary,
+    result.provider === "mock" ? "Mock provider placeholder for socialVoice, obsessions, and refusalStyle suggestions." : undefined,
+    result.provider === "not_configured" ? "Configure AI provider for suggestions (currently mock)." : undefined
+  ].filter(Boolean).join("\n");
 }
 
 function formatPersonaFields(): string {

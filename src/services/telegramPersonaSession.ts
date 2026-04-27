@@ -38,6 +38,7 @@ export interface CreateTelegramPersonaSessionInput {
   chatId: number;
   userId: number;
   field?: PersonaField;
+  checkFillQueue?: PersonaField[];
   now?: number;
   ttlMs?: number;
 }
@@ -45,6 +46,7 @@ export interface CreateTelegramPersonaSessionInput {
 export interface UpdateTelegramPersonaSessionInput {
   stepIndex?: number;
   field?: PersonaField;
+  checkFillQueue?: PersonaField[];
   pending?: TelegramPersonaSession["pending"];
   history?: TelegramPersonaSession["history"];
   active?: boolean;
@@ -108,6 +110,7 @@ export async function createTelegramPersonaSession(
     mode: input.mode,
     stepIndex: 0,
     field: input.field,
+    checkFillQueue: input.checkFillQueue,
     pending: {},
     history: [],
     startedAt: now,
@@ -132,6 +135,7 @@ export async function updateTelegramPersonaSession(
     active: input.active ?? current.active,
     stepIndex: input.stepIndex ?? current.stepIndex,
     field: input.field ?? current.field,
+    checkFillQueue: input.checkFillQueue ?? current.checkFillQueue,
     pending: input.pending ?? current.pending,
     history: input.history ?? current.history,
     updatedAt: now,
@@ -196,12 +200,21 @@ export async function handleTelegramPersonaSessionMessage(
     return session.mode === "setup_soul" ? formatSoulPersonaQuestion(stepIndex) : formatArtistPersonaQuestion(stepIndex);
   }
   if (command === "/skip") {
+    if (session.mode === "check_fill_chain") {
+      const [nextField, ...rest] = session.checkFillQueue ?? [];
+      if (!nextField) {
+        await cancelTelegramPersonaSession(root);
+        return "All fields complete. Use /persona show to review it.";
+      }
+      await updateTelegramPersonaSession(root, { field: nextField, checkFillQueue: rest, pending: {}, stepIndex: 0, now });
+      return `Skipped. Next: ${nextField}. ${formatEditPrompt(nextField)}`;
+    }
     return session.mode === "setup_soul"
       ? advanceSoulSetup(root, session, undefined, now, true)
       : advanceArtistSetup(root, session, undefined, now, true);
   }
   if (command.startsWith("/confirm")) {
-    if (session.mode === "edit_field") {
+    if (session.mode === "edit_field" || session.mode === "check_fill_chain") {
       return confirmEditField(root, session);
     }
     if (isSoulPersonaPreviewStep(session)) {
@@ -221,6 +234,9 @@ export async function handleTelegramPersonaSessionMessage(
     return "Persona setup is active. Send an answer, /skip, /back, /confirm, or /cancel.";
   }
   if (session.mode === "edit_field") {
+    return stageEditField(root, session, text, now);
+  }
+  if (session.mode === "check_fill_chain") {
     return stageEditField(root, session, text, now);
   }
   return session.mode === "setup_soul"
@@ -297,8 +313,23 @@ async function confirmEditField(root: string, session: TelegramPersonaSession): 
   } else {
     return "Unknown persona field. Send /persona fields for editable fields.";
   }
-  await cancelTelegramPersonaSession(root);
-  return "Persona field saved. Use /persona show to review it.";
+  if (session.mode !== "check_fill_chain") {
+    await cancelTelegramPersonaSession(root);
+    return "Persona field saved. Use /persona show to review it.";
+  }
+  const remaining = session.checkFillQueue ?? [];
+  if (remaining.length === 0) {
+    await cancelTelegramPersonaSession(root);
+    return "Persona field saved. All fields complete. Use /persona show to review it.";
+  }
+  const [nextField, ...rest] = remaining;
+  await updateTelegramPersonaSession(root, {
+    field: nextField,
+    checkFillQueue: rest,
+    pending: {},
+    stepIndex: 0
+  });
+  return `Persona field saved. Next: ${nextField}. ${formatEditPrompt(nextField)} Send /skip to skip this field.`;
 }
 
 async function advanceArtistSetup(
