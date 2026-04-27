@@ -19,6 +19,16 @@ export interface ServiceRegistration {
   create: () => unknown;
 }
 
+export interface CommandRegistration {
+  name: string;
+  description: string;
+  acceptsArgs?: boolean;
+  requireAuth?: boolean;
+  nativeNames?: Partial<Record<string, string>> & { default?: string };
+  nativeProgressMessages?: Partial<Record<string, string>> & { default?: string };
+  handler: UnknownHandler;
+}
+
 export interface RouteRegistration {
   method: HttpMethod | HttpMethod[];
   path: string;
@@ -32,6 +42,7 @@ export interface PluginApiLike {
   registerTool?: (tool: ToolRegistration, opts?: { name?: string; names?: string[]; optional?: boolean }) => void;
   registerHook?: (events: string | string[], handler: UnknownHandler, opts?: { name?: string; description?: string; register?: boolean }) => void;
   registerService?: (service: { id?: string; name?: string; start?: UnknownHandler; stop?: UnknownHandler }) => void;
+  registerCommand?: (command: CommandRegistration) => void;
   registerHttpRoute?: (route: {
     path: string;
     handler: (req: IncomingMessage, res: ServerResponse) => Promise<boolean | void> | boolean | void;
@@ -198,6 +209,10 @@ export function safeRegisterService(api: unknown, service: ServiceRegistration):
       return undefined;
     }
   });
+}
+
+export function safeRegisterCommand(api: unknown, command: CommandRegistration): void {
+  asPluginApi(api).registerCommand?.(command);
 }
 
 export function safeRegisterRoute(api: unknown, route: RouteRegistration): void {
