@@ -6,7 +6,13 @@ import type {
   TelegramPersonaSession,
   TelegramPersonaSessionMode
 } from "../types.js";
-import { writeArtistPersona, writePersonaCompletionMarker } from "./personaFileBuilder.js";
+import {
+  resetArtistPersonaBlock,
+  updateArtistPersonaField,
+  writeArtistPersona,
+  writePersonaCompletionMarker,
+  type ArtistPersonaSummary
+} from "./personaFileBuilder.js";
 import {
   artistPersonaQuestions,
   formatArtistPersonaPreview,
@@ -14,6 +20,15 @@ import {
   getArtistPersonaQuestion,
   isArtistPersonaPreviewStep
 } from "./personaWizardQuestions.js";
+import {
+  formatSoulPersonaPreview,
+  formatSoulPersonaQuestion,
+  resetSoulPersonaBlock,
+  soulPersonaQuestions,
+  updateSoulPersonaField,
+  writeSoulPersona,
+  type SoulPersonaSummary
+} from "./soulFileBuilder.js";
 
 export const TELEGRAM_PERSONA_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -141,22 +156,47 @@ export async function handleTelegramPersonaSessionMessage(
     await cancelTelegramPersonaSession(root);
     return "Persona setup cancelled. No ARTIST.md or SOUL.md changes were written.";
   }
+  if (session.mode === "reset_confirm") {
+    if (command === "/confirm reset") {
+      await resetArtistPersonaBlock(root);
+      await resetSoulPersonaBlock(root);
+      await cancelTelegramPersonaSession(root);
+      return "Telegram-managed persona blocks were reset. Songs, ledgers, budget, and profiles were not touched.";
+    }
+    return "Persona reset is waiting for confirmation. Reply /confirm reset or /cancel.";
+  }
   if (command === "/back") {
+    if (session.mode === "edit_field") {
+      await updateTelegramPersonaSession(root, { pending: {}, stepIndex: 0, now });
+      return formatEditPrompt(session.field);
+    }
     const previous = session.history[session.history.length - 1];
     const stepIndex = isArtistPersonaPreviewStep(session)
       ? Math.max(artistPersonaQuestions.length - 1, 0)
-      : previous?.stepIndex ?? Math.max(session.stepIndex - 1, 0);
+      : isSoulPersonaPreviewStep(session)
+        ? Math.max(soulPersonaQuestions.length - 1, 0)
+        : previous?.stepIndex ?? Math.max(session.stepIndex - 1, 0);
     await updateTelegramPersonaSession(root, {
       stepIndex,
       history: session.history.slice(0, -1),
       now
     });
-    return formatArtistPersonaQuestion(stepIndex);
+    return session.mode === "setup_soul" ? formatSoulPersonaQuestion(stepIndex) : formatArtistPersonaQuestion(stepIndex);
   }
   if (command === "/skip") {
-    return advanceArtistSetup(root, session, undefined, now, true);
+    return session.mode === "setup_soul"
+      ? advanceSoulSetup(root, session, undefined, now, true)
+      : advanceArtistSetup(root, session, undefined, now, true);
   }
   if (command.startsWith("/confirm")) {
+    if (session.mode === "edit_field") {
+      return confirmEditField(root, session);
+    }
+    if (isSoulPersonaPreviewStep(session)) {
+      await writeSoulPersona(root, session.pending);
+      await cancelTelegramPersonaSession(root);
+      return "SOUL saved. Use /persona show to review it.";
+    }
     if (!isArtistPersonaPreviewStep(session)) {
       return "Persona setup is not ready to confirm yet. Answer the remaining questions or send /skip.";
     }
@@ -168,7 +208,85 @@ export async function handleTelegramPersonaSessionMessage(
   if (command.startsWith("/")) {
     return "Persona setup is active. Send an answer, /skip, /back, /confirm, or /cancel.";
   }
-  return advanceArtistSetup(root, session, text, now, false);
+  if (session.mode === "edit_field") {
+    return stageEditField(root, session, text, now);
+  }
+  return session.mode === "setup_soul"
+    ? advanceSoulSetup(root, session, text, now, false)
+    : advanceArtistSetup(root, session, text, now, false);
+}
+
+function isSoulPersonaPreviewStep(session: TelegramPersonaSession): boolean {
+  return session.mode === "setup_soul" && session.stepIndex >= soulPersonaQuestions.length;
+}
+
+function artistFieldKey(field: PersonaField | undefined): keyof ArtistPersonaSummary | undefined {
+  switch (field) {
+    case "artistName":
+    case "identityLine":
+    case "soundDna":
+    case "obsessions":
+    case "lyricsRules":
+    case "socialVoice":
+      return field;
+    default:
+      return undefined;
+  }
+}
+
+function soulFieldKey(field: PersonaField | undefined): keyof SoulPersonaSummary | undefined {
+  switch (field) {
+    case "soul-tone":
+      return "conversationTone";
+    case "soul-refusal":
+      return "refusalStyle";
+    default:
+      return undefined;
+  }
+}
+
+function formatEditPrompt(field: PersonaField | undefined): string {
+  return `Send the new value for ${field ?? "this field"}. Reply /cancel to stop.`;
+}
+
+function formatEditPreview(field: PersonaField | undefined, value: string): string {
+  return [
+    "Persona edit preview:",
+    `${field ?? "field"}: ${value}`,
+    "",
+    "Write this change? Reply /confirm or /back."
+  ].join("\n");
+}
+
+async function stageEditField(root: string, session: TelegramPersonaSession, value: string, now: number): Promise<string> {
+  const trimmed = value.trim();
+  if (trimmed.length < 2) {
+    return "Edit value is too short. Send a longer value or /cancel.";
+  }
+  await updateTelegramPersonaSession(root, {
+    pending: { editValue: trimmed } as Partial<PersonaAnswers>,
+    stepIndex: 1,
+    now
+  });
+  return formatEditPreview(session.field, trimmed);
+}
+
+async function confirmEditField(root: string, session: TelegramPersonaSession): Promise<string> {
+  const value = (session.pending as Partial<PersonaAnswers> & { editValue?: string }).editValue;
+  if (!value) {
+    return "No pending edit value yet. Send the new value first, or /cancel.";
+  }
+  const artistKey = artistFieldKey(session.field);
+  const soulKey = soulFieldKey(session.field);
+  if (artistKey) {
+    await updateArtistPersonaField(root, artistKey, value);
+  } else if (soulKey) {
+    await updateSoulPersonaField(root, soulKey, value);
+  } else {
+    return "Unknown persona field. Send /persona fields for editable fields.";
+  }
+  await cancelTelegramPersonaSession(root);
+  return "Persona field saved. Use /persona show to review it.";
 }
 
 async function advanceArtistSetup(
@@ -215,5 +333,48 @@ async function advanceArtistSetup(
   const response = nextStepIndex >= artistPersonaQuestions.length
     ? formatArtistPersonaPreview(nextPending)
     : formatArtistPersonaQuestion(nextStepIndex);
+  return useDefault ? `Skipped. Default saved for ${question.label}.\n\n${response}` : response;
+}
+
+async function advanceSoulSetup(
+  root: string,
+  session: TelegramPersonaSession,
+  value: string | undefined,
+  now: number,
+  useDefault: boolean
+): Promise<string> {
+  if (session.mode !== "setup_soul") {
+    return "This persona session mode cannot handle SOUL setup. Send /cancel to stop it.";
+  }
+  if (isSoulPersonaPreviewStep(session)) {
+    return formatSoulPersonaPreview(session.pending);
+  }
+  const question = soulPersonaQuestions[session.stepIndex];
+  if (!question) {
+    await updateTelegramPersonaSession(root, { stepIndex: soulPersonaQuestions.length, now });
+    return formatSoulPersonaPreview(session.pending);
+  }
+  const answer = useDefault ? question.defaultValue : value?.trim() ?? "";
+  const validationError = useDefault ? undefined : question.validate(answer);
+  if (validationError) {
+    return validationError;
+  }
+  const nextPending: Partial<PersonaAnswers> = {
+    ...session.pending,
+    [question.field]: answer
+  };
+  const nextStepIndex = session.stepIndex + 1;
+  await updateTelegramPersonaSession(root, {
+    stepIndex: nextStepIndex,
+    pending: nextPending,
+    history: [
+      ...session.history,
+      { stepIndex: session.stepIndex, field: question.field === "conversationTone" ? "soul-tone" : "soul-refusal" }
+    ],
+    now
+  });
+  const response = nextStepIndex >= soulPersonaQuestions.length
+    ? formatSoulPersonaPreview(nextPending)
+    : formatSoulPersonaQuestion(nextStepIndex);
   return useDefault ? `Skipped. Default saved for ${question.label}.\n\n${response}` : response;
 }

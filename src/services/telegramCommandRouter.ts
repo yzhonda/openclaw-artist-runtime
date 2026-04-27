@@ -3,10 +3,13 @@ import { dirname, join } from "node:path";
 import type { AiReviewProvider, AutopilotStatus } from "../types.js";
 import { AutopilotControlService } from "./autopilotControlService.js";
 import { formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiReviewService.js";
+import { readArtistPersonaSummary } from "./personaFileBuilder.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
 import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
 import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
+import { formatSoulPersonaQuestion, readSoulPersonaSummary } from "./soulFileBuilder.js";
+import type { PersonaField } from "../types.js";
 
 export type TelegramCommandKind =
   | "help"
@@ -18,6 +21,7 @@ export type TelegramCommandKind =
   | "pause"
   | "resume"
   | "setup"
+  | "persona"
   | "unknown"
   | "free_text";
 
@@ -76,6 +80,8 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/regen <songId> - queue a dry-run regeneration note",
         "/review <songId> - run a debug-only mock AI review",
         "/setup - start Telegram artist persona setup",
+        "/setup soul - configure SOUL.md voice",
+        "/persona show|fields|edit <field>|reset - manage Telegram persona",
         "/pause - pause autopilot",
         "/resume - resume autopilot",
         "/help - show this help"
@@ -88,6 +94,18 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     if (!input.workspaceRoot) {
       return { kind: "setup", responseText: "Persona setup unavailable: workspace root missing.", shouldStoreFreeText: false };
     }
+    if (args[0]?.toLowerCase() === "soul") {
+      await createTelegramPersonaSession(input.workspaceRoot, {
+        mode: "setup_soul",
+        chatId: input.chatId,
+        userId: input.fromUserId
+      });
+      return {
+        kind: "setup",
+        responseText: ["SOUL setup started.", formatSoulPersonaQuestion(0)].join("\n"),
+        shouldStoreFreeText: false
+      };
+    }
     await createTelegramPersonaSession(input.workspaceRoot, {
       mode: "setup_artist",
       chatId: input.chatId,
@@ -99,6 +117,57 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "Artist persona setup started.",
         formatArtistPersonaQuestion(0)
       ].join("\n"),
+      shouldStoreFreeText: false
+    };
+  }
+
+  if (command === "/persona") {
+    if (!input.workspaceRoot) {
+      return { kind: "persona", responseText: "Persona command unavailable: workspace root missing.", shouldStoreFreeText: false };
+    }
+    const subcommand = args[0]?.toLowerCase();
+    if (subcommand === "fields") {
+      return { kind: "persona", responseText: formatPersonaFields(), shouldStoreFreeText: false };
+    }
+    if (subcommand === "show") {
+      return { kind: "persona", responseText: await formatPersonaShow(input.workspaceRoot), shouldStoreFreeText: false };
+    }
+    if (subcommand === "edit") {
+      const field = parsePersonaEditField(args[1]);
+      if (!field) {
+        return {
+          kind: "persona",
+          responseText: "Usage: /persona edit <field>. Send /persona fields for editable fields.",
+          shouldStoreFreeText: false
+        };
+      }
+      await createTelegramPersonaSession(input.workspaceRoot, {
+        mode: "edit_field",
+        field,
+        chatId: input.chatId,
+        userId: input.fromUserId
+      });
+      return {
+        kind: "persona",
+        responseText: `Editing ${args[1]}. Send the new value, then /confirm or /cancel.`,
+        shouldStoreFreeText: false
+      };
+    }
+    if (subcommand === "reset") {
+      await createTelegramPersonaSession(input.workspaceRoot, {
+        mode: "reset_confirm",
+        chatId: input.chatId,
+        userId: input.fromUserId
+      });
+      return {
+        kind: "persona",
+        responseText: "This will replace Telegram-managed ARTIST/SOUL persona blocks. Reply /confirm reset or /cancel.",
+        shouldStoreFreeText: false
+      };
+    }
+    return {
+      kind: "persona",
+      responseText: "Usage: /persona show | /persona fields | /persona edit <field> | /persona reset",
       shouldStoreFreeText: false
     };
   }
@@ -210,6 +279,53 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     responseText: "Instruction received for local artist inbox staging.",
     shouldStoreFreeText: true
   };
+}
+
+function formatPersonaFields(): string {
+  return [
+    "Editable persona fields:",
+    "ARTIST: name, identity, sound, themes, lyrics, social",
+    "SOUL: soul-tone, soul-refusal"
+  ].join("\n");
+}
+
+function parsePersonaEditField(value?: string): PersonaField | undefined {
+  switch (value?.toLowerCase()) {
+    case "name":
+      return "artistName";
+    case "identity":
+      return "identityLine";
+    case "sound":
+      return "soundDna";
+    case "themes":
+      return "obsessions";
+    case "lyrics":
+      return "lyricsRules";
+    case "social":
+      return "socialVoice";
+    case "soul-tone":
+      return "soul-tone";
+    case "soul-refusal":
+      return "soul-refusal";
+    default:
+      return undefined;
+  }
+}
+
+async function formatPersonaShow(root: string): Promise<string> {
+  const [artist, soul] = await Promise.all([readArtistPersonaSummary(root), readSoulPersonaSummary(root)]);
+  const response = [
+    `Artist: ${artist.artistName}`,
+    `Identity: ${artist.identityLine}`,
+    `Sound: ${artist.soundDna}`,
+    `Themes: ${artist.obsessions}`,
+    `Lyrics guard: ${artist.lyricsRules}`,
+    `Social voice: ${artist.socialVoice}`,
+    "---",
+    `Conversation tone: ${soul.conversationTone || "(not set)"}`,
+    `Refusal style: ${soul.refusalStyle || "(not set)"}`
+  ].join("\n");
+  return response.length > 1600 ? `${response.slice(0, 1597)}...` : response;
 }
 
 export function classifyTelegramFreeText(text: string): "pause" | "resume" | "status" | "artist_inbox" {

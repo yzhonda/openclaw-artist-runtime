@@ -174,8 +174,8 @@ export interface PersonaAnswers {
   obsessions: string;
   lyricsRules: string;
   socialVoice: string;
-  "soul-tone": string;
-  "soul-refusal": string;
+  conversationTone: string;
+  refusalStyle: string;
 }
 
 export interface TelegramPersonaSessionHistoryEntry {

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { PersonaAnswers } from "../types.js";
 import { completeArtistPersonaAnswers } from "./personaWizardQuestions.js";
@@ -13,6 +13,15 @@ const secretPattern = /(TELEGRAM_BOT_TOKEN|bot\d+:[A-Za-z0-9_-]{30,}|API[_ -]?KE
 export interface WriteArtistPersonaResult {
   path: string;
   mode: "replace_default" | "replace_marker" | "append_marker";
+}
+
+export interface ArtistPersonaSummary {
+  artistName: string;
+  identityLine: string;
+  soundDna: string;
+  obsessions: string;
+  lyricsRules: string;
+  socialVoice: string;
 }
 
 function artistPath(root: string): string {
@@ -107,6 +116,29 @@ function replaceMarkerBlock(contents: string, block: string): string {
   return contents.replace(expression, block);
 }
 
+function removeMarkerBlock(contents: string): string {
+  const expression = new RegExp(`\\n?${artistPersonaBlockStart}[\\s\\S]*?${artistPersonaBlockEnd}\\n?`);
+  return contents.replace(expression, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
+}
+
+function extractMarkerBlock(contents: string): string {
+  const expression = new RegExp(`${artistPersonaBlockStart}[\\s\\S]*?${artistPersonaBlockEnd}`);
+  return contents.match(expression)?.[0] ?? contents;
+}
+
+function sectionBetween(contents: string, heading: string, nextHeading: string): string {
+  const expression = new RegExp(`## ${heading}\\n\\n([\\s\\S]*?)(?=\\n## ${nextHeading}\\n|${artistPersonaBlockEnd}|$)`);
+  return contents.match(expression)?.[1]?.trim() ?? "";
+}
+
+function bulletsToText(contents: string): string {
+  return contents
+    .split("\n")
+    .map((line) => line.replace(/^\s*-\s*/, "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function insertAfterArtistHeading(contents: string, block: string): string {
   const heading = /^# ARTIST\.md\s*$/m;
   if (!heading.test(contents)) {
@@ -137,6 +169,49 @@ export async function writeArtistPersona(root: string, pending: Partial<PersonaA
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, nextContents.endsWith("\n") ? nextContents : `${nextContents}\n`, "utf8");
   return { path, mode };
+}
+
+export async function readArtistPersonaSummary(root: string): Promise<ArtistPersonaSummary> {
+  const contents = await readFile(artistPath(root), "utf8").catch(() => "");
+  const block = extractMarkerBlock(contents);
+  const publicIdentity = sectionBetween(block, "Public Identity", "Producer Relationship");
+  const core = sectionBetween(block, "Current Artist Core", "Sound");
+  const sound = sectionBetween(block, "Sound", "Lyrics");
+  const lyrics = sectionBetween(block, "Lyrics", "Social Voice");
+  const social = sectionBetween(block, "Social Voice", "Suno Production Profile");
+  return {
+    artistName: publicIdentity.match(/Artist name:\s*(.+)/)?.[1]?.trim() || "Unknown artist",
+    identityLine: publicIdentity
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("Artist name:"))[0] ?? "",
+    soundDna: bulletsToText(sound),
+    obsessions: bulletsToText(core.match(/- Core obsessions:([\s\S]*?)- Emotional weather:/)?.[1] ?? core),
+    lyricsRules: bulletsToText(lyrics),
+    socialVoice: bulletsToText(social)
+  };
+}
+
+export async function updateArtistPersonaField(
+  root: string,
+  field: keyof ArtistPersonaSummary,
+  value: string
+): Promise<WriteArtistPersonaResult> {
+  const current = await readArtistPersonaSummary(root);
+  return writeArtistPersona(root, { ...current, [field]: value });
+}
+
+export async function resetArtistPersonaBlock(root: string): Promise<boolean> {
+  const path = artistPath(root);
+  const contents = await readFile(path, "utf8").catch(() => "");
+  if (!contents.includes(artistPersonaBlockStart) || !contents.includes(artistPersonaBlockEnd)) {
+    await unlink(completionMarkerPath(root)).catch(() => undefined);
+    return false;
+  }
+  const nextContents = removeMarkerBlock(contents);
+  await writeFile(path, nextContents ? `${nextContents}\n` : "", "utf8");
+  await unlink(completionMarkerPath(root)).catch(() => undefined);
+  return true;
 }
 
 export async function writePersonaCompletionMarker(root: string, now = new Date()): Promise<string> {
