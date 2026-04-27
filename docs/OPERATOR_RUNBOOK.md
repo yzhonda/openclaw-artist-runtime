@@ -135,6 +135,30 @@ Telegram-managed markers or is missing some of the lean persona fields.
    default provider is still `mock`; no external AI provider is called unless a
    future operator-selected provider is explicitly configured.
 
+## Production Telegram command path (Plan v9.8)
+
+Plan v9.8 wires the persona commands into OpenClaw's native plugin command
+registry. This means the main OpenClaw Telegram plugin handles the bot polling
+and invokes artist-runtime directly for `/persona ...` and `/setup` instead of
+letting those messages fall through to the model.
+
+1. Restart the Gateway after installing the package or rebuilding `dist/` so
+   OpenClaw reloads the artist-runtime command registry.
+2. Send `/persona check`. The expected response is the artist-runtime audit
+   summary with filled/thin/missing fields and custom sections. It should not
+   produce an OpenAI-provider error.
+3. Send `/persona migrate` only when the preview is expected, then use
+   `/confirm migrate` to execute. The migrator now preserves custom SOUL.md
+   prose and headings outside the Telegram-managed marker block.
+4. For setup/edit flows on the OpenClaw native command path, use `/answer <text>`
+   for free-text wizard answers. Session control commands remain `/confirm`,
+   `/cancel`, `/skip`, and `/back`.
+
+The older artist-runtime `TelegramBotWorker` remains as a mockable service
+module for tests and non-OpenClaw harnesses, but production should not start a
+second Telegram long-poll worker against the same bot token. OpenClaw owns the
+polling loop.
+
 ### Debug AI review command
 
 `/review <songId>` is a Telegram debug command for inspecting a song's current
