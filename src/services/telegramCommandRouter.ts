@@ -6,6 +6,7 @@ import { formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiRev
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
 import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
+import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
 
 export type TelegramCommandKind =
   | "help"
@@ -96,8 +97,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
       kind: "setup",
       responseText: [
         "Artist persona setup started.",
-        "Phase 1 created the local setup session. Phase 2 will add the lean question flow.",
-        "Send /cancel to stop this setup session."
+        formatArtistPersonaQuestion(0)
       ].join("\n"),
       shouldStoreFreeText: false
     };

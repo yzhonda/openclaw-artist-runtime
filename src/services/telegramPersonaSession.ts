@@ -1,10 +1,19 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
+  PersonaAnswers,
   PersonaField,
   TelegramPersonaSession,
   TelegramPersonaSessionMode
 } from "../types.js";
+import { writeArtistPersona, writePersonaCompletionMarker } from "./personaFileBuilder.js";
+import {
+  artistPersonaQuestions,
+  formatArtistPersonaPreview,
+  formatArtistPersonaQuestion,
+  getArtistPersonaQuestion,
+  isArtistPersonaPreviewStep
+} from "./personaWizardQuestions.js";
 
 export const TELEGRAM_PERSONA_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -134,19 +143,77 @@ export async function handleTelegramPersonaSessionMessage(
   }
   if (command === "/back") {
     const previous = session.history[session.history.length - 1];
+    const stepIndex = isArtistPersonaPreviewStep(session)
+      ? Math.max(artistPersonaQuestions.length - 1, 0)
+      : previous?.stepIndex ?? Math.max(session.stepIndex - 1, 0);
     await updateTelegramPersonaSession(root, {
-      stepIndex: previous?.stepIndex ?? Math.max(session.stepIndex - 1, 0),
+      stepIndex,
       history: session.history.slice(0, -1),
       now
     });
-    return "Persona setup moved back one step. The next question will be available in Phase 2.";
+    return formatArtistPersonaQuestion(stepIndex);
   }
   if (command === "/skip") {
-    await updateTelegramPersonaSession(root, { stepIndex: session.stepIndex + 1, now });
-    return "Skipped this persona setup step. The next question will be available in Phase 2.";
+    return advanceArtistSetup(root, session, undefined, now, true);
   }
   if (command.startsWith("/confirm")) {
-    return "Persona setup confirmation is staged for Phase 2. No files were written.";
+    if (!isArtistPersonaPreviewStep(session)) {
+      return "Persona setup is not ready to confirm yet. Answer the remaining questions or send /skip.";
+    }
+    await writeArtistPersona(root, session.pending);
+    await writePersonaCompletionMarker(root, new Date(now));
+    await cancelTelegramPersonaSession(root);
+    return "Persona saved. Use /persona show to review it. To configure SOUL later, send /setup soul.";
   }
-  return "Persona setup is in progress. Phase 2 will add the question flow. Send /cancel to stop for now.";
+  if (command.startsWith("/")) {
+    return "Persona setup is active. Send an answer, /skip, /back, /confirm, or /cancel.";
+  }
+  return advanceArtistSetup(root, session, text, now, false);
+}
+
+async function advanceArtistSetup(
+  root: string,
+  session: TelegramPersonaSession,
+  value: string | undefined,
+  now: number,
+  useDefault: boolean
+): Promise<string> {
+  if (session.mode !== "setup_artist") {
+    return "This persona session mode is reserved for a later phase. Send /cancel to stop it.";
+  }
+  if (isArtistPersonaPreviewStep(session)) {
+    return formatArtistPersonaPreview(session.pending);
+  }
+
+  const question = getArtistPersonaQuestion(session.stepIndex);
+  if (!question) {
+    await updateTelegramPersonaSession(root, { stepIndex: artistPersonaQuestions.length, now });
+    return formatArtistPersonaPreview(session.pending);
+  }
+
+  const answer = useDefault ? question.defaultValue : value?.trim() ?? "";
+  const validationError = useDefault ? undefined : question.validate(answer);
+  if (validationError) {
+    return validationError;
+  }
+
+  const nextPending: Partial<PersonaAnswers> = {
+    ...session.pending,
+    [question.field]: answer
+  };
+  const nextStepIndex = session.stepIndex + 1;
+  await updateTelegramPersonaSession(root, {
+    stepIndex: nextStepIndex,
+    pending: nextPending,
+    history: [
+      ...session.history,
+      { stepIndex: session.stepIndex, field: question.field, previous: session.pending[question.field] }
+    ],
+    now
+  });
+
+  const response = nextStepIndex >= artistPersonaQuestions.length
+    ? formatArtistPersonaPreview(nextPending)
+    : formatArtistPersonaQuestion(nextStepIndex);
+  return useDefault ? `Skipped. Default saved for ${question.label}.\n\n${response}` : response;
 }

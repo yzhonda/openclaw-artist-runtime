@@ -156,24 +156,24 @@ export interface TelegramConfig {
 }
 
 export type PersonaField =
-  | "name"
-  | "identity"
-  | "sound"
-  | "themes"
-  | "lyrics"
-  | "social"
+  | "artistName"
+  | "identityLine"
+  | "soundDna"
+  | "obsessions"
+  | "lyricsRules"
+  | "socialVoice"
   | "soul-tone"
   | "soul-refusal";
 
 export type TelegramPersonaSessionMode = "setup_artist" | "setup_soul" | "edit_field" | "reset_confirm";
 
 export interface PersonaAnswers {
-  name: string;
-  identity: string;
-  sound: string;
-  themes: string;
-  lyrics: string;
-  social: string;
+  artistName: string;
+  identityLine: string;
+  soundDna: string;
+  obsessions: string;
+  lyricsRules: string;
+  socialVoice: string;
   "soul-tone": string;
   "soul-refusal": string;
 }

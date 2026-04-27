@@ -100,6 +100,7 @@ describe("telegram command router", () => {
 
     expect(result.kind).toBe("setup");
     expect(result.responseText).toContain("Artist persona setup started");
+    expect(result.responseText).toContain("Q1. Artist name");
     expect(session).toMatchObject({
       active: true,
       mode: "setup_artist",
