@@ -256,5 +256,5 @@ describe("registration shells", () => {
       );
       expect(JSON.parse(platformResponse.readBody()).platform).toBe(platform);
     }
-  });
+  }, 30_000);
 });

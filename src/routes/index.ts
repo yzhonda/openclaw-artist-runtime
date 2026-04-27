@@ -10,6 +10,7 @@ import { acknowledgeAlert } from "../services/alertAcks.js";
 import { collectAlerts } from "../services/alerts.js";
 import { listSongStates, readArtistMind, readSongState } from "../services/artistState.js";
 import { ArtistAutopilotService, pauseAutopilot, resumeAutopilot } from "../services/autopilotService.js";
+import { AutopilotControlService } from "../services/autopilotControlService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
 import { buildPlatformStats, readDistributionEvents } from "../services/distributionLedgerReader.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
@@ -1076,6 +1077,13 @@ export function registerRoutes(api: unknown): void {
     handler: async (input) => {
       const payload = payloadRecord(input);
       const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      if (payload.resetState === true) {
+        return new AutopilotControlService().resume(config.artist.workspaceRoot, {
+          resetState: true,
+          reason: typeof payload.reason === "string" ? payload.reason : undefined,
+          source: "operator"
+        });
+      }
       return resumeAutopilot(config.artist.workspaceRoot);
     }
   });
