@@ -188,6 +188,48 @@ creates the usual backups first, and still preserves custom imported sections
 outside the managed blocks. If no intent is supplied, `/persona migrate` keeps
 the older placeholder fallback behavior.
 
+## Persona migrate field directives (Plan v9.10)
+
+Plan v9.10 adds two operator-facing safeguards for the native Telegram command
+path:
+
+1. Gateway startup should log one registration line for each runtime slash
+   command, for example `[artist-runtime] registered runtime-slash command:
+   persona`.
+2. If OpenClaw exposes plugin command specs during registration, startup should
+   also log a snapshot like `[artist-runtime] telegram plugin command specs:
+   persona,setup,... (count=7, persona=true)`.
+
+For migration guidance, prefer explicit `field: value` lines after
+`/persona migrate`. Values may span multiple lines until the next recognized
+field key. Lines such as `Genre: dark folk` are treated as part of the previous
+value unless the key is one of the recognized aliases below. Use `keep ...`,
+`keep as-is`, `keep as is`, or `skip` to leave a field unchanged.
+
+```text
+/persona migrate obsessions: 日本社会の風刺、批評、皮肉
+socialVoice: 短く、刺さるように、過剰な売り込みは避ける
+soul-tone: 御大に対しては率直、ぶっきらぼう、必要なら反論
+soul-refusal: できないことは「できない」と即答、言い訳しない
+artistName: keep used::honda
+```
+
+| Field | Recognized aliases |
+|---|---|
+| `artistName` | `artistName`, `artist name`, `name` |
+| `identityLine` | `identityLine`, `identity`, `manifesto` |
+| `soundDna` | `soundDna`, `sound` |
+| `obsessions` | `obsessions`, `themes`, `theme` |
+| `lyricsRules` | `lyricsRules`, `lyrics`, `lyrics rule` |
+| `socialVoice` | `socialVoice`, `social voice`, `voice` |
+| `soul-tone` | `soul-tone`, `soul tone`, `conversation tone`, `tone` |
+| `soul-refusal` | `soul-refusal`, `soul refusal`, `refusal style`, `refusal` |
+
+The old mock echo wrapper is intentionally gone. If no recognized directive is
+found for a missing field, the preview shows `(no value extracted; provide
+directive in next /persona migrate)` instead of writing the whole operator
+intent into the field.
+
 ### Debug AI review command
 
 `/review <songId>` is a Telegram debug command for inspecting a song's current
