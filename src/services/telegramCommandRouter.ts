@@ -7,6 +7,7 @@ import { readArtistPersonaSummary } from "./personaFileBuilder.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
 import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
+import { formatPersonaMigratePlan, planPersonaMigrate } from "./personaMigrator.js";
 import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
 import { formatSoulPersonaQuestion, readSoulPersonaSummary } from "./soulFileBuilder.js";
 import type { PersonaField } from "../types.js";
@@ -81,7 +82,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/review <songId> - run a debug-only mock AI review",
         "/setup - start Telegram artist persona setup",
         "/setup soul - configure SOUL.md voice",
-        "/persona show|fields|edit <field>|reset - manage Telegram persona",
+        "/persona show|fields|edit <field>|reset|migrate - manage Telegram persona",
         "/pause - pause autopilot",
         "/resume - resume autopilot",
         "/help - show this help"
@@ -165,9 +166,22 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         shouldStoreFreeText: false
       };
     }
+    if (subcommand === "migrate") {
+      const plan = await planPersonaMigrate(input.workspaceRoot);
+      await createTelegramPersonaSession(input.workspaceRoot, {
+        mode: "migrate_confirm",
+        chatId: input.chatId,
+        userId: input.fromUserId
+      });
+      return {
+        kind: "persona",
+        responseText: formatPersonaMigratePlan(plan),
+        shouldStoreFreeText: false
+      };
+    }
     return {
       kind: "persona",
-      responseText: "Usage: /persona show | /persona fields | /persona edit <field> | /persona reset",
+      responseText: "Usage: /persona show | /persona fields | /persona edit <field> | /persona reset | /persona migrate",
       shouldStoreFreeText: false
     };
   }

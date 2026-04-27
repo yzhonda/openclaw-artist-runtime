@@ -20,6 +20,7 @@ import {
   getArtistPersonaQuestion,
   isArtistPersonaPreviewStep
 } from "./personaWizardQuestions.js";
+import { executePersonaMigrate, planPersonaMigrate } from "./personaMigrator.js";
 import {
   formatSoulPersonaPreview,
   formatSoulPersonaQuestion,
@@ -164,6 +165,17 @@ export async function handleTelegramPersonaSessionMessage(
       return "Telegram-managed persona blocks were reset. Songs, ledgers, budget, and profiles were not touched.";
     }
     return "Persona reset is waiting for confirmation. Reply /confirm reset or /cancel.";
+  }
+  if (session.mode === "migrate_confirm") {
+    if (command === "/confirm migrate") {
+      const plan = await planPersonaMigrate(root);
+      await executePersonaMigrate(root, plan);
+      await cancelTelegramPersonaSession(root);
+      return plan.warnings.includes("already migrated")
+        ? "Persona is already migrated. No files were changed."
+        : "Persona migrated into Telegram-managed marker blocks. Backup files were written first.";
+    }
+    return "Persona migrate is waiting for confirmation. Reply /confirm migrate or /cancel.";
   }
   if (command === "/back") {
     if (session.mode === "edit_field") {
