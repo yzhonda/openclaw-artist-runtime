@@ -45,6 +45,27 @@ Useful environment knobs:
 - `OPENCLAW_DOCTOR_DISK_WARN_GB`: runtime disk warning threshold, default `10`
 - `OPENCLAW_DOCTOR_DISK_FAIL_GB`: runtime disk failure threshold, default `50`
 
+## Autopilot mode
+
+Archive-only mode is retired. The package default now starts the 8-stage
+autopilot pipeline in dry-run-protected mode: `autopilot.enabled=true` and
+`autopilot.dryRun=true`. This lets the runtime plan, create prompt packs, and
+exercise the pipeline while Suno create and social publish remain blocked by
+the existing authority gates.
+
+Obsidian importer scripts remain available only as manual CLI tools for
+operator-led archive work:
+
+```bash
+node scripts/import-obsidian-artist.mjs --help
+node scripts/import-obsidian-song.mjs --help
+```
+
+The autopilot service does not call those importer scripts. If the operator
+needs to preserve or import older Obsidian material, run the scripts manually
+before or after an autopilot cycle and keep the resulting song status under
+operator review.
+
 ## Runtime log rotation
 
 `scripts/rotate-runtime-logs.sh` rotates only top-level `runtime/*.log` files.

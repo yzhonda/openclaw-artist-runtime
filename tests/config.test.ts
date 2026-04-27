@@ -33,7 +33,8 @@ function extractDefaults(schema: JsonSchema, root: JsonSchema): unknown {
 }
 
 describe("config schema", () => {
-  it("starts in dry-run", () => {
+  it("starts enabled but dry-run protected", () => {
+    expect(defaultArtistRuntimeConfig.autopilot.enabled).toBe(true);
     expect(defaultArtistRuntimeConfig.autopilot.dryRun).toBe(true);
   });
 

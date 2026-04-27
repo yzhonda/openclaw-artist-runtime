@@ -68,7 +68,8 @@ describe("config migrations", () => {
     expect(reset).toMatchObject({
       schemaVersion: CURRENT_CONFIG_SCHEMA_VERSION,
       autopilot: {
-        enabled: false
+        enabled: true,
+        dryRun: true
       }
     });
   });

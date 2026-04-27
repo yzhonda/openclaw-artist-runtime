@@ -76,13 +76,13 @@ async function seedPromptPack(root: string, songId = "song-001"): Promise<void> 
 }
 
 describe("autopilot revival smoke coverage", () => {
-  it("keeps the default disabled config as a ticker no-op", async () => {
+  it("keeps explicitly disabled config as a ticker no-op", async () => {
     const root = makeWorkspace();
     await mkdir(join(root, "runtime"), { recursive: true });
     const outcomes: string[] = [];
     const ticker = new AutopilotTicker({ onOutcome: (outcome) => outcomes.push(outcome) });
 
-    const result = await ticker.runNow({ artist: { workspaceRoot: root } });
+    const result = await ticker.runNow({ artist: { workspaceRoot: root }, autopilot: { enabled: false } });
 
     expect(result.outcome).toBe("skipped:disabled");
     expect(outcomes).toEqual(["skipped:disabled"]);

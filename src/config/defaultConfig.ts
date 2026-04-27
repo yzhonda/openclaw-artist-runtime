@@ -9,7 +9,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     workspaceRoot: "."
   },
   autopilot: {
-    enabled: false,
+    enabled: true,
     dryRun: true,
     songsPerWeek: 3,
     cycleIntervalMinutes: 180,
