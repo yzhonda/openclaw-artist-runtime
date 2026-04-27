@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Plan v9.5 finalizes the autopilot revival and Telegram bridge dogfood pass: RuntimeEventBus stage/state/take notifications, owner-only Telegram commands, local free-text inbox staging, debug-only `/review <songId>` mock AI review, and final pre-release distribution gate coverage.
+
 ## [0.3.0] - 2026-04-26
 
 First public-release candidate. Bundles the working dry-run runtime,

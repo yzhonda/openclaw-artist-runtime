@@ -95,6 +95,45 @@ review and writes the result to `runtime/debug-ai-reviews/<songId>-<UTC>.json`.
 If a future provider is selected but not configured, the command returns a safe
 "provider not configured" response rather than calling an external model.
 
+## Plan v9.5 dogfood sequence
+
+Use this sequence after changing the autopilot or Telegram control surface. Keep
+real Suno create and social publish disabled unless a separate operator GO says
+otherwise.
+
+1. Start with `autopilot.enabled=false` and `telegram.enabled=true`, then send
+   `/status`. This proves the bot worker and owner allowlist without running a
+   cycle.
+2. Send `/pause` and `/resume`; verify `runtime/autopilot-state.json` changes
+   and no external create/publish action starts.
+3. Temporarily run one cycle with `autopilot.enabled=true` and
+   `autopilot.dryRun=true`.
+4. Confirm the stage transition appears through RuntimeEventBus and Telegram
+   notification. Automated tests cover this with mock Telegram fetch; live
+   Telegram smoke is optional because Phase 2B already proved `/status`.
+5. Send `/songs`, `/song <songId>`, and `/review <songId>` against the generated
+   dry-run song. `/review` writes only `runtime/debug-ai-reviews/` evidence.
+6. Keep `music.suno.submitMode="skip"` for form-fill style validation. Do not
+   click Suno `Create` in this dogfood pass.
+7. Review budget, profile, and MusicAuthority status before any later live Suno
+   GO. Live create remains a separate operator decision.
+8. Keep social publishing behind the existing global arm, platform arm, and
+   connector edge. Telegram has no command that changes `liveGoArmed` or any
+   platform arm.
+
+### Rollback to archive-only behavior
+
+If the operator needs the pre-revival posture, use config rather than deleting
+runtime state:
+
+```bash
+node -e 'const fs=require("fs"); const p="runtime/config-overrides.json"; const c=fs.existsSync(p)?JSON.parse(fs.readFileSync(p,"utf8")):{}; c.autopilot={...(c.autopilot||{}), enabled:false, dryRun:true}; fs.mkdirSync("runtime",{recursive:true}); fs.writeFileSync(p, JSON.stringify(c,null,2)+"\n");'
+```
+
+Then restart the Gateway process that owns the runtime. Existing songs,
+ledgers, Suno budget/profile files, and Telegram inbox/debug-review records are
+left in place for audit and recovery.
+
 ## Runtime log rotation
 
 `scripts/rotate-runtime-logs.sh` rotates only top-level `runtime/*.log` files.

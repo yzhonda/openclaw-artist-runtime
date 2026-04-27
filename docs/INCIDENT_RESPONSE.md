@@ -60,6 +60,19 @@ See also: `docs/ERRORS.md` for reason-code anchors and operator recovery links.
 4. Complete manual Google OAuth login only through the operator-run login helper.
 5. Probe again and require connected status before trusting the rebuilt profile.
 
+## Failure injection checklist
+
+Use these tests before a release candidate or after changing the autopilot,
+Telegram, or Suno control surfaces. Keep all injections local/mock unless a
+separate operator GO explicitly opens a live lane.
+
+| Injection | How to trigger safely | Expected fail-closed behavior | Recovery |
+| --- | --- | --- | --- |
+| Suno auth expired | Set the mock worker/profile state to `login_required` or use the Suno probe fixture | Autopilot blocks before live create; status surfaces login-required state | Follow `docs/SUNO_BROWSER_DRIVER.md` Scenario B |
+| Network error | Use mock fetch/connector failure in Telegram or social dry-run tests | Worker reports an error/backoff; process does not crash; no real network retry loop | Restore mock success and rerun the route/test |
+| Take count zero | Seed a song with empty `latest-results.json` / no selected take | `/review` returns a mock or safe debug result without changing `selected-take.json` | Re-import takes or rerun the dry-run Suno import path |
+| Telegram bot failure | Run worker tests with a failing mock fetch or missing owner allowlist | Worker stays disabled or backs off; no unhandled exception; tokens stay unlogged | Re-enable the three Telegram opt-in gates and rerun `/status` |
+
 ## Safe incident notes
 
 Allowed in incident notes:

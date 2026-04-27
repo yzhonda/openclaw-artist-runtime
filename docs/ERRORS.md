@@ -95,6 +95,15 @@ See the Suno and budget table entry for `playwright_create_rate_limited`.
 ### gateway_token_mismatch
 See the gateway and auth boundary table entry for `gateway_token_mismatch`.
 
+### telegram_poll_failed
+See the Telegram and debug review table entry for `telegram_poll_failed`.
+
+### missing_owner_allowlist
+See the Telegram and debug review table entry for `missing_owner_allowlist`.
+
+### debug_ai_provider_not_configured
+See the Telegram and debug review table entry for `debug_ai_provider_not_configured`.
+
 ## Operator runbook quick links
 
 | Scenario | Primary reason codes | Runbook |
@@ -144,3 +153,13 @@ See the gateway and auth boundary table entry for `gateway_token_mismatch`.
 | --- | --- | --- | --- |
 | `account_not_created` | Frozen platform status | A platform lane is intentionally unavailable. | Keep the platform disabled until account setup is complete. |
 | `gateway_token_mismatch` | Gateway boundary docs | The gateway/plugin access boundary rejected the caller or used stale credentials. | Recheck `docs/GATEWAY_AUTH.md` and restart the gateway with the intended local env. |
+
+## Telegram and debug review
+
+| Code | Source | Meaning | Operator recovery |
+| --- | --- | --- | --- |
+| `missing_token` | Telegram bot worker | `telegram.enabled=true` but no local bot token is present. | Set `TELEGRAM_BOT_TOKEN` in the operator environment or disable Telegram again. |
+| `missing_owner_allowlist` | Telegram bot worker | The bot has no allowed Telegram owner ids. | Set `TELEGRAM_OWNER_USER_IDS`; keep the list limited to the operator. |
+| `telegram_poll_failed` | Telegram bot worker | Long-polling failed or Telegram returned a transport/API error. | Keep the worker in backoff, verify local network, and retry `/status`; do not paste token bodies into logs. |
+| `debug_ai_provider_not_configured` | Debug AI review | A non-mock debug provider was selected but no real provider is wired. | Switch `aiReview.provider` back to `mock` or configure a future provider in a separate change. |
+| `debug_review_song_missing` | Telegram `/review` command | The requested song material does not exist or cannot be read. | Check `/songs`, then rerun `/review <songId>` with an existing song id. |

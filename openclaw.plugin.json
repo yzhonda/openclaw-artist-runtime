@@ -643,7 +643,7 @@
     },
     "telegram.enabled": {
       "label": "Telegram bot",
-      "help": "Opt-in long-poll Telegram bridge. Requires TELEGRAM_BOT_TOKEN and TELEGRAM_OWNER_USER_IDS in local environment before it starts."
+      "help": "Opt-in long-poll Telegram bridge. Requires local environment gates before it starts."
     },
     "telegram.pollIntervalMs": {
       "label": "Telegram poll interval",
@@ -651,7 +651,7 @@
     },
     "telegram.notifyStages": {
       "label": "Telegram stage notifications",
-      "help": "Prepare stage notification routing for Phase 3. No Telegram worker starts unless the opt-in gate and local secrets are present."
+      "help": "Prepare stage notification routing. No Telegram worker starts unless all local opt-in gates are present."
     },
     "telegram.acceptFreeText": {
       "label": "Telegram free-text inbox",
