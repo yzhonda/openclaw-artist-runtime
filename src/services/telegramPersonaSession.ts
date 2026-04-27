@@ -1,6 +1,7 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
+  AiReviewProvider,
   PersonaAnswers,
   PersonaField,
   TelegramPersonaSession,
@@ -39,6 +40,8 @@ export interface CreateTelegramPersonaSessionInput {
   userId: number;
   field?: PersonaField;
   checkFillQueue?: PersonaField[];
+  migrateIntent?: string;
+  migrateAiReviewProvider?: AiReviewProvider;
   now?: number;
   ttlMs?: number;
 }
@@ -47,6 +50,8 @@ export interface UpdateTelegramPersonaSessionInput {
   stepIndex?: number;
   field?: PersonaField;
   checkFillQueue?: PersonaField[];
+  migrateIntent?: string;
+  migrateAiReviewProvider?: AiReviewProvider;
   pending?: TelegramPersonaSession["pending"];
   history?: TelegramPersonaSession["history"];
   active?: boolean;
@@ -111,6 +116,8 @@ export async function createTelegramPersonaSession(
     stepIndex: 0,
     field: input.field,
     checkFillQueue: input.checkFillQueue,
+    migrateIntent: input.migrateIntent,
+    migrateAiReviewProvider: input.migrateAiReviewProvider,
     pending: {},
     history: [],
     startedAt: now,
@@ -136,6 +143,8 @@ export async function updateTelegramPersonaSession(
     stepIndex: input.stepIndex ?? current.stepIndex,
     field: input.field ?? current.field,
     checkFillQueue: input.checkFillQueue ?? current.checkFillQueue,
+    migrateIntent: input.migrateIntent ?? current.migrateIntent,
+    migrateAiReviewProvider: input.migrateAiReviewProvider ?? current.migrateAiReviewProvider,
     pending: input.pending ?? current.pending,
     history: input.history ?? current.history,
     updatedAt: now,
@@ -172,7 +181,10 @@ export async function handleTelegramPersonaSessionMessage(
   }
   if (session.mode === "migrate_confirm") {
     if (command === "/confirm migrate") {
-      const plan = await planPersonaMigrate(root);
+      const plan = await planPersonaMigrate(root, {
+        intent: session.migrateIntent,
+        aiReviewProvider: session.migrateAiReviewProvider
+      });
       await executePersonaMigrate(root, plan);
       await cancelTelegramPersonaSession(root);
       return plan.warnings.includes("already migrated")

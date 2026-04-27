@@ -196,6 +196,8 @@ export interface TelegramPersonaSession {
   stepIndex: number;
   field?: PersonaField;
   checkFillQueue?: PersonaField[];
+  migrateIntent?: string;
+  migrateAiReviewProvider?: AiReviewProvider;
   pending: Partial<PersonaAnswers>;
   history: TelegramPersonaSessionHistoryEntry[];
   startedAt: number;

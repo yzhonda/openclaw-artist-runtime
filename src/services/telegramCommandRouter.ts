@@ -203,11 +203,14 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
       };
     }
     if (subcommand === "migrate") {
-      const plan = await planPersonaMigrate(input.workspaceRoot);
+      const intent = args.slice(1).join(" ").trim() || undefined;
+      const plan = await planPersonaMigrate(input.workspaceRoot, { intent, aiReviewProvider: input.aiReviewProvider });
       await createTelegramPersonaSession(input.workspaceRoot, {
         mode: "migrate_confirm",
         chatId: input.chatId,
-        userId: input.fromUserId
+        userId: input.fromUserId,
+        migrateIntent: intent,
+        migrateAiReviewProvider: input.aiReviewProvider
       });
       return {
         kind: "persona",
