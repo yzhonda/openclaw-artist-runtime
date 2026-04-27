@@ -79,6 +79,22 @@ describe("boundary-grep", () => {
     ]);
   });
 
+  it("detects Telegram bot token assignments and literals", async () => {
+    const root = mkdtempSync(join(tmpdir(), "artist-runtime-boundary-grep-telegram-"));
+    await writeFixture(
+      root,
+      "src/telegram-leaks.ts",
+      [
+        `const env = "${"TELEGRAM_" + "BOT_TOKEN="}secret";`,
+        `const token = "${"bot" + "1234567890:" + "abcdefghijklmnopqrstuvwxyzABCDEF"}";`
+      ].join("\n")
+    );
+
+    const findings = await scanBoundaryPatterns({ cwd: root, roots: ["src"] });
+
+    expect(findings.map((finding) => finding.rule)).toEqual(["telegram-token-assignment", "telegram-token-literal"]);
+  });
+
   it("detects bash 4 syntax that would break macOS bash 3 operators", async () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-boundary-grep-bash4-"));
     await writeFixture(

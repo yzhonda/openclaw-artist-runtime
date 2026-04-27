@@ -295,6 +295,30 @@
           }
         }
       },
+      "telegram": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "pollIntervalMs": {
+            "type": "integer",
+            "minimum": 500,
+            "maximum": 60000,
+            "default": 2000
+          },
+          "notifyStages": {
+            "type": "boolean",
+            "default": true
+          },
+          "acceptFreeText": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
       "safety": {
         "type": "object",
         "additionalProperties": false,
@@ -601,6 +625,22 @@
     "distribution.platforms.tiktok.enabled": {
       "label": "Enable TikTok",
       "help": "Uses TikTok Content Posting API where available."
+    },
+    "telegram.enabled": {
+      "label": "Telegram bot",
+      "help": "Opt-in long-poll Telegram bridge. Requires TELEGRAM_BOT_TOKEN and TELEGRAM_OWNER_USER_IDS in local environment before it starts."
+    },
+    "telegram.pollIntervalMs": {
+      "label": "Telegram poll interval",
+      "help": "Delay between long-poll cycles after a completed Telegram poll."
+    },
+    "telegram.notifyStages": {
+      "label": "Telegram stage notifications",
+      "help": "Prepare stage notification routing for Phase 3. No Telegram worker starts unless the opt-in gate and local secrets are present."
+    },
+    "telegram.acceptFreeText": {
+      "label": "Telegram free-text inbox",
+      "help": "Allow owner free-text messages to be staged for a later operator inbox path."
     },
     "safety.auditLog": {
       "label": "Audit log",

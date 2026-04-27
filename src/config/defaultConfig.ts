@@ -71,6 +71,12 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
       }
     }
   },
+  telegram: {
+    enabled: false,
+    pollIntervalMs: 2000,
+    notifyStages: true,
+    acceptFreeText: true
+  },
   safety: {
     auditLog: true,
     failClosed: true,

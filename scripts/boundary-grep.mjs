@@ -11,6 +11,8 @@ export const forbiddenPatterns = [
   { id: "tiktok-token-assignment", pattern: /\bTIKTOK_ACCESS_TOKEN\s*=/i },
   { id: "openclaw-instagram-token-assignment", pattern: /\bOPENCLAW_INSTAGRAM_ACCESS_TOKEN\s*=/i },
   { id: "openclaw-tiktok-token-assignment", pattern: /\bOPENCLAW_TIKTOK_ACCESS_TOKEN\s*=/i },
+  { id: "telegram-token-assignment", pattern: /\bTELEGRAM_BOT_TOKEN\s*=\s*\S+/i },
+  { id: "telegram-token-literal", pattern: /\bbot[0-9]+:[A-Za-z0-9_-]{30,}/ },
   { id: "oauth-token-assignment", pattern: /\bOAUTH_TOKEN\s*=/i },
   { id: "oauth-token-literal", pattern: /\boauth_token_[A-Za-z0-9_-]+/i },
   { id: "bearer-header-literal", pattern: /\bauthorization\s*:\s*bearer\s+["'`]?[A-Za-z0-9._-]{12,}/i },

@@ -66,6 +66,23 @@ needs to preserve or import older Obsidian material, run the scripts manually
 before or after an autopilot cycle and keep the resulting song status under
 operator review.
 
+## Telegram opt-in
+
+Telegram is disabled by default. With default config and no token, the runtime
+starts normally and the Telegram worker performs no fetches.
+
+To opt in, the operator must provide all three gates:
+
+1. Set `telegram.enabled=true` in config.
+2. Put `TELEGRAM_BOT_TOKEN` in `.local/social-credentials.env` or the shell
+   environment.
+3. Put the owner Telegram user id in `TELEGRAM_OWNER_USER_IDS`.
+
+`scripts/openclaw-local-env.sh print` masks the token body and shows only
+whether it is set. To disable Telegram again, set `telegram.enabled=false` or
+remove either local environment value, then restart the Gateway process that
+owns the environment.
+
 ## Runtime log rotation
 
 `scripts/rotate-runtime-logs.sh` rotates only top-level `runtime/*.log` files.

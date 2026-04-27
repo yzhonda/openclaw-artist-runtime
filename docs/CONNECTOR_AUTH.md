@@ -59,6 +59,29 @@ Use it together with:
 - A raw password alone does **not** satisfy any connector. Each platform below
   still requires its own session or token.
 
+### Telegram bot opt-in
+
+Telegram is an operator communication bridge, not a social publishing platform.
+It is disabled by default and starts only when all of these are true:
+
+1. `telegram.enabled=true` in Artist Runtime config.
+2. `TELEGRAM_BOT_TOKEN` is present in the operator environment.
+3. `TELEGRAM_OWNER_USER_IDS` contains at least one allowed Telegram user id.
+
+Suggested local setup:
+
+```sh
+cat >> .local/social-credentials.env <<'EOF'
+TELEGRAM_BOT_TOKEN=<token from BotFather>
+TELEGRAM_OWNER_USER_IDS=<numeric owner user id>
+EOF
+set -a; . ./.local/social-credentials.env; set +a
+```
+
+Use BotFather to create the bot token and a user-id helper bot or Telegram
+client metadata to find the numeric owner id. Do not commit the local env file
+or paste the token body into issue reports, logs, or screenshots.
+
 ## Token expiry reaction
 
 Use this flow when a platform test route reports expired, missing, or failed

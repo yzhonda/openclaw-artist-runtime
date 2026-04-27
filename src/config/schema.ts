@@ -110,6 +110,9 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
       }
     }
   }
+  if (config.telegram) {
+    Object.assign(merged.telegram, config.telegram);
+  }
   if (config.safety) {
     Object.assign(merged.safety, config.safety);
   }
@@ -124,7 +127,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     return { ok: false, errors: ["config must be an object"], warnings };
   }
 
-  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "safety"], errors);
+  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "safety"], errors);
 
   if ("schemaVersion" in config && !isIntegerInRange(config.schemaVersion, 1, CURRENT_CONFIG_SCHEMA_VERSION)) {
     errors.push(`config.schemaVersion must be an integer between 1 and ${CURRENT_CONFIG_SCHEMA_VERSION}`);
@@ -287,6 +290,26 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
             validateTikTokPlatform(config.distribution.platforms.tiktok, errors);
           }
         }
+      }
+    }
+  }
+
+  if ("telegram" in config) {
+    if (!isRecord(config.telegram)) {
+      errors.push("config.telegram must be an object");
+    } else {
+      validateKnownKeys("config.telegram", config.telegram, ["enabled", "pollIntervalMs", "notifyStages", "acceptFreeText"], errors);
+      if ("enabled" in config.telegram && typeof config.telegram.enabled !== "boolean") {
+        errors.push("config.telegram.enabled must be a boolean");
+      }
+      if ("pollIntervalMs" in config.telegram && !isIntegerInRange(config.telegram.pollIntervalMs, 500, 60000)) {
+        errors.push("config.telegram.pollIntervalMs must be an integer between 500 and 60000");
+      }
+      if ("notifyStages" in config.telegram && typeof config.telegram.notifyStages !== "boolean") {
+        errors.push("config.telegram.notifyStages must be a boolean");
+      }
+      if ("acceptFreeText" in config.telegram && typeof config.telegram.acceptFreeText !== "boolean") {
+        errors.push("config.telegram.acceptFreeText must be a boolean");
       }
     }
   }

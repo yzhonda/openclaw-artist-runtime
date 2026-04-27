@@ -225,6 +225,30 @@
         }
       }
     },
+    "telegram": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "pollIntervalMs": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 60000,
+          "default": 2000
+        },
+        "notifyStages": {
+          "type": "boolean",
+          "default": true
+        },
+        "acceptFreeText": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
     "safety": {
       "type": "object",
       "additionalProperties": false,

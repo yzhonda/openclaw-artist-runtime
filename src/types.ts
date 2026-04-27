@@ -146,12 +146,20 @@ export interface SafetyConfig {
   requireApprovalForHighRisk: boolean;
 }
 
+export interface TelegramConfig {
+  enabled: boolean;
+  pollIntervalMs: number;
+  notifyStages: boolean;
+  acceptFreeText: boolean;
+}
+
 export interface ArtistRuntimeConfig {
   schemaVersion: number;
   artist: ArtistConfig;
   autopilot: AutopilotConfig;
   music: MusicConfig;
   distribution: DistributionConfig;
+  telegram: TelegramConfig;
   safety: SafetyConfig;
 }
 

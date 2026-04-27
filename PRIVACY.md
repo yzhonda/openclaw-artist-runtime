@@ -22,7 +22,9 @@ Depending on enabled platforms, the plugin sends:
 - Suno prompt payloads to Suno;
 - posts/media to X, Instagram, or TikTok;
 - OAuth authorization requests to Instagram/TikTok;
-- Bird commands to local Bird CLI for X.
+- Bird commands to local Bird CLI for X;
+- Telegram Bot API requests only when the operator explicitly enables Telegram
+  and provides a local bot token plus owner allowlist.
 
 Connector credential contracts are local-only:
 
@@ -37,6 +39,12 @@ See `docs/CONNECTOR_AUTH.md` for the operator-facing setup and refresh flow.
 - X/Bird authentication stays inside the `bird` CLI's own cookie/token store;
   the plugin invokes the CLI but does not export, rewrite, or persist those
   cookies itself.
+- Telegram free-text messages are not sent to any AI provider in the default
+  skeleton. Future inbox handling must keep staged message text in local
+  runtime JSONL files unless the operator explicitly enables a later workflow.
+- Telegram bot tokens are read from the operator environment only and are not
+  copied into `/api/status`, Producer Console payloads, Prompt Ledgers, audit
+  logs, or creative workspace files.
 
 ## Suno profile boundary
 

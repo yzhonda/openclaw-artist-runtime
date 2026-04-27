@@ -47,12 +47,27 @@ For platform-by-platform setup and refresh flow, see `docs/CONNECTOR_AUTH.md`.
 - `TikTokConnector` currently checks only these environment variables:
   - `OPENCLAW_TIKTOK_AUTH`
   - `OPENCLAW_TIKTOK_ACCESS_TOKEN`
+- `TelegramBotWorker` starts only when all three local opt-in gates are present:
+  - `telegram.enabled=true` in non-secret config
+  - `TELEGRAM_BOT_TOKEN` in the operator environment
+  - `TELEGRAM_OWNER_USER_IDS` with at least one allowed numeric user id
 - These values must be treated as secrets:
   - do not commit them
   - do not place them in `workspace-template/**`
   - do not echo them in shell history, screenshots, Prompt Ledger entries, audit logs, or error text
 - Missing or expired connector credentials must fail closed. The plugin should
   surface a diagnostic reason rather than attempting a best-effort publish.
+
+### Telegram bot token
+
+- The Telegram bot token is local-only operator secret state. Keep it in
+  `.local/social-credentials.env` or an equivalent shell environment, never in
+  plugin config, package files, docs examples with real values, Prompt Ledgers,
+  audit logs, screenshots, or chat transcripts.
+- `scripts/openclaw-local-env.sh print` reports only whether the token is set;
+  it must not print the token body.
+- The owner allowlist is non-secret but still local operator configuration. If
+  the allowlist is empty, the worker stays disabled even when a token exists.
 
 ## Browser profile handling
 
