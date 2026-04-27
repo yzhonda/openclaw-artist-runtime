@@ -116,6 +116,10 @@ async function buildMigratedSoul(root: string): Promise<string> {
     conversationTone: migrationValues(summary.conversationTone, "TBD"),
     refusalStyle: migrationValues(summary.refusalStyle, "TBD")
   });
+  const hasStandardSoulSection = h2Sections(contents).some((heading) => soulMarkerSections.includes(heading));
+  if (contents.trim() && !hasStandardSoulSection) {
+    return [contents.trimEnd(), "", markerBlock, ""].join("\n");
+  }
   return withHeading("SOUL.md", markerBlock, customBlocks(contents, soulMarkerSections));
 }
 

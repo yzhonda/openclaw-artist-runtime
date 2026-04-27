@@ -91,6 +91,34 @@ describe("persona migrator", () => {
     await expect(readFile(join(root, "runtime", "persona-completed.json"), "utf8")).resolves.toContain("telegram");
   });
 
+  it("preserves custom SOUL content without standard Telegram Persona Voice sections", async () => {
+    const root = makeRoot();
+    await writeObsidianLikePersona(root);
+    const customSoul = [
+      "<!--",
+      "このファイルについて: OpenClaw標準: SOUL.md",
+      "役割: 会話人格・応答の温度感を定義する。",
+      "-->",
+      "",
+      "# SOUL.md",
+      "",
+      "You speak as the artist, not as a generic assistant.",
+      "",
+      "You are concise, observant, and artistically opinionated."
+    ].join("\n");
+    await writeFile(join(root, "SOUL.md"), customSoul, "utf8");
+
+    const plan = await planPersonaMigrate(root);
+    await executePersonaMigrate(root, plan);
+    const soul = await readFile(join(root, "SOUL.md"), "utf8");
+
+    expect(soul).toContain("このファイルについて: OpenClaw標準: SOUL.md");
+    expect(soul).toContain("You speak as the artist, not as a generic assistant.");
+    expect(soul).toContain(soulPersonaBlockStart);
+    expect(soul.indexOf("You speak as the artist")).toBeLessThan(soul.indexOf(soulPersonaBlockStart));
+    expect(soul.length).toBeGreaterThan(customSoul.length);
+  });
+
   it("returns early for already migrated files", async () => {
     const root = makeRoot();
     await mkdir(root, { recursive: true });
