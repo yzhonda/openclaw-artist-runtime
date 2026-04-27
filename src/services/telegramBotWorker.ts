@@ -29,6 +29,7 @@ export interface TelegramPollResult {
 
 interface TelegramWorkerState {
   offset?: number;
+  chatId?: number;
   personaSetupAnnouncedAt?: number;
 }
 
@@ -45,6 +46,7 @@ async function readState(root: string): Promise<TelegramWorkerState> {
     const parsed = JSON.parse(contents) as Partial<TelegramWorkerState>;
     return {
       ...(Number.isInteger(parsed.offset) ? { offset: parsed.offset } : {}),
+      ...(Number.isInteger(parsed.chatId) ? { chatId: parsed.chatId } : {}),
       ...(Number.isFinite(parsed.personaSetupAnnouncedAt) ? { personaSetupAnnouncedAt: parsed.personaSetupAnnouncedAt } : {})
     };
   } catch {
@@ -76,6 +78,8 @@ export class TelegramBotWorker {
       return { enabled: false, fetched: false, processed: 0, reason: disabled };
     }
     this.running = true;
+    const client = new TelegramClient(this.token ?? "", this.options.fetchImpl);
+    await this.pushStartupPersonaAnnouncement(client).catch(() => undefined);
     const result = await this.pollOnce();
     this.scheduleNext();
     return result;
@@ -165,6 +169,7 @@ export class TelegramBotWorker {
     if (!message || !from || !text || !this.ownerUserIds.has(String(from.id))) {
       return false;
     }
+    await this.rememberChatId(message.chat.id);
 
     const session = await readTelegramPersonaSession(this.options.root);
     const sessionResponse = session ? await handleTelegramPersonaSessionMessage(this.options.root, text) : undefined;
@@ -191,6 +196,27 @@ export class TelegramBotWorker {
     const responseText = await this.withPersonaSetupAnnouncement(route.responseText);
     await client.sendMessage(message.chat.id, responseText);
     return true;
+  }
+
+  private async rememberChatId(chatId: number): Promise<void> {
+    const state = await readState(this.options.root);
+    if (state.chatId === chatId) {
+      return;
+    }
+    await writeState(this.options.root, { ...state, chatId });
+  }
+
+  private async pushStartupPersonaAnnouncement(client: TelegramClient): Promise<void> {
+    const state = await readState(this.options.root);
+    if (!state.chatId || state.personaSetupAnnouncedAt) {
+      return;
+    }
+    const status = await readPersonaSetupStatus(this.options.root);
+    if (!status.needsSetup) {
+      return;
+    }
+    await client.sendMessage(state.chatId, "Artist persona is not set up yet. Send /setup to create it in Telegram.");
+    await writeState(this.options.root, { ...state, personaSetupAnnouncedAt: Date.now() });
   }
 
   private async withPersonaSetupAnnouncement(responseText: string): Promise<string> {

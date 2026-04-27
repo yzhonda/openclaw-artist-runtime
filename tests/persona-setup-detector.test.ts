@@ -59,6 +59,21 @@ describe("persona setup detector", () => {
     expect(status.reasons).toEqual([]);
   });
 
+  it("treats an imported non-default ARTIST.md without a marker as externally completed", async () => {
+    const root = makeRoot();
+    await writeFile(
+      join(root, "ARTIST.md"),
+      ["# ARTIST.md", "", "Artist name: Obsidian Artist", "", "```yaml", "name: Obsidian Artist", "```"].join("\n"),
+      "utf8"
+    );
+
+    const status = await readPersonaSetupStatus(root);
+
+    expect(status.needsSetup).toBe(false);
+    expect(status.completed).toBe(true);
+    expect(status.reasons).toEqual([]);
+  });
+
   it("can identify an unchanged template by hash", async () => {
     const root = makeRoot();
     const templatePath = join(root, "template-ARTIST.md");
@@ -73,4 +88,3 @@ describe("persona setup detector", () => {
     expect(status.reasons).toContain("matches_default_template_hash");
   });
 });
-

@@ -116,14 +116,45 @@ function replaceMarkerBlock(contents: string, block: string): string {
   return contents.replace(expression, block);
 }
 
+export function extractManagedPersonaBlock(contents: string, startMarker: string, endMarker: string): string | undefined {
+  const expression = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`);
+  return contents.match(expression)?.[0];
+}
+
+export function preserveManagedPersonaBlock(
+  nextContents: string,
+  existingContents: string,
+  startMarker: string,
+  endMarker: string
+): { contents: string; preserved: boolean } {
+  const existingBlock = extractManagedPersonaBlock(existingContents, startMarker, endMarker);
+  if (!existingBlock) {
+    return { contents: nextContents, preserved: false };
+  }
+
+  const nextExpression = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`);
+  if (nextExpression.test(nextContents)) {
+    return { contents: nextContents.replace(nextExpression, existingBlock), preserved: true };
+  }
+
+  const titleExpression = /^#\s+.+$/m;
+  if (titleExpression.test(nextContents)) {
+    return {
+      contents: nextContents.replace(titleExpression, (match) => `${match}\n\n${existingBlock}`),
+      preserved: true
+    };
+  }
+
+  return { contents: `${existingBlock}\n\n${nextContents.trimStart()}`, preserved: true };
+}
+
 function removeMarkerBlock(contents: string): string {
   const expression = new RegExp(`\\n?${artistPersonaBlockStart}[\\s\\S]*?${artistPersonaBlockEnd}\\n?`);
   return contents.replace(expression, "\n").replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
 function extractMarkerBlock(contents: string): string {
-  const expression = new RegExp(`${artistPersonaBlockStart}[\\s\\S]*?${artistPersonaBlockEnd}`);
-  return contents.match(expression)?.[0] ?? contents;
+  return extractManagedPersonaBlock(contents, artistPersonaBlockStart, artistPersonaBlockEnd) ?? contents;
 }
 
 function sectionBetween(contents: string, heading: string, nextHeading: string): string {

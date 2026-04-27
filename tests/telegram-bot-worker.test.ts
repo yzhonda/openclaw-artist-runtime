@@ -1,4 +1,4 @@
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -198,6 +198,59 @@ describe("telegram bot worker", () => {
     };
     expect(state.offset).toBe(22);
     expect(state.personaSetupAnnouncedAt).toBeGreaterThan(0);
+  });
+
+  it("pushes persona setup guidance on startup when a chat id is already known", async () => {
+    const root = makeRoot();
+    await mkdir(join(root, "runtime"), { recursive: true });
+    await writeFile(join(root, "runtime", "telegram-state.json"), `${JSON.stringify({ chatId: 555 }, null, 2)}\n`, "utf8");
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ ok: true, result: { message_id: 1, text: "ok", chat: { id: 555 } } }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, result: [] }));
+    const worker = new TelegramBotWorker({
+      root,
+      config: enabledConfig,
+      token: "token",
+      ownerUserIds: new Set(["123"]),
+      fetchImpl
+    });
+
+    const result = await worker.start();
+    worker.stop();
+
+    expect(result).toMatchObject({ enabled: true, fetched: true, processed: 0 });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl.mock.calls[0][0]).toContain("/sendMessage");
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body as string)).toMatchObject({
+      chat_id: 555,
+      text: expect.stringContaining("Artist persona is not set up yet")
+    });
+    const state = JSON.parse(await readFile(join(root, "runtime", "telegram-state.json"), "utf8")) as {
+      chatId: number;
+      personaSetupAnnouncedAt: number;
+    };
+    expect(state.chatId).toBe(555);
+    expect(state.personaSetupAnnouncedAt).toBeGreaterThan(0);
+  });
+
+  it("does not push startup guidance without a known chat id", async () => {
+    const root = makeRoot();
+    const fetchImpl = vi.fn().mockResolvedValueOnce(jsonResponse({ ok: true, result: [] }));
+    const worker = new TelegramBotWorker({
+      root,
+      config: enabledConfig,
+      token: "token",
+      ownerUserIds: new Set(["123"]),
+      fetchImpl
+    });
+
+    const result = await worker.start();
+    worker.stop();
+
+    expect(result).toMatchObject({ enabled: true, fetched: true, processed: 0 });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0][0]).toContain("/getUpdates");
   });
 
   it("captures long-poll errors without crashing", async () => {

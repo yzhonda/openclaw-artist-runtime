@@ -66,28 +66,33 @@ export async function readPersonaSetupStatus(
     readFile(artistPath(root), "utf8").catch(() => "")
   ]);
   const reasons: string[] = [];
+  const missingArtistFile = !artistContents;
+  const artistNameTbd = artistNameTbdPattern.test(artistContents);
+  const sunoProfileNameTbd = sunoProfileNameTbdPattern.test(artistContents);
+  const defaultTemplateMatch = await matchesTemplate(artistContents, options.templateArtistPath);
+  const completedExternalImport =
+    !marker && !missingArtistFile && !artistNameTbd && !sunoProfileNameTbd && !defaultTemplateMatch;
 
-  if (!marker) {
+  if (!marker && !completedExternalImport) {
     reasons.push("missing_completion_marker");
   }
-  if (!artistContents) {
+  if (missingArtistFile) {
     reasons.push("missing_artist_file");
   }
-  if (artistNameTbdPattern.test(artistContents)) {
+  if (artistNameTbd) {
     reasons.push("artist_name_tbd");
   }
-  if (sunoProfileNameTbdPattern.test(artistContents)) {
+  if (sunoProfileNameTbd) {
     reasons.push("suno_profile_name_tbd");
   }
-  if (await matchesTemplate(artistContents, options.templateArtistPath)) {
+  if (defaultTemplateMatch) {
     reasons.push("matches_default_template_hash");
   }
 
   return {
-    completed: Boolean(marker) && reasons.length === 0,
+    completed: (Boolean(marker) || completedExternalImport) && reasons.length === 0,
     needsSetup: reasons.length > 0,
     reasons,
     marker
   };
 }
-

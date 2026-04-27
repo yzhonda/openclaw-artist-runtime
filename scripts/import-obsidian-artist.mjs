@@ -6,7 +6,7 @@
 //     [--source <obsidian-music-root>] \
 //     [--target <workspace-root>] \
 //     [--artist <slug>] \
-//     [--dry-run] [--force]
+//     [--dry-run] [--force] [--no-preserve-telegram-persona]
 
 import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -14,6 +14,10 @@ import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..");
+const ARTIST_PERSONA_START = "<!-- artist-runtime:persona:core:start -->";
+const ARTIST_PERSONA_END = "<!-- artist-runtime:persona:core:end -->";
+const SOUL_PERSONA_START = "<!-- artist-runtime:persona:soul:start -->";
+const SOUL_PERSONA_END = "<!-- artist-runtime:persona:soul:end -->";
 
 function parseArgs(argv) {
   const opts = {
@@ -21,7 +25,8 @@ function parseArgs(argv) {
     target: process.env.OPENCLAW_LOCAL_WORKSPACE || join(REPO_ROOT, ".local/openclaw/workspace"),
     artist: process.env.OPENCLAW_DEFAULT_ARTIST_SLUG || "my-artist",
     dryRun: false,
-    force: false
+    force: false,
+    preserveTelegramPersona: true
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -30,8 +35,12 @@ function parseArgs(argv) {
     else if (arg === "--artist") opts.artist = argv[++i];
     else if (arg === "--dry-run") opts.dryRun = true;
     else if (arg === "--force") opts.force = true;
+    else if (arg === "--preserve-telegram-persona") opts.preserveTelegramPersona = true;
+    else if (arg === "--no-preserve-telegram-persona") opts.preserveTelegramPersona = false;
     else if (arg === "--help" || arg === "-h") {
-      console.log("Usage: import-obsidian-artist.mjs [--source <path>] [--target <path>] [--artist <slug>] [--dry-run] [--force]");
+      console.log(
+        "Usage: import-obsidian-artist.mjs [--source <path>] [--target <path>] [--artist <slug>] [--dry-run] [--force] [--no-preserve-telegram-persona]"
+      );
       process.exit(0);
     }
   }
@@ -278,6 +287,81 @@ export function buildSocialVoiceMd({ sections, existingSpotifyProfile }) {
   return lines.join("\n");
 }
 
+export function buildSoulMd({ frontmatter, sections }) {
+  const name = frontmatter.name ?? "TBD";
+  const persona = joinSection(sections, "人物像");
+  const voice = joinSection(sections, "声・歌い方");
+  const outputRules = joinSection(sections, "出力ルール（全曲共通）");
+  const lines = [];
+  lines.push("<!--");
+  lines.push("SOUL.md - Imported from Obsidian vault.");
+  lines.push("Run scripts/import-obsidian-artist.mjs to refresh from the source.");
+  lines.push("-->");
+  lines.push("");
+  lines.push("# SOUL.md");
+  lines.push("");
+  lines.push("## Conversational Core");
+  lines.push("");
+  lines.push(`Speak as ${name}. Keep the artist persona present without exposing private configuration.`);
+  if (persona) {
+    lines.push("");
+    lines.push("## Persona Notes");
+    lines.push("");
+    lines.push(persona);
+  }
+  if (voice) {
+    lines.push("");
+    lines.push("## Voice Notes");
+    lines.push("");
+    lines.push(voice);
+  }
+  lines.push("");
+  lines.push("## Decision Style");
+  lines.push("");
+  if (outputRules) {
+    lines.push(outputRules);
+  } else {
+    lines.push("- Be concise, grounded, and willing to refuse weak directions with a practical alternative.");
+  }
+  lines.push("");
+  return lines.join("\n");
+}
+
+function extractManagedBlock(contents, startMarker, endMarker) {
+  const expression = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`);
+  return contents.match(expression)?.[0] ?? null;
+}
+
+export function preserveManagedBlock(nextContents, existingContents, startMarker, endMarker) {
+  const block = extractManagedBlock(existingContents, startMarker, endMarker);
+  if (!block) {
+    return { contents: nextContents, preserved: false };
+  }
+  const nextExpression = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`);
+  if (nextExpression.test(nextContents)) {
+    return { contents: nextContents.replace(nextExpression, block), preserved: true };
+  }
+  const titleExpression = /^#\s+.+$/m;
+  if (titleExpression.test(nextContents)) {
+    return {
+      contents: nextContents.replace(titleExpression, (match) => `${match}\n\n${block}`),
+      preserved: true
+    };
+  }
+  return { contents: `${block}\n\n${nextContents.trimStart()}`, preserved: true };
+}
+
+async function preserveTelegramPersonaBlock(path, nextContents, startMarker, endMarker, label, opts) {
+  if (!opts.preserveTelegramPersona) {
+    console.log(`preserve: ${label} telegram persona preservation disabled`);
+    return nextContents;
+  }
+  const existing = await readFile(path, "utf8").catch(() => "");
+  const result = preserveManagedBlock(nextContents, existing, startMarker, endMarker);
+  console.log(`preserve: ${label} telegram persona block ${result.preserved ? "kept" : "not found"}`);
+  return result.contents;
+}
+
 async function fileExists(path) {
   try {
     await stat(path);
@@ -326,6 +410,7 @@ async function main() {
   const sourceArtistMd = join(opts.source, "artists", `${opts.artist}.md`);
   const sourceCover = join(opts.source, "artists", `${opts.artist}-cover.png`);
   const targetArtistMd = join(opts.target, "ARTIST.md");
+  const targetSoulMd = join(opts.target, "SOUL.md");
   const targetSocialVoice = join(opts.target, "artist", "SOCIAL_VOICE.md");
   const targetCover = join(opts.target, "artist", "cover.png");
 
@@ -344,14 +429,31 @@ async function main() {
 
   const existingSpotifyProfile = await readExistingSpotifyProfileSection(targetSocialVoice);
 
-  const artistMd = buildArtistMd({ frontmatter, sections });
+  const artistMd = await preserveTelegramPersonaBlock(
+    targetArtistMd,
+    buildArtistMd({ frontmatter, sections }),
+    ARTIST_PERSONA_START,
+    ARTIST_PERSONA_END,
+    "ARTIST.md",
+    opts
+  );
+  const soulMd = await preserveTelegramPersonaBlock(
+    targetSoulMd,
+    buildSoulMd({ frontmatter, sections }),
+    SOUL_PERSONA_START,
+    SOUL_PERSONA_END,
+    "SOUL.md",
+    opts
+  );
   const socialVoiceMd = buildSocialVoiceMd({ sections, existingSpotifyProfile });
 
   await backupIfPresent(targetArtistMd, opts);
+  await backupIfPresent(targetSoulMd, opts);
   await backupIfPresent(targetSocialVoice, opts);
   await backupIfPresent(targetCover, opts);
 
   await writeFileSafe(targetArtistMd, artistMd, opts);
+  await writeFileSafe(targetSoulMd, soulMd, opts);
   await writeFileSafe(targetSocialVoice, socialVoiceMd, opts);
   if (await fileExists(sourceCover)) {
     await copyFileSafe(sourceCover, targetCover, opts);
