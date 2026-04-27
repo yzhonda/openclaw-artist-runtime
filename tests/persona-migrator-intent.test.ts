@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { formatPersonaMigratePlan, executePersonaMigrate, planPersonaMigrate } from "../src/services/personaMigrator";
-import { artistPersonaBlockStart } from "../src/services/personaFileBuilder";
-import { soulPersonaBlockStart } from "../src/services/soulFileBuilder";
+import { artistPersonaBlockStart, readArtistPersonaSummary } from "../src/services/personaFileBuilder";
+import { readSoulPersonaSummary, soulPersonaBlockStart } from "../src/services/soulFileBuilder";
 
 function makeRoot(): string {
   return mkdtempSync(join(tmpdir(), "artist-runtime-persona-migrate-intent-"));
@@ -64,26 +64,37 @@ describe("persona migrate operator intent", () => {
     await writePersonaWithMissingFields(root);
 
     const plan = await planPersonaMigrate(root, {
-      intent: "Use the notebook Voice section, keep the tone blunt and unsalesy, and make social voice short.",
+      intent: [
+        "obsessions: 日本社会の風刺、批評、皮肉",
+        "socialVoice: 短く、刺さるように、過剰な売り込みは避ける",
+        "soul-tone: 御大に対しては率直、ぶっきらぼう、必要なら反論",
+        "soul-refusal: できないことは「できない」と即答、言い訳しない"
+      ].join("\n"),
       aiReviewProvider: "mock"
     });
     const preview = formatPersonaMigratePlan(plan);
 
-    expect(plan.operatorIntent).toContain("notebook Voice section");
+    expect(plan.operatorIntent).toContain("日本社会の風刺");
     expect(plan.aiProvider).toBe("mock");
     expect(plan.proposedDrafts.map((draft) => draft.field)).toEqual(expect.arrayContaining(["socialVoice", "soul-tone", "soul-refusal"]));
     expect(preview).toContain("Operator intent:");
     expect(preview).toContain("Proposed drafts (AI provider=mock):");
-    expect(preview).toContain("socialVoice:");
+    expect(preview).toContain("socialVoice: 短く、刺さるように、過剰な売り込みは避ける");
 
     await executePersonaMigrate(root, plan);
     const artist = await readFile(join(root, "ARTIST.md"), "utf8");
     const soul = await readFile(join(root, "SOUL.md"), "utf8");
+    const artistSummary = await readArtistPersonaSummary(root);
+    const soulSummary = await readSoulPersonaSummary(root);
 
     expect(artist).toContain(artistPersonaBlockStart);
     expect(soul).toContain(soulPersonaBlockStart);
-    expect(artist).toContain("[mock proposal based on operator intent:");
-    expect(soul).toContain("[mock proposal based on operator intent:");
+    expect(artist).not.toContain("[mock proposal based on operator intent:");
+    expect(soul).not.toContain("[mock proposal based on operator intent:");
+    expect(artistSummary.obsessions).toBe("日本社会の風刺, 批評, 皮肉");
+    expect(artistSummary.socialVoice).toBe("短く, 刺さるように, 過剰な売り込みは避ける");
+    expect(soulSummary.conversationTone).toBe("御大に対しては率直、ぶっきらぼう、必要なら反論");
+    expect(soulSummary.refusalStyle).toBe("できないことは「できない」と即答、言い訳しない");
     expect(soul).toContain("custom imported soul header");
   });
 
@@ -92,7 +103,10 @@ describe("persona migrate operator intent", () => {
     await writePersonaWithMissingFields(root);
 
     const plan = await planPersonaMigrate(root, {
-      intent: "socialVoice: keep as-is, skip. Draft only the SOUL refusal style from the imported prose.",
+      intent: [
+        "socialVoice: keep as-is, skip",
+        "soul-refusal: できないことは「できない」と即答、言い訳しない"
+      ].join("\n"),
       aiReviewProvider: "mock"
     });
     const socialVoiceDraft = plan.proposedDrafts.find((draft) => draft.field === "socialVoice");

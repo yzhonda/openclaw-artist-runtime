@@ -36,6 +36,12 @@ export interface PersonaMigrateDraft {
   reason?: string;
 }
 
+export interface ParsedIntentDirective {
+  field: PersonaField;
+  value: string;
+  skip: boolean;
+}
+
 interface MarkdownSection {
   level: number;
   heading: string;
@@ -159,9 +165,16 @@ function normalizeIntent(intent?: string): string | undefined {
   return normalized || undefined;
 }
 
-function truncate(value: string, maxLength: number): string {
-  return value.length > maxLength ? `${value.slice(0, Math.max(0, maxLength - 3))}...` : value;
-}
+const personaFields: PersonaField[] = [
+  "artistName",
+  "identityLine",
+  "soundDna",
+  "obsessions",
+  "lyricsRules",
+  "socialVoice",
+  "soul-tone",
+  "soul-refusal"
+];
 
 function fieldAliases(field: PersonaField): string[] {
   switch (field) {
@@ -170,7 +183,7 @@ function fieldAliases(field: PersonaField): string[] {
     case "identityLine":
       return ["identityLine", "identity", "manifesto"];
     case "soundDna":
-      return ["soundDna", "sound", "genre"];
+      return ["soundDna", "sound"];
     case "obsessions":
       return ["obsessions", "themes", "theme"];
     case "lyricsRules":
@@ -184,11 +197,64 @@ function fieldAliases(field: PersonaField): string[] {
   }
 }
 
+function normalizeDirectiveKey(value: string): string {
+  return value.toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function buildDirectiveAliasMap(): Map<string, PersonaField> {
+  const aliases = new Map<string, PersonaField>();
+  for (const field of personaFields) {
+    for (const alias of fieldAliases(field)) {
+      aliases.set(normalizeDirectiveKey(alias), field);
+    }
+  }
+  return aliases;
+}
+
+function detectSkipDirective(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+  const firstToken = trimmed.split(/\s+/)[0]?.toLowerCase();
+  return firstToken === "keep" || /\b(skip|keep as-is|keep as is)\b/i.test(trimmed);
+}
+
+export function parseIntentDirectives(intent: string): Map<PersonaField, ParsedIntentDirective> {
+  const directives = new Map<PersonaField, ParsedIntentDirective>();
+  const aliasMap = buildDirectiveAliasMap();
+  let currentField: PersonaField | undefined;
+
+  for (const rawLine of intent.split(/\r?\n/)) {
+    const match = rawLine.match(/^\s*([a-zA-Z][\w\s-]*?)\s*:\s*(.*)$/);
+    const matchedField = match ? aliasMap.get(normalizeDirectiveKey(match[1])) : undefined;
+    if (matchedField) {
+      const value = match?.[2] ?? "";
+      directives.set(matchedField, { field: matchedField, value, skip: detectSkipDirective(value) });
+      currentField = matchedField;
+      continue;
+    }
+    if (!currentField) {
+      continue;
+    }
+    const directive = directives.get(currentField);
+    if (!directive) {
+      continue;
+    }
+    const nextValue = directive.value ? `${directive.value}\n${rawLine}` : rawLine;
+    directives.set(currentField, { ...directive, value: nextValue, skip: detectSkipDirective(nextValue) });
+  }
+
+  for (const [field, directive] of directives.entries()) {
+    const value = directive.value.trim();
+    directives.set(field, { ...directive, value, skip: detectSkipDirective(value) });
+  }
+
+  return directives;
+}
+
 function isSkippedByIntent(intent: string, field: PersonaField): boolean {
-  return fieldAliases(field).some((alias) => {
-    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`\\b${escaped}\\b[^\\n;。]*\\b(skip|keep as-is|keep as is)\\b`, "i").test(intent);
-  });
+  return parseIntentDirectives(intent).get(field)?.skip === true;
 }
 
 async function proposeDrafts(
@@ -226,16 +292,25 @@ async function proposeDrafts(
     return { provider, drafts: [] };
   }
 
-  const intentSummary = truncate(intent, 180);
+  const parsed = parseIntentDirectives(options.intent ?? "");
   const drafts = candidates.map((field): PersonaMigrateDraft => {
-    if (isSkippedByIntent(intent, field.field)) {
+    const directive = parsed.get(field.field);
+    if (directive?.skip || (!directive && isSkippedByIntent(options.intent ?? "", field.field))) {
       return { field: field.field, status: "skipped", reason: "skip per operator intent" };
+    }
+    if (directive && directive.value.trim().length > 0) {
+      return {
+        field: field.field,
+        status: "proposed",
+        value: directive.value.trim(),
+        reason: field.status === "missing" ? "missing field" : "thin field"
+      };
     }
     return {
       field: field.field,
       status: "proposed",
-      value: `[mock proposal based on operator intent: ${intentSummary}] ${field.field}`,
-      reason: field.status === "missing" ? "missing field" : "thin field"
+      value: "",
+      reason: "could not extract from intent; provide explicit field directive"
     };
   });
   return { provider, drafts };
@@ -307,7 +382,7 @@ export function formatPersonaMigratePlan(plan: PersonaMigratePlan): string {
         ...plan.proposedDrafts.map((draft) =>
           draft.status === "skipped"
             ? `- ${draft.field}: skip per operator intent`
-            : `- ${draft.field}: ${draft.value}`
+            : `- ${draft.field}: ${draft.value?.trim() ? draft.value : "(no value extracted; provide directive in next /persona migrate)"}`
         )
       ]
     : [`Proposed drafts (AI provider=${plan.aiProvider ?? "mock"}): none`];

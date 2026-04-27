@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { TelegramConfig } from "../src/types";
 import { TelegramBotWorker } from "../src/services/telegramBotWorker";
+import { readArtistPersonaSummary } from "../src/services/personaFileBuilder";
+import { readSoulPersonaSummary } from "../src/services/soulFileBuilder";
 
 const enabledConfig: TelegramConfig = {
   enabled: true,
@@ -97,7 +99,13 @@ describe("telegram persona migrate intent e2e", () => {
     const root = makeRoot();
     await writeImportedPersona(root);
     const { fetchImpl, sent } = makeTelegramFetch([
-      "/persona migrate make the social voice spare and unsalesy; use the imported SOUL prose for refusal style",
+      [
+        "/persona migrate obsessions: 日本社会の風刺、批評、皮肉",
+        "socialVoice: 短く、刺さるように、過剰な売り込みは避ける",
+        "soul-tone: 御大に対しては率直、ぶっきらぼう、必要なら反論",
+        "soul-refusal: できないことは「できない」と即答、言い訳しない",
+        "artistName: keep used::honda"
+      ].join("\n"),
       "/confirm migrate"
     ]);
     const worker = new TelegramBotWorker({
@@ -115,12 +123,19 @@ describe("telegram persona migrate intent e2e", () => {
 
     expect(sent[0]).toContain("Operator intent:");
     expect(sent[0]).toContain("Proposed drafts (AI provider=mock):");
-    expect(sent[0]).toContain("socialVoice:");
+    expect(sent[0]).toContain("socialVoice: 短く、刺さるように、過剰な売り込みは避ける");
     expect(sent[1]).toContain("Persona migrated");
     const artist = await readFile(join(root, "ARTIST.md"), "utf8");
     const soul = await readFile(join(root, "SOUL.md"), "utf8");
-    expect(artist).toContain("[mock proposal based on operator intent:");
-    expect(soul).toContain("[mock proposal based on operator intent:");
+    const artistSummary = await readArtistPersonaSummary(root);
+    const soulSummary = await readSoulPersonaSummary(root);
+    expect(artist).not.toContain("[mock proposal based on operator intent:");
+    expect(soul).not.toContain("[mock proposal based on operator intent:");
+    expect(artistSummary.artistName).toBe("Telegram Intent Artist");
+    expect(artistSummary.obsessions).toBe("日本社会の風刺, 批評, 皮肉");
+    expect(artistSummary.socialVoice).toBe("短く, 刺さるように, 過剰な売り込みは避ける");
+    expect(soulSummary.conversationTone).toBe("御大に対しては率直、ぶっきらぼう、必要なら反論");
+    expect(soulSummary.refusalStyle).toBe("できないことは「できない」と即答、言い訳しない");
     expect(artist).toContain("## Voice");
     expect(soul).toContain("Imported prose with no Telegram Persona Voice section.");
   });

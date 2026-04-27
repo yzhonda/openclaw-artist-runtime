@@ -203,7 +203,8 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
       };
     }
     if (subcommand === "migrate") {
-      const intent = args.slice(1).join(" ").trim() || undefined;
+      const migrateMatch = text.match(/^\/persona\s+migrate(?:\s+([\s\S]*))?$/i);
+      const intent = migrateMatch?.[1]?.trim() || undefined;
       const plan = await planPersonaMigrate(input.workspaceRoot, { intent, aiReviewProvider: input.aiReviewProvider });
       await createTelegramPersonaSession(input.workspaceRoot, {
         mode: "migrate_confirm",
