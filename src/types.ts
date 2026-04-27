@@ -756,6 +756,7 @@ export interface StatusResponse {
   distributionSummary: DistributionSummary;
   recentDistributionEvents: DistributionEvent[];
   platformStats: Record<SocialPlatform, PlatformStat>;
+  runtimeEvents?: unknown[];
   setupReadiness: SetupReadiness;
   alerts: AlertRecord[];
   recentSong?: SongState;

@@ -1,9 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { TelegramConfig } from "../types.js";
+import type { AutopilotStatus, TelegramConfig } from "../types.js";
 import { getTelegramOwnerUserIds } from "./telegramAuth.js";
 import { TelegramClient, type TelegramFetch, type TelegramUpdate } from "./telegramClient.js";
-import { routeTelegramCommand } from "./telegramCommandRouter.js";
+import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } from "./telegramCommandRouter.js";
 
 export interface TelegramBotWorkerOptions {
   root: string;
@@ -11,6 +11,7 @@ export interface TelegramBotWorkerOptions {
   token?: string;
   ownerUserIds?: Set<string>;
   fetchImpl?: TelegramFetch;
+  getAutopilotStatus?: () => Promise<AutopilotStatus>;
 }
 
 export interface TelegramPollResult {
@@ -158,11 +159,23 @@ export class TelegramBotWorker {
       return false;
     }
 
-    const route = routeTelegramCommand({
+    const route = await routeTelegramCommand({
       text,
       fromUserId: from.id,
-      chatId: message.chat.id
+      chatId: message.chat.id,
+      workspaceRoot: this.options.root,
+      autopilotStatus: await this.options.getAutopilotStatus?.()
     });
+    if (route.shouldStoreFreeText) {
+      await storeTelegramInbox(this.options.root, {
+        type: "free_text",
+        intent: classifyTelegramFreeText(text),
+        fromUserId: from.id,
+        chatId: message.chat.id,
+        text,
+        timestamp: Date.now()
+      });
+    }
     await client.sendMessage(message.chat.id, route.responseText);
     return true;
   }

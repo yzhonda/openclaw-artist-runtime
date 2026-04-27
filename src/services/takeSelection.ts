@@ -3,6 +3,7 @@ import { join } from "node:path";
 import type { TakeSelectionRecord } from "../types.js";
 import { updateSongState } from "./artistState.js";
 import { appendPromptLedger, createPromptLedgerEntry, getSongPromptLedgerPath } from "./promptLedger.js";
+import { emitRuntimeEvent } from "./runtimeEventBus.js";
 
 export interface SelectTakeInput {
   workspaceRoot: string;
@@ -77,6 +78,13 @@ export async function selectTake(input: SelectTakeInput): Promise<TakeSelectionR
     reason,
     selectedTakeId,
     appendPublicLinks: urls
+  });
+  emitRuntimeEvent({
+    type: "autopilot_stage_changed",
+    songId: input.songId,
+    from: "take_selection",
+    to: "asset_generation",
+    timestamp: Date.now()
   });
 
   return record;

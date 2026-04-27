@@ -110,7 +110,13 @@ describe("telegram bot worker", () => {
       config: enabledConfig,
       token: "token",
       ownerUserIds: new Set(["123"]),
-      fetchImpl
+      fetchImpl,
+      getAutopilotStatus: async () => ({
+        enabled: true,
+        dryRun: true,
+        stage: "planning",
+        nextAction: "decide_next_song"
+      })
     });
 
     const result = await worker.pollOnce();
@@ -120,6 +126,9 @@ describe("telegram bot worker", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(fetchImpl.mock.calls[0][0]).toContain("/getUpdates");
     expect(fetchImpl.mock.calls[1][0]).toContain("/sendMessage");
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body as string)).toMatchObject({
+      text: expect.stringContaining("Stage: planning")
+    });
     const state = JSON.parse(await readFile(join(root, "runtime", "telegram-state.json"), "utf8")) as { offset: number };
     expect(state.offset).toBe(11);
   });

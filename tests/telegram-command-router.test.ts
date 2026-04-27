@@ -1,41 +1,132 @@
+import { mkdir } from "node:fs/promises";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { routeTelegramCommand } from "../src/services/telegramCommandRouter";
+import { ensureSongState, updateSongState, writeSongBrief } from "../src/services/artistState";
+import { readAutopilotRunState } from "../src/services/autopilotService";
+import { classifyTelegramFreeText, readTelegramInbox, routeTelegramCommand } from "../src/services/telegramCommandRouter";
 
 const baseInput = {
   fromUserId: 123,
   chatId: 456
 };
 
+function makeRoot(): string {
+  return mkdtempSync(join(tmpdir(), "artist-runtime-telegram-router-"));
+}
+
 describe("telegram command router", () => {
-  it("routes /help to the skeleton help response", () => {
-    const result = routeTelegramCommand({ ...baseInput, text: "/help" });
+  it("routes /help to the command list", async () => {
+    const result = await routeTelegramCommand({ ...baseInput, text: "/help" });
 
     expect(result.kind).toBe("help");
     expect(result.responseText).toContain("/status");
+    expect(result.responseText).toContain("/pause");
     expect(result.shouldStoreFreeText).toBe(false);
   });
 
-  it("routes /status without invoking autopilot controls", () => {
-    const result = routeTelegramCommand({ ...baseInput, text: "/status" });
+  it("routes /status to formatted autopilot status", async () => {
+    const result = await routeTelegramCommand({
+      ...baseInput,
+      text: "/status",
+      autopilotStatus: {
+        enabled: true,
+        dryRun: true,
+        stage: "planning",
+        nextAction: "decide_next_song",
+        currentSongId: "song-001"
+      }
+    });
 
     expect(result.kind).toBe("status");
-    expect(result.responseText).toContain("Phase 3");
+    expect(result.responseText).toContain("Autopilot: enabled (dry-run)");
+    expect(result.responseText).toContain("Stage: planning");
     expect(result.shouldStoreFreeText).toBe(false);
   });
 
-  it("returns a safe response for unknown commands", () => {
-    const result = routeTelegramCommand({ ...baseInput, text: "/regen song-001" });
+  it("lists recent songs", async () => {
+    const root = makeRoot();
+    await ensureSongState(root, "song-001", "Ash Road");
+    await ensureSongState(root, "song-002", "Cold Relay");
+
+    const result = await routeTelegramCommand({ ...baseInput, text: "/songs", workspaceRoot: root });
+
+    expect(result.kind).toBe("songs");
+    expect(result.responseText).toContain("song-001");
+    expect(result.responseText).toContain("Cold Relay");
+  });
+
+  it("shows a song detail summary", async () => {
+    const root = makeRoot();
+    await writeSongBrief(root, "song-001", "# Brief\n\nA cold wire hymn.");
+    await updateSongState(root, "song-001", {
+      status: "take_selected",
+      selectedTakeId: "take-a",
+      reason: "test",
+      lastImportOutcome: {
+        runId: "run-1",
+        urlCount: 1,
+        pathCount: 1,
+        paths: [join(root, "runtime", "suno", "run-1", "take-a.mp3")],
+        at: new Date().toISOString()
+      }
+    });
+
+    const result = await routeTelegramCommand({ ...baseInput, text: "/song song-001", workspaceRoot: root });
+
+    expect(result.kind).toBe("song");
+    expect(result.responseText).toContain("take-a");
+    expect(result.responseText).toContain("Imported assets: 1");
+    expect(result.responseText).toContain("A cold wire hymn");
+  });
+
+  it("queues /regen as a dry-run inbox request", async () => {
+    const root = makeRoot();
+    const result = await routeTelegramCommand({ ...baseInput, text: "/regen song-001", workspaceRoot: root });
+    const inbox = await readTelegramInbox(root);
+
+    expect(result.kind).toBe("regen");
+    expect(result.responseText).toContain("No Suno create was started");
+    expect(inbox[0]).toMatchObject({ type: "regen_requested", songId: "song-001" });
+  });
+
+  it("pauses and resumes autopilot through the control service", async () => {
+    const root = makeRoot();
+    await mkdir(join(root, "runtime"), { recursive: true });
+
+    const paused = await routeTelegramCommand({ ...baseInput, text: "/pause", workspaceRoot: root });
+    const pausedState = await readAutopilotRunState(root);
+    const resumed = await routeTelegramCommand({ ...baseInput, text: "/resume", workspaceRoot: root });
+    const resumedState = await readAutopilotRunState(root);
+
+    expect(paused.kind).toBe("pause");
+    expect(pausedState.paused).toBe(true);
+    expect(pausedState.pausedReason).toBe("telegram:123");
+    expect(resumed.kind).toBe("resume");
+    expect(resumedState.paused).toBe(false);
+  });
+
+  it("returns a safe response for unknown commands", async () => {
+    const result = await routeTelegramCommand({ ...baseInput, text: "/wat" });
 
     expect(result.kind).toBe("unknown");
     expect(result.responseText).toContain("Unknown command");
     expect(result.shouldStoreFreeText).toBe(false);
   });
 
-  it("stages free-text for the future inbox path", () => {
-    const result = routeTelegramCommand({ ...baseInput, text: "please make the next hook colder" });
+  it("stages free-text for the local inbox path", async () => {
+    const result = await routeTelegramCommand({ ...baseInput, text: "please make the next hook colder" });
 
     expect(result.kind).toBe("free_text");
-    expect(result.responseText).toContain("disabled until Phase 3");
+    expect(result.responseText).toContain("local artist inbox");
     expect(result.shouldStoreFreeText).toBe(true);
+  });
+
+  it("classifies free-text command suggestions without forwarding to CC or Cdx", () => {
+    expect(classifyTelegramFreeText("please pause")).toBe("pause");
+    expect(classifyTelegramFreeText("resume the artist")).toBe("resume");
+    expect(classifyTelegramFreeText("status?")).toBe("status");
+    expect(classifyTelegramFreeText("make the hook colder")).toBe("artist_inbox");
   });
 });

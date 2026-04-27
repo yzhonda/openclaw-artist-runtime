@@ -13,6 +13,8 @@ import { ArtistAutopilotService, pauseAutopilot, resumeAutopilot } from "../serv
 import { AutopilotControlService } from "../services/autopilotControlService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
 import { buildPlatformStats, readDistributionEvents } from "../services/distributionLedgerReader.js";
+import { getRuntimeEventBus } from "../services/runtimeEventBus.js";
+import { readRuntimeEvents } from "../services/runtimeEventsLedger.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
 import { mergeResolvedConfig, patchResolvedConfig, resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
@@ -611,9 +613,10 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     buildMusicSummary(mergedConfig),
     buildDistributionSummary(mergedConfig, platforms)
   ]);
-  const [recentDistributionEvents, platformStats] = await Promise.all([
+  const [recentDistributionEvents, platformStats, runtimeEventsLedger] = await Promise.all([
     readDistributionEvents(mergedConfig.artist.workspaceRoot, 20),
-    buildPlatformStats(mergedConfig.artist.workspaceRoot)
+    buildPlatformStats(mergedConfig.artist.workspaceRoot),
+    readRuntimeEvents(mergedConfig.artist.workspaceRoot, 20)
   ]);
   const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
   const effectiveDryRunMap = buildEffectiveDryRunMap(mergedConfig);
@@ -646,6 +649,10 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     distributionSummary,
     recentDistributionEvents,
     platformStats,
+    runtimeEvents: [
+      ...getRuntimeEventBus().listRecent(20),
+      ...runtimeEventsLedger
+    ].slice(0, 20),
     setupReadiness,
     alerts,
     recentSong: workspaceStatus.recentSong,

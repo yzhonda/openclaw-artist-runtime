@@ -1,6 +1,7 @@
 import { applyConfigDefaults } from "../config/schema.js";
 import type { AutopilotRunState, ArtistRuntimeConfig } from "../types.js";
 import { ArtistAutopilotService, readAutopilotRunState } from "./autopilotService.js";
+import { emitRuntimeEvent } from "./runtimeEventBus.js";
 
 type PartialDeep<T> = {
   [K in keyof T]?: T[K] extends string[] ? string[] : T[K] extends Record<string, unknown> ? PartialDeep<T[K]> : T[K];
@@ -116,6 +117,13 @@ export class AutopilotTicker {
   private emit(outcome: AutopilotTickOutcome): AutopilotTickOutcome {
     lastOutcome = outcome;
     lastTickAt = new Date().toISOString();
+    emitRuntimeEvent({
+      type: "autopilot_state_changed",
+      enabled: outcome !== "skipped:disabled",
+      paused: outcome === "skipped:paused",
+      reason: outcome,
+      timestamp: Date.now()
+    });
     this.options.onOutcome?.(outcome);
     return outcome;
   }

@@ -18,6 +18,7 @@ import {
   SUNO_BUDGET_EXHAUSTED_REASON,
   SunoBudgetTracker
 } from "./sunoBudget.js";
+import { emitRuntimeEvent } from "./runtimeEventBus.js";
 
 export interface GenerateSunoRunInput {
   workspaceRoot: string;
@@ -320,6 +321,13 @@ export async function importSunoResults(input: ImportSunoResultsInput): Promise<
       at: importedAt,
       dryRun: config.autopilot.dryRun
     }
+  });
+  emitRuntimeEvent({
+    type: "take_imported",
+    songId: input.songId,
+    paths: input.resultRefs ?? [],
+    metadata: [],
+    timestamp: Date.now()
   });
 
   return importedRecord;

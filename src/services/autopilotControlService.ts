@@ -1,4 +1,5 @@
 import type { AutopilotRunState } from "../types.js";
+import { emitRuntimeEvent } from "./runtimeEventBus.js";
 import {
   backupAutopilotState,
   buildResetAutopilotState,
@@ -18,12 +19,20 @@ export class AutopilotControlService {
 
   async pause(root: string, reason = "paused by operator"): Promise<AutopilotRunState> {
     const current = await readAutopilotState(root);
-    return writeAutopilotState(root, {
+    const next = await writeAutopilotState(root, {
       ...current,
       paused: true,
       pausedReason: reason,
       stage: "paused"
     });
+    emitRuntimeEvent({
+      type: "autopilot_state_changed",
+      enabled: true,
+      paused: true,
+      reason,
+      timestamp: Date.now()
+    });
+    return next;
   }
 
   async resume(root: string, options: AutopilotResumeOptions = {}): Promise<AutopilotRunState> {
@@ -33,13 +42,21 @@ export class AutopilotControlService {
     }
 
     const current = await readAutopilotState(root);
-    return writeAutopilotState(root, {
+    const next = await writeAutopilotState(root, {
       ...current,
       paused: false,
       pausedReason: undefined,
       hardStopReason: undefined,
       stage: "idle"
     });
+    emitRuntimeEvent({
+      type: "autopilot_state_changed",
+      enabled: true,
+      paused: false,
+      reason: options.reason,
+      timestamp: Date.now()
+    });
+    return next;
   }
 
   async backupState(root: string): Promise<{ backupPath?: string }> {
