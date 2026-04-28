@@ -230,6 +230,41 @@ found for a missing field, the preview shows `(no value extracted; provide
 directive in next /persona migrate)` instead of writing the whole operator
 intent into the field.
 
+## Persona AI auto-fill (Plan v9.11)
+
+Plan v9.11 keeps the Telegram persona flow default-safe while reducing first-run
+typing. The proposer is enabled by default and uses the configured persona AI
+provider; the distributed default is the deterministic `mock` provider, so no
+external model call is made unless the operator opts into a real provider later.
+
+Journey A, fresh setup:
+
+1. Send `/setup`.
+2. Reply with a rough artist sketch, for example `和風 hip-hop で社会風刺がメインの男性アーティスト、20代`.
+3. Review each proposed field with `/confirm`, or use `/answer <text>` to
+   override the current field.
+4. `/skip` asks for one alternative. A second `/skip` on the same field asks for
+   `/confirm skip`, which stores the built-in default for that field.
+5. The final `/confirm` writes ARTIST.md, SOUL.md, and the local persona
+   completion marker.
+
+Journey B, filling an imported persona:
+
+1. Send `/persona check`.
+2. If fields are thin or missing, send `/persona check fill`.
+3. Review each AI draft with `/confirm`, override with `/answer <text>`, or use
+   the same two-step `/skip` behavior.
+4. Before the first write in a session, ARTIST.md and/or SOUL.md are backed up
+   once per file. Repeated fields in the same session do not create backup spam.
+5. `/persona check suggest` returns the same proposed drafts in read-only mode;
+   it does not create a session and does not write files.
+
+Retreat flag: set `OPENCLAW_PERSONA_PROPOSER=off` before gateway start to force
+the older handwritten wizard for `/setup` and `/persona check fill`. This does
+not rename commands or change OpenClaw permissions. Secret-like input or AI
+responses are rejected for the affected field and surfaced as warnings instead
+of being written to ARTIST.md or SOUL.md.
+
 ### Debug AI review command
 
 `/review <songId>` is a Telegram debug command for inspecting a song's current
