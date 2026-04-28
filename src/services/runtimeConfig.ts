@@ -44,6 +44,10 @@ export function resolveDefaultWorkspaceRoot(): string {
   return envWorkspace || defaultArtistRuntimeConfig.artist.workspaceRoot;
 }
 
+export function isPersonaProposerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENCLAW_PERSONA_PROPOSER?.trim().toLowerCase() !== "off";
+}
+
 function isRelativeWorkspaceRoot(value: string): boolean {
   return value === "." || value === "./" || value === "" || value.startsWith("./") || value.startsWith("../");
 }

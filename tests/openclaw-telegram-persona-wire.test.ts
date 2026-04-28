@@ -96,10 +96,10 @@ describe("OpenClaw Telegram persona command wire", () => {
     const answer = await commands.get("answer")?.handler(commandContext("Neon Relay Unit", root));
     const session = await readTelegramPersonaSession(root);
 
-    expect(setup?.text).toContain("Artist persona setup started");
-    expect(answer?.text).toContain("Q2");
-    expect(session?.mode).toBe("setup_artist");
-    expect(session?.pending.artistName).toBe("Neon Relay Unit");
+    expect(setup?.text).toContain("Artist persona AI setup started");
+    expect(answer?.text).toContain("Field 1/8");
+    expect(session?.mode).toBe("setup_ai_review");
+    expect(session?.pending.aiDrafts?.[0].field).toBe("artistName");
   });
 
   it("routes /confirm migrate through native command session control", async () => {

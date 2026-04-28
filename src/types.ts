@@ -168,6 +168,8 @@ export type PersonaField =
 export type TelegramPersonaSessionMode =
   | "setup_artist"
   | "setup_soul"
+  | "setup_ai_rough"
+  | "setup_ai_review"
   | "edit_field"
   | "reset_confirm"
   | "migrate_confirm"
@@ -190,6 +192,19 @@ export interface TelegramPersonaSessionHistoryEntry {
   previous?: string;
 }
 
+export interface TelegramPersonaSessionDraft {
+  field: PersonaField;
+  draft: string;
+  reasoning?: string;
+  status: "proposed" | "skipped" | "low_confidence";
+}
+
+export interface TelegramPersonaSessionPending extends Partial<PersonaAnswers> {
+  aiDrafts?: TelegramPersonaSessionDraft[];
+  skipCount?: Partial<Record<PersonaField, number>>;
+  roughSkipCount?: number;
+}
+
 export interface TelegramPersonaSession {
   active: boolean;
   mode: TelegramPersonaSessionMode;
@@ -198,7 +213,7 @@ export interface TelegramPersonaSession {
   checkFillQueue?: PersonaField[];
   migrateIntent?: string;
   migrateAiReviewProvider?: AiReviewProvider;
-  pending: Partial<PersonaAnswers>;
+  pending: TelegramPersonaSessionPending;
   history: TelegramPersonaSessionHistoryEntry[];
   startedAt: number;
   updatedAt: number;

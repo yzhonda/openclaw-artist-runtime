@@ -9,6 +9,7 @@ import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
 import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
 import { formatPersonaMigratePlan, planPersonaMigrate } from "./personaMigrator.js";
+import { isPersonaProposerEnabled } from "./runtimeConfig.js";
 import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
 import { formatSoulPersonaQuestion, readSoulPersonaSummary } from "./soulFileBuilder.js";
 import type { PersonaField } from "../types.js";
@@ -108,16 +109,32 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         shouldStoreFreeText: false
       };
     }
+    if (!isPersonaProposerEnabled()) {
+      await createTelegramPersonaSession(input.workspaceRoot, {
+        mode: "setup_artist",
+        chatId: input.chatId,
+        userId: input.fromUserId
+      });
+      return {
+        kind: "setup",
+        responseText: [
+          "Artist persona setup started.",
+          formatArtistPersonaQuestion(0)
+        ].join("\n"),
+        shouldStoreFreeText: false
+      };
+    }
     await createTelegramPersonaSession(input.workspaceRoot, {
-      mode: "setup_artist",
+      mode: "setup_ai_rough",
       chatId: input.chatId,
       userId: input.fromUserId
     });
     return {
       kind: "setup",
       responseText: [
-        "Artist persona setup started.",
-        formatArtistPersonaQuestion(0)
+        "Artist persona AI setup started.",
+        "Send a rough 1-2 sentence artist sketch. Example: 和風 hip-hop で社会風刺がメインの男性アーティスト、20代",
+        "Commands: /skip repeats this prompt, /cancel stops setup."
       ].join("\n"),
       shouldStoreFreeText: false
     };

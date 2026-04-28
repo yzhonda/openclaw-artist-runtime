@@ -2,7 +2,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TelegramConfig } from "../src/types";
 import { TelegramBotWorker } from "../src/services/telegramBotWorker";
 
@@ -25,8 +25,13 @@ function jsonResponse(body: unknown): Response {
   } as Response;
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("telegram persona wizard e2e", () => {
   it("runs setup, SOUL setup, show, edit, and reset-cancel through mock Telegram polling", async () => {
+    vi.stubEnv("OPENCLAW_PERSONA_PROPOSER", "off");
     const root = makeRoot();
     await mkdir(join(root, "runtime"), { recursive: true });
     let nextText = "";
@@ -115,5 +120,40 @@ describe("telegram persona wizard e2e", () => {
     await expect(send("/cancel")).resolves.toContain("cancelled");
     expect(await readFile(join(root, "ARTIST.md"), "utf8")).toBe(beforeResetArtist);
     expect(fetchImpl.mock.calls.every(([input]) => String(input).startsWith("https://api.telegram.org/"))).toBe(true);
+  });
+
+  it("starts the AI rough-input setup by default", async () => {
+    const root = makeRoot();
+    await mkdir(join(root, "runtime"), { recursive: true });
+    const nextText = "/setup";
+    const replies: string[] = [];
+    const fetchImpl = vi.fn(async (input: string, init: RequestInit) => {
+      if (input.includes("/getUpdates")) {
+        return jsonResponse({
+          ok: true,
+          result: [
+            {
+              update_id: 900,
+              message: { message_id: 900, text: nextText, chat: { id: 555 }, from: { id: 123 } }
+            }
+          ]
+        });
+      }
+      const body = JSON.parse(String(init.body)) as { text: string };
+      replies.push(body.text);
+      return jsonResponse({ ok: true, result: { message_id: 901, text: body.text, chat: { id: 555 } } });
+    });
+    const worker = new TelegramBotWorker({
+      root,
+      config: enabledConfig,
+      token: "local-test-token",
+      ownerUserIds: new Set(["123"]),
+      fetchImpl
+    });
+
+    await worker.pollOnce();
+
+    expect(replies[0]).toContain("Artist persona AI setup started");
+    expect(replies[0]).toContain("rough 1-2 sentence");
   });
 });

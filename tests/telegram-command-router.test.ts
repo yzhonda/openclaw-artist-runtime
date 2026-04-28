@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensureSongState, updateSongState, writeSongBrief } from "../src/services/artistState";
 import { readAutopilotRunState } from "../src/services/autopilotService";
 import { classifyTelegramFreeText, readTelegramInbox, routeTelegramCommand } from "../src/services/telegramCommandRouter";
@@ -16,6 +16,10 @@ const baseInput = {
 function makeRoot(): string {
   return mkdtempSync(join(tmpdir(), "artist-runtime-telegram-router-"));
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("telegram command router", () => {
   it("routes /help to the command list", async () => {
@@ -99,15 +103,26 @@ describe("telegram command router", () => {
     const session = await readTelegramPersonaSession(root);
 
     expect(result.kind).toBe("setup");
-    expect(result.responseText).toContain("Artist persona setup started");
-    expect(result.responseText).toContain("Q1. Artist name");
+    expect(result.responseText).toContain("Artist persona AI setup started");
+    expect(result.responseText).toContain("rough 1-2 sentence");
     expect(session).toMatchObject({
       active: true,
-      mode: "setup_artist",
+      mode: "setup_ai_rough",
       stepIndex: 0,
       chatId: baseInput.chatId,
       userId: baseInput.fromUserId
     });
+  });
+
+  it("keeps the legacy setup wizard when the persona proposer flag is off", async () => {
+    vi.stubEnv("OPENCLAW_PERSONA_PROPOSER", "off");
+    const root = makeRoot();
+    const result = await routeTelegramCommand({ ...baseInput, text: "/setup", workspaceRoot: root });
+    const session = await readTelegramPersonaSession(root);
+
+    expect(result.responseText).toContain("Artist persona setup started");
+    expect(result.responseText).toContain("Q1. Artist name");
+    expect(session).toMatchObject({ mode: "setup_artist", stepIndex: 0 });
   });
 
   it("pauses and resumes autopilot through the control service", async () => {
