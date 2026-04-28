@@ -212,6 +212,7 @@ export interface TelegramPersonaSession {
   stepIndex: number;
   field?: PersonaField;
   checkFillQueue?: PersonaField[];
+  aiReviewProvider?: AiReviewProvider;
   migrateIntent?: string;
   migrateAiReviewProvider?: AiReviewProvider;
   pending: TelegramPersonaSessionPending;

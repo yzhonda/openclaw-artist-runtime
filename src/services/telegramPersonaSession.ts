@@ -55,6 +55,7 @@ export interface CreateTelegramPersonaSessionInput {
   userId: number;
   field?: PersonaField;
   checkFillQueue?: PersonaField[];
+  aiReviewProvider?: AiReviewProvider;
   migrateIntent?: string;
   migrateAiReviewProvider?: AiReviewProvider;
   pending?: TelegramPersonaSession["pending"];
@@ -67,6 +68,7 @@ export interface UpdateTelegramPersonaSessionInput {
   stepIndex?: number;
   field?: PersonaField;
   checkFillQueue?: PersonaField[];
+  aiReviewProvider?: AiReviewProvider;
   migrateIntent?: string;
   migrateAiReviewProvider?: AiReviewProvider;
   pending?: TelegramPersonaSession["pending"];
@@ -133,6 +135,7 @@ export async function createTelegramPersonaSession(
     stepIndex: 0,
     field: input.field,
     checkFillQueue: input.checkFillQueue,
+    aiReviewProvider: input.aiReviewProvider,
     migrateIntent: input.migrateIntent,
     migrateAiReviewProvider: input.migrateAiReviewProvider,
     pending: input.pending ?? {},
@@ -161,6 +164,7 @@ export async function updateTelegramPersonaSession(
     stepIndex: input.stepIndex ?? current.stepIndex,
     field: input.field ?? current.field,
     checkFillQueue: input.checkFillQueue ?? current.checkFillQueue,
+    aiReviewProvider: input.aiReviewProvider ?? current.aiReviewProvider,
     migrateIntent: input.migrateIntent ?? current.migrateIntent,
     migrateAiReviewProvider: input.migrateAiReviewProvider ?? current.migrateAiReviewProvider,
     pending: input.pending ?? current.pending,
@@ -194,7 +198,7 @@ export async function handleTelegramPersonaSessionMessage(
       return "Usage: /answer <text>";
     }
     if (session.mode === "setup_ai_rough") {
-      return startSetupAiReview(root, session, answer, now);
+      return startSetupAiReview(root, session, answer, now, session.aiReviewProvider);
     }
     if (session.mode === "setup_ai_review") {
       return answerSetupAiDraft(root, session, answer, now);
@@ -307,7 +311,7 @@ export async function handleTelegramPersonaSessionMessage(
     return "Persona setup is active. Send an answer, /skip, /back, /confirm, or /cancel.";
   }
   if (session.mode === "setup_ai_rough") {
-    return startSetupAiReview(root, session, text, now);
+    return startSetupAiReview(root, session, text, now, session.aiReviewProvider);
   }
   if (session.mode === "setup_ai_review") {
     return answerSetupAiDraft(root, session, text, now);
@@ -416,7 +420,8 @@ async function replaceCheckFillAiDraft(
   root: string,
   session: TelegramPersonaSession,
   field: PersonaField,
-  now: number
+  now: number,
+  aiReviewProvider?: AiReviewProvider
 ): Promise<TelegramPersonaSessionDraft[]> {
   const currentDrafts = session.pending.aiDrafts ?? [];
   const [artistMd, soulMd] = await Promise.all([
@@ -430,7 +435,7 @@ async function replaceCheckFillAiDraft(
       soulMd,
       roughInput: `Alternative draft for ${field}. Use the existing ARTIST.md and SOUL.md context.`
     }
-  });
+  }, { aiReviewProvider });
   const replacement = result.drafts[0] ?? {
     field,
     draft: defaultForSetupAiField(field),
@@ -464,7 +469,7 @@ async function skipCheckFillAiDraft(root: string, session: TelegramPersonaSessio
   }
   const skipCount = session.pending.skipCount?.[session.field] ?? 0;
   if (skipCount === 0) {
-    const nextDrafts = await replaceCheckFillAiDraft(root, session, session.field, now);
+    const nextDrafts = await replaceCheckFillAiDraft(root, session, session.field, now, session.aiReviewProvider);
     return [
       "Alternative draft generated.",
       "",
@@ -501,7 +506,8 @@ async function startSetupAiReview(
   root: string,
   session: TelegramPersonaSession,
   roughInput: string,
-  now: number
+  now: number,
+  aiReviewProvider?: AiReviewProvider
 ): Promise<string> {
   const normalized = roughInput.trim();
   if (!normalized) {
@@ -519,7 +525,7 @@ async function startSetupAiReview(
   const result = await proposePersonaFields({
     fields: setupAiFields,
     source: { artistMd: "", soulMd: "", roughInput: normalized }
-  });
+  }, { aiReviewProvider });
   const drafts = result.drafts.map((draft): TelegramPersonaSessionDraft => ({
     field: draft.field,
     draft: draft.status === "skipped" ? defaultForSetupAiField(draft.field) : draft.draft,
@@ -544,7 +550,8 @@ async function replaceSetupAiDraft(
   root: string,
   session: TelegramPersonaSession,
   field: PersonaField,
-  now: number
+  now: number,
+  aiReviewProvider?: AiReviewProvider
 ): Promise<TelegramPersonaSessionDraft[]> {
   const currentDrafts = session.pending.aiDrafts ?? defaultSetupAiDrafts();
   const result = await proposePersonaFields({
@@ -554,7 +561,7 @@ async function replaceSetupAiDraft(
       soulMd: "",
       roughInput: `Alternative draft for ${field}. Avoid repeating the previous draft exactly.`
     }
-  });
+  }, { aiReviewProvider });
   const replacement = result.drafts[0] ?? {
     field,
     draft: defaultForSetupAiField(field),
@@ -589,7 +596,7 @@ async function skipSetupAiDraft(root: string, session: TelegramPersonaSession, n
   }
   const skipCount = session.pending.skipCount?.[draft.field] ?? 0;
   if (skipCount === 0) {
-    const nextDrafts = await replaceSetupAiDraft(root, session, draft.field, now);
+    const nextDrafts = await replaceSetupAiDraft(root, session, draft.field, now, session.aiReviewProvider);
     return ["Alternative draft generated.", "", formatSetupAiDraft(nextDrafts, session.stepIndex)].join("\n");
   }
   await updateTelegramPersonaSession(root, {

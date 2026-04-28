@@ -128,7 +128,8 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     await createTelegramPersonaSession(input.workspaceRoot, {
       mode: "setup_ai_rough",
       chatId: input.chatId,
-      userId: input.fromUserId
+      userId: input.fromUserId,
+      aiReviewProvider: input.aiReviewProvider
     });
     return {
       kind: "setup",
@@ -173,13 +174,14 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
               soulMd,
               customSections: report.customSections
             }
-          });
+          }, { aiReviewProvider: input.aiReviewProvider });
           await createTelegramPersonaSession(input.workspaceRoot, {
             mode: "check_fill_chain",
             field,
             checkFillQueue: rest,
             chatId: input.chatId,
             userId: input.fromUserId,
+            aiReviewProvider: input.aiReviewProvider,
             pending: { aiDrafts: proposals.drafts, skipCount: {} }
           });
           return {
