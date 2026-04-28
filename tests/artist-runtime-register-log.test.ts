@@ -41,11 +41,12 @@ describe("artist-runtime command registration diagnostics", () => {
       }
     });
 
-    expect(commands).toEqual(["persona", "setup", "confirm", "cancel", "skip", "back", "answer"]);
+    expect(commands).toEqual(["persona", "song", "setup", "confirm", "cancel", "skip", "back", "answer"]);
     expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: persona");
+    expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: song");
     expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: answer");
     expect(info).toHaveBeenCalledWith(
-      "[artist-runtime] telegram plugin command specs: persona,setup,confirm,cancel,skip,back,answer (count=7, persona=true)"
+      "[artist-runtime] telegram plugin command specs: persona,song,setup,confirm,cancel,skip,back,answer (count=8, persona=true)"
     );
     expect(warn).not.toHaveBeenCalled();
 

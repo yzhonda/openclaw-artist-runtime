@@ -4,6 +4,7 @@ import { ArtistAutopilotService } from "../services/autopilotService.js";
 import { resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { routeTelegramCommand } from "../services/telegramCommandRouter.js";
 import { handleTelegramPersonaSessionMessage } from "../services/telegramPersonaSession.js";
+import { handleTelegramSongSessionMessage } from "../services/telegramSongSession.js";
 
 interface PluginCommandContextLike {
   senderId?: string;
@@ -94,10 +95,14 @@ async function handleSessionCommand(name: string, ctx: PluginCommandContextLike,
   const config = await resolveCommandRuntimeConfig(ctx, api);
   const text = name === "answer" ? (ctx.args?.trim() ?? "") : commandText(name, ctx);
   if (!text) {
-    return { text: "Usage: /answer <persona setup answer>" };
+    return { text: "Usage: /answer <wizard answer>" };
   }
-  const response = await handleTelegramPersonaSessionMessage(config.artist.workspaceRoot, text);
-  return { text: response ?? "No active persona setup session. Use /setup or /persona check fill first." };
+  const personaResponse = await handleTelegramPersonaSessionMessage(config.artist.workspaceRoot, text);
+  if (personaResponse) {
+    return { text: personaResponse };
+  }
+  const songResponse = await handleTelegramSongSessionMessage(config.artist.workspaceRoot, text);
+  return { text: songResponse ?? "No active artist-runtime wizard. Use /setup, /persona check fill, /song update <id>, or /song add first." };
 }
 
 function logRegistration(ok: boolean, name: string): void {
@@ -117,6 +122,14 @@ export function registerCommands(api: unknown): void {
     requireAuth: true,
     nativeProgressMessages: { telegram: "Checking artist persona..." },
     handler: (ctx) => handleRoutedCommand("persona", ctx as PluginCommandContextLike, apiConfig)
+  }, logRegistration);
+  safeRegisterCommand(api, {
+    name: "song",
+    description: "Show or update artist-runtime song records with /song update <id> and /song add.",
+    acceptsArgs: true,
+    requireAuth: true,
+    nativeProgressMessages: { telegram: "Checking artist song..." },
+    handler: (ctx) => handleRoutedCommand("song", ctx as PluginCommandContextLike, apiConfig)
   }, logRegistration);
   safeRegisterCommand(api, {
     name: "setup",

@@ -38,7 +38,7 @@ describe("song proposer", () => {
     expect(result.warnings).toEqual([]);
     expect(result.drafts).toHaveLength(8);
     expect(result.drafts.find((draft) => draft.field === "status")).toMatchObject({
-      draft: "draft_review",
+      draft: "idea",
       status: "proposed"
     });
     expect(result.drafts.find((draft) => draft.field === "nextAction")).toMatchObject({
@@ -59,7 +59,7 @@ describe("song proposer", () => {
     expect(result.warnings.join("\n")).toContain("notes");
     expect(result.drafts.find((draft) => draft.field === "status")).toMatchObject({
       status: "proposed",
-      draft: "draft_review"
+      draft: "idea"
     });
     expect(result.drafts.find((draft) => draft.field === "notes")).toMatchObject({
       status: "skipped",

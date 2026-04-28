@@ -48,6 +48,10 @@ export function isPersonaProposerEnabled(env: NodeJS.ProcessEnv = process.env): 
   return env.OPENCLAW_PERSONA_PROPOSER?.trim().toLowerCase() !== "off";
 }
 
+export function isSongProposerEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENCLAW_SONG_PROPOSER?.trim().toLowerCase() !== "off";
+}
+
 function isRelativeWorkspaceRoot(value: string): boolean {
   return value === "." || value === "./" || value === "" || value.startsWith("./") || value.startsWith("../");
 }

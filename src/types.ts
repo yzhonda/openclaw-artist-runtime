@@ -27,6 +27,10 @@ export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generat
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "scheduled", "published", "archived", "failed"] as const;
 export const sunoRunStatuses = ["blocked_dry_run", "blocked_authority", "accepted", "imported", "failed"] as const;
 export const songUpdateFields = [
+  "title",
+  "brief",
+  "style",
+  "lyrics",
   "status",
   "publicLinksSpotify",
   "publicLinksAppleMusic",
@@ -185,6 +189,8 @@ export type TelegramPersonaSessionMode =
   | "reset_confirm"
   | "migrate_confirm"
   | "check_fill_chain";
+
+export type SongSessionMode = "song_update_chain" | "song_add_rough" | "song_add_review";
 
 export interface PersonaAnswers {
   artistName: string;

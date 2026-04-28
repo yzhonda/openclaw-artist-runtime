@@ -37,7 +37,11 @@ interface ParsedSongDirective {
 }
 
 const fieldDefaults = new Map<SongUpdateField, string>([
-  ["status", "draft_review"],
+  ["title", "Untitled OpenClaw Song"],
+  ["brief", "A concise song brief for the next artist-runtime cycle."],
+  ["style", "intimate alternative pop with restrained electronic texture"],
+  ["lyrics", "Draft lyrics pending producer review."],
+  ["status", "idea"],
   ["publicLinksSpotify", "TBD"],
   ["publicLinksAppleMusic", "TBD"],
   ["publicLinksYoutubeMusic", "TBD"],
@@ -54,6 +58,14 @@ function truncate(value: string, maxLength: number): string {
 
 function fieldAliases(field: SongUpdateField): string[] {
   switch (field) {
+    case "title":
+      return ["title", "song title", "name"];
+    case "brief":
+      return ["brief", "song brief", "concept", "summary"];
+    case "style":
+      return ["style", "sound", "suno style", "production style"];
+    case "lyrics":
+      return ["lyrics", "lyric", "draft lyrics"];
     case "status":
       return ["status", "song status", "state"];
     case "publicLinksSpotify":

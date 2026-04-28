@@ -9,8 +9,13 @@ import { proposePersonaFields, type PersonaFieldDraft } from "./personaProposer.
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
 import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
+import {
+  handleTelegramSongSessionMessage,
+  startTelegramSongAddSession,
+  startTelegramSongUpdateSession
+} from "./telegramSongSession.js";
 import { formatPersonaMigratePlan, planPersonaMigrate } from "./personaMigrator.js";
-import { isPersonaProposerEnabled } from "./runtimeConfig.js";
+import { isPersonaProposerEnabled, isSongProposerEnabled } from "./runtimeConfig.js";
 import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
 import { formatSoulPersonaQuestion, readSoulPersonaSummary } from "./soulFileBuilder.js";
 import type { PersonaField } from "../types.js";
@@ -71,6 +76,13 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     };
   }
 
+  if (input.workspaceRoot) {
+    const songSessionResponse = await handleTelegramSongSessionMessage(input.workspaceRoot, text);
+    if (songSessionResponse) {
+      return { kind: "song", responseText: songSessionResponse, shouldStoreFreeText: false };
+    }
+  }
+
   const [commandRaw, ...args] = text.split(/\s+/);
   const command = commandRaw.toLowerCase();
   if (command === "/help" || command === "/start") {
@@ -81,6 +93,8 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/status - show autopilot status",
         "/songs - list recent songs",
         "/song <songId> - show song detail",
+        "/song update <songId> - update song files through AI draft review",
+        "/song add - create a new song draft through AI draft review",
         "/regen <songId> - queue a dry-run regeneration note",
         "/review <songId> - run a debug-only mock AI review",
         "/setup - start Telegram artist persona setup",
@@ -302,9 +316,46 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
   }
 
   if (command === "/song") {
+    const subcommand = args[0]?.toLowerCase();
+    if (subcommand === "update") {
+      const songId = args[1];
+      if (!input.workspaceRoot || !songId) {
+        return { kind: "song", responseText: "Usage: /song update <songId>", shouldStoreFreeText: false };
+      }
+      if (!isSongProposerEnabled()) {
+        return { kind: "song", responseText: "Plan v9.12 song proposer is disabled.", shouldStoreFreeText: false };
+      }
+      return {
+        kind: "song",
+        responseText: await startTelegramSongUpdateSession(input.workspaceRoot, {
+          songId,
+          chatId: input.chatId,
+          userId: input.fromUserId,
+          aiReviewProvider: input.aiReviewProvider
+        }),
+        shouldStoreFreeText: false
+      };
+    }
+    if (subcommand === "add") {
+      if (!input.workspaceRoot) {
+        return { kind: "song", responseText: "Song add unavailable: workspace root missing.", shouldStoreFreeText: false };
+      }
+      if (!isSongProposerEnabled()) {
+        return { kind: "song", responseText: "Plan v9.12 song proposer is disabled.", shouldStoreFreeText: false };
+      }
+      return {
+        kind: "song",
+        responseText: await startTelegramSongAddSession(input.workspaceRoot, {
+          chatId: input.chatId,
+          userId: input.fromUserId,
+          aiReviewProvider: input.aiReviewProvider
+        }),
+        shouldStoreFreeText: false
+      };
+    }
     const songId = args[0];
     if (!input.workspaceRoot || !songId) {
-      return { kind: "song", responseText: "Usage: /song <songId>", shouldStoreFreeText: false };
+      return { kind: "song", responseText: "Usage: /song <songId> | /song update <songId> | /song add", shouldStoreFreeText: false };
     }
     const song = await getSongDetail(input.workspaceRoot, songId);
     return {
