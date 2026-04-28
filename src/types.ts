@@ -26,6 +26,16 @@ export const sunoWorkerStates = ["disconnected", "connecting", "connected", "gen
 export const autopilotStages = ["idle", "planning", "prompt_pack", "suno_generation", "take_selection", "asset_generation", "publishing", "completed", "paused", "failed_closed"] as const;
 export const songStatuses = ["idea", "brief", "lyrics", "suno_prompt_pack", "suno_running", "takes_imported", "take_selected", "social_assets", "scheduled", "published", "archived", "failed"] as const;
 export const sunoRunStatuses = ["blocked_dry_run", "blocked_authority", "accepted", "imported", "failed"] as const;
+export const songUpdateFields = [
+  "status",
+  "publicLinksSpotify",
+  "publicLinksAppleMusic",
+  "publicLinksYoutubeMusic",
+  "publicLinksOther",
+  "selectedTake",
+  "notes",
+  "nextAction"
+] as const;
 export const alertSeverities = ["info", "warning", "critical"] as const;
 export const setupChecklistStates = ["complete", "pending", "attention"] as const;
 export const sunoLoginHandoffStates = ["waiting_for_operator", "completed"] as const;
@@ -50,6 +60,7 @@ export type SunoWorkerState = (typeof sunoWorkerStates)[number];
 export type AutopilotStage = (typeof autopilotStages)[number];
 export type SongStatus = (typeof songStatuses)[number];
 export type SunoRunStatus = (typeof sunoRunStatuses)[number];
+export type SongUpdateField = (typeof songUpdateFields)[number];
 export type AlertSeverity = (typeof alertSeverities)[number];
 export type SetupChecklistState = (typeof setupChecklistStates)[number];
 export type SunoLoginHandoffState = (typeof sunoLoginHandoffStates)[number];
