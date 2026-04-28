@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AiReviewProvider, DebugAiReviewInput, DebugAiReviewResult } from "../types.js";
+import { callAiProvider } from "./aiProviderClient.js";
 
 export interface DebugAiReviewer {
   review(input: DebugAiReviewInput): Promise<DebugAiReviewResult>;
@@ -35,10 +36,11 @@ class NotConfiguredDebugAiReviewer implements DebugAiReviewer {
   constructor(private readonly provider: AiReviewProvider) {}
 
   async review(input: DebugAiReviewInput): Promise<DebugAiReviewResult> {
+    const summary = await callAiProvider(`Debug review unavailable for ${input.songId}`, { provider: this.provider });
     return {
       songId: input.songId,
       score: 0,
-      summary: `AI provider '${this.provider}' is not configured. Debug review did not call an external model.`,
+      summary: `${summary} Debug review did not call an external model.`,
       reasons: [],
       cautions: ["Configure a debug AI provider before expecting scored review output."],
       provider: "not_configured",

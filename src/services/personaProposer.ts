@@ -1,0 +1,179 @@
+import type { AiReviewProvider, PersonaField } from "../types.js";
+import { callAiProvider } from "./aiProviderClient.js";
+import { secretLikePattern, parseIntentDirectives } from "./personaMigrator.js";
+import { artistPersonaQuestions } from "./personaWizardQuestions.js";
+import { soulPersonaQuestions } from "./soulFileBuilder.js";
+
+export interface PersonaProposerSourceContext {
+  artistMd: string;
+  soulMd: string;
+  roughInput?: string;
+  customSections?: string[];
+}
+
+export interface PersonaFieldDraft {
+  field: PersonaField;
+  draft: string;
+  reasoning?: string;
+  status: "proposed" | "skipped" | "low_confidence";
+}
+
+export interface PersonaProposerRequest {
+  fields: PersonaField[];
+  source: PersonaProposerSourceContext;
+}
+
+export interface PersonaProposerResult {
+  drafts: PersonaFieldDraft[];
+  provider: AiReviewProvider | "mock" | "not_configured";
+  warnings: string[];
+}
+
+const fieldDefaults = new Map<PersonaField, string>([
+  ...artistPersonaQuestions.map((question): [PersonaField, string] => [question.field, question.defaultValue]),
+  ["soul-tone", soulPersonaQuestions[0].defaultValue],
+  ["soul-refusal", soulPersonaQuestions[1].defaultValue]
+]);
+
+function truncate(value: string, maxLength: number): string {
+  const trimmed = value.trim();
+  return trimmed.length <= maxLength ? trimmed : `${trimmed.slice(0, maxLength - 3)}...`;
+}
+
+function statusForField(raw: string, field: PersonaField): PersonaFieldDraft["status"] {
+  return secretLikePattern.test(raw) ? "skipped" : fieldDefaults.has(field) ? "proposed" : "low_confidence";
+}
+
+function splitOrigin(value: string): { draft: string; reasoning?: string } {
+  const match = value.match(/\s*\(origin:\s*([^)]+)\)\s*$/i);
+  if (!match) {
+    return { draft: value.trim() };
+  }
+  return {
+    draft: value.slice(0, match.index).trim(),
+    reasoning: match[1].trim()
+  };
+}
+
+export function buildPersonaProposerPrompt(req: PersonaProposerRequest): string {
+  return [
+    "System: You help build a concise musical artist persona.",
+    "Return one line per requested field using: fieldKey: value (origin: source).",
+    "Keep each value under 200 characters. Do not include secrets, tokens, cookies, or credentials.",
+    "",
+    `Requested fields: ${req.fields.join(", ")}`,
+    req.source.roughInput ? `Rough input: ${req.source.roughInput}` : "Rough input: (none)",
+    req.source.customSections?.length ? `Custom sections: ${req.source.customSections.join(", ")}` : "Custom sections: (none)",
+    "",
+    "ARTIST.md:",
+    truncate(req.source.artistMd, 4000),
+    "",
+    "SOUL.md:",
+    truncate(req.source.soulMd, 2000)
+  ].join("\n");
+}
+
+export function parsePersonaProposerResponse(raw: string, fields: PersonaField[]): PersonaFieldDraft[] {
+  const directives = parseIntentDirectives(raw);
+  return fields.map((field) => {
+    const directive = directives.get(field);
+    if (!directive) {
+      return {
+        field,
+        draft: fieldDefaults.get(field) ?? "<TBD>",
+        status: "low_confidence",
+        reasoning: "provider response did not include this field"
+      };
+    }
+    if (directive.skip) {
+      return { field, draft: "", status: "skipped", reasoning: "provider requested skip" };
+    }
+    const parsed = splitOrigin(directive.value);
+    return {
+      field,
+      draft: parsed.draft,
+      reasoning: parsed.reasoning,
+      status: statusForField(parsed.draft, field)
+    };
+  });
+}
+
+function mockDrafts(fields: PersonaField[]): PersonaFieldDraft[] {
+  return fields.map((field) => ({
+    field,
+    draft: fieldDefaults.get(field) ?? "<TBD>",
+    status: "proposed",
+    reasoning: "mock provider default"
+  }));
+}
+
+function secretFieldsFromDirectives(value: string | undefined, fields: PersonaField[]): Set<PersonaField> {
+  if (!value) {
+    return new Set();
+  }
+  const directives = parseIntentDirectives(value);
+  const secretFields = new Set<PersonaField>();
+  for (const field of fields) {
+    const directive = directives.get(field);
+    if (directive && secretLikePattern.test(directive.value)) {
+      secretFields.add(field);
+    }
+  }
+  return secretFields;
+}
+
+function applySecretSkips(drafts: PersonaFieldDraft[], secretFields: Set<PersonaField>, reason: string): PersonaFieldDraft[] {
+  return drafts.map((draft) =>
+    secretFields.has(draft.field)
+      ? { field: draft.field, draft: "", status: "skipped", reasoning: reason }
+      : draft
+  );
+}
+
+export async function proposePersonaFields(
+  req: PersonaProposerRequest,
+  options: { aiReviewProvider?: AiReviewProvider } = {}
+): Promise<PersonaProposerResult> {
+  const provider = options.aiReviewProvider ?? "mock";
+  const warnings: string[] = [];
+  const roughInputSecretFields = secretFieldsFromDirectives(req.source.roughInput, req.fields);
+  if (roughInputSecretFields.size > 0) {
+    warnings.push(`rough input contains secret-like text for: ${[...roughInputSecretFields].join(", ")}`);
+  } else if (req.source.roughInput && secretLikePattern.test(req.source.roughInput)) {
+    warnings.push("rough input contains secret-like text; requested fields were skipped");
+    return {
+      provider,
+      warnings,
+      drafts: req.fields.map((field) => ({ field, draft: "", status: "skipped", reasoning: "secret-like rough input" }))
+    };
+  }
+  if (provider === "mock") {
+    return {
+      provider: "mock",
+      warnings,
+      drafts: applySecretSkips(mockDrafts(req.fields), roughInputSecretFields, "secret-like rough input")
+    };
+  }
+  const raw = await callAiProvider(buildPersonaProposerPrompt(req), { provider });
+  const responseSecretFields = secretFieldsFromDirectives(raw, req.fields);
+  if (responseSecretFields.size > 0) {
+    warnings.push(`AI response contains secret-like text for: ${[...responseSecretFields].join(", ")}`);
+  } else if (secretLikePattern.test(raw)) {
+    warnings.push("AI response contains secret-like text; requested fields were skipped");
+    return {
+      provider,
+      warnings,
+      drafts: req.fields.map((field) => ({ field, draft: "", status: "skipped", reasoning: "secret-like AI response" }))
+    };
+  }
+  const drafts = applySecretSkips(
+    applySecretSkips(parsePersonaProposerResponse(raw, req.fields), roughInputSecretFields, "secret-like rough input"),
+    responseSecretFields,
+    "secret-like AI response"
+  );
+  if (raw.includes("is not configured")) {
+    warnings.push(`AI provider ${provider} is not configured; parsed fallback response only`);
+    return { provider: "not_configured", warnings, drafts };
+  }
+  return { provider, warnings, drafts };
+}

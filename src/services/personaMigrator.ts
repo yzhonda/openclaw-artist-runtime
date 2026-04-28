@@ -1,8 +1,8 @@
-import { constants } from "node:fs";
-import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AiReviewProvider, PersonaField } from "../types.js";
 import { createDebugAiReviewer } from "./debugAiReviewService.js";
+import { backupPathIfPresentOnce } from "./personaBackup.js";
 import { auditPersonaCompleteness } from "./personaFieldAuditor.js";
 import {
   artistPersonaBlockEnd,
@@ -58,7 +58,7 @@ const artistMarkerSections = [
   "Suno Production Profile"
 ];
 const soulMarkerSections = ["Telegram Persona Voice"];
-const secretLikePattern = /(TELEGRAM_BOT_TOKEN|bot\d+:[A-Za-z0-9_-]{30,}|API[_ -]?KEY|COOKIE|CREDENTIAL|PASSWORD|SECRET)/i;
+export const secretLikePattern = /(TELEGRAM_BOT_TOKEN|bot\d+:[A-Za-z0-9_-]{30,}|API[_ -]?KEY|COOKIE|CREDENTIAL|PASSWORD|SECRET)/i;
 
 function artistPath(root: string): string {
   return join(root, "ARTIST.md");
@@ -150,14 +150,6 @@ async function buildMigratedSoul(root: string, drafts: PersonaMigrateDraft[] = [
     return [contents.trimEnd(), "", markerBlock, ""].join("\n");
   }
   return withHeading("SOUL.md", markerBlock, customBlocks(contents, soulMarkerSections));
-}
-
-async function backupIfPresent(source: string, backup: string): Promise<void> {
-  if (!(await exists(source))) {
-    return;
-  }
-  await mkdir(dirname(backup), { recursive: true });
-  await copyFile(source, backup, constants.COPYFILE_EXCL);
 }
 
 function normalizeIntent(intent?: string): string | undefined {
@@ -361,8 +353,8 @@ export async function executePersonaMigrate(root: string, plan: PersonaMigratePl
   }
   const [artist, soul] = await Promise.all([buildMigratedArtist(root, plan.proposedDrafts), buildMigratedSoul(root, plan.proposedDrafts)]);
   await Promise.all([
-    backupIfPresent(artistPath(root), plan.artistBackupPath),
-    backupIfPresent(soulPath(root), plan.soulBackupPath)
+    backupPathIfPresentOnce(artistPath(root), plan.artistBackupPath, `migrate:${plan.artistBackupPath}`),
+    backupPathIfPresentOnce(soulPath(root), plan.soulBackupPath, `migrate:${plan.soulBackupPath}`)
   ]);
   await Promise.all([
     mkdir(dirname(artistPath(root)), { recursive: true }),
