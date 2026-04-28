@@ -138,11 +138,19 @@ describe("telegram persona check command", () => {
   it("returns mock suggestion placeholder for suggest mode", async () => {
     const root = makeRoot();
     await writeSparsePersona(root);
+    const beforeArtist = await readFile(join(root, "ARTIST.md"), "utf8");
+    const beforeSoul = await readFile(join(root, "SOUL.md"), "utf8");
 
     const result = await routeTelegramCommand({ ...base, text: "/persona check suggest", workspaceRoot: root, aiReviewProvider: "mock" });
 
     expect(result.responseText).toContain("Persona suggestion mode");
+    expect(result.responseText).toContain("Provider: mock");
+    expect(result.responseText).toContain("- socialVoice:");
+    expect(result.responseText).toContain("- soul-refusal:");
     expect(result.responseText).toContain("Mock provider");
+    await expect(readTelegramPersonaSession(root)).resolves.toBeUndefined();
+    await expect(readFile(join(root, "ARTIST.md"), "utf8")).resolves.toBe(beforeArtist);
+    await expect(readFile(join(root, "SOUL.md"), "utf8")).resolves.toBe(beforeSoul);
   });
 
   it("summarizes audit output when the full report would exceed one Telegram message", async () => {
