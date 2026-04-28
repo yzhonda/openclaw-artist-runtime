@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { writeArtistPersona } from "../src/services/personaFileBuilder";
 import { routeTelegramCommand } from "../src/services/telegramCommandRouter";
 import { handleTelegramPersonaSessionMessage, readTelegramPersonaSession } from "../src/services/telegramPersonaSession";
@@ -13,6 +13,10 @@ const base = { fromUserId: 123, chatId: 456 };
 function makeRoot(): string {
   return mkdtempSync(join(tmpdir(), "artist-runtime-persona-check-"));
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 async function writeSparsePersona(root: string): Promise<void> {
   await writeFile(
@@ -84,6 +88,7 @@ describe("telegram persona check command", () => {
   });
 
   it("fills missing fields through a chained edit session", async () => {
+    vi.stubEnv("OPENCLAW_PERSONA_PROPOSER", "off");
     const root = makeRoot();
     await writeFile(
       join(root, "ARTIST.md"),

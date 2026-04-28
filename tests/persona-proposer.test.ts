@@ -91,4 +91,17 @@ describe("persona proposer", () => {
       { field: "obsessions", draft: "satire and infrastructure", reasoning: "Lyrics", status: "proposed" }
     ]);
   });
+
+  it("marks a field skipped when provider response contains secret-like text", () => {
+    const drafts = parsePersonaProposerResponse(
+      `socialVoice: ${["TELEGRAM", "BOT", "TOKEN"].join("_")}=do-not-store (origin: unsafe response)`,
+      ["socialVoice"]
+    );
+
+    expect(drafts[0]).toMatchObject({
+      field: "socialVoice",
+      status: "skipped",
+      reasoning: "unsafe response"
+    });
+  });
 });

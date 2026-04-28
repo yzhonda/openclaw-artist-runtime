@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TelegramConfig } from "../src/types";
 import { TelegramBotWorker } from "../src/services/telegramBotWorker";
 import { writeSoulPersona } from "../src/services/soulFileBuilder";
@@ -101,6 +101,10 @@ function makeTelegramFetch(messages: string[]) {
   return { fetchImpl, sent };
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("telegram persona check e2e", () => {
   it("does not fetch persona check updates while Telegram is disabled", async () => {
     const fetchImpl = vi.fn();
@@ -119,6 +123,7 @@ describe("telegram persona check e2e", () => {
   });
 
   it("diagnoses, fills a chained field, skips the next field, and returns mock suggestions", async () => {
+    vi.stubEnv("OPENCLAW_PERSONA_PROPOSER", "off");
     const root = makeRoot();
     await suppressSetupAnnouncement(root);
     await writeImportedPersona(root);

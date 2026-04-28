@@ -203,6 +203,7 @@ export interface TelegramPersonaSessionPending extends Partial<PersonaAnswers> {
   aiDrafts?: TelegramPersonaSessionDraft[];
   skipCount?: Partial<Record<PersonaField, number>>;
   roughSkipCount?: number;
+  editValue?: string;
 }
 
 export interface TelegramPersonaSession {

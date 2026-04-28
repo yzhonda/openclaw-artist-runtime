@@ -15,6 +15,7 @@ import {
   writePersonaCompletionMarker,
   type ArtistPersonaSummary
 } from "./personaFileBuilder.js";
+import { ensureBackupOnce } from "./personaBackup.js";
 import {
   artistPersonaQuestions,
   formatArtistPersonaPreview,
@@ -56,6 +57,7 @@ export interface CreateTelegramPersonaSessionInput {
   checkFillQueue?: PersonaField[];
   migrateIntent?: string;
   migrateAiReviewProvider?: AiReviewProvider;
+  pending?: TelegramPersonaSession["pending"];
   now?: number;
   ttlMs?: number;
 }
@@ -133,7 +135,7 @@ export async function createTelegramPersonaSession(
     checkFillQueue: input.checkFillQueue,
     migrateIntent: input.migrateIntent,
     migrateAiReviewProvider: input.migrateAiReviewProvider,
-    pending: {},
+    pending: input.pending ?? {},
     history: [],
     startedAt: now,
     updatedAt: now,
@@ -266,6 +268,9 @@ export async function handleTelegramPersonaSessionMessage(
       return skipSetupAiDraft(root, session, now);
     }
     if (session.mode === "check_fill_chain") {
+      if (isCheckFillAiSession(session)) {
+        return skipCheckFillAiDraft(root, session, now);
+      }
       const [nextField, ...rest] = session.checkFillQueue ?? [];
       if (!nextField) {
         await cancelTelegramPersonaSession(root);
@@ -375,6 +380,102 @@ function formatSetupAiDraft(drafts: TelegramPersonaSessionDraft[], stepIndex: nu
     "",
     "Commands: /confirm accepts, /answer <text> overrides, /skip asks for another draft, /back goes back, /cancel stops setup."
   ].filter(Boolean).join("\n");
+}
+
+function allCheckFillFields(session: TelegramPersonaSession): PersonaField[] {
+  return [session.field, ...(session.checkFillQueue ?? [])].filter((field): field is PersonaField => Boolean(field));
+}
+
+function isCheckFillAiSession(session: TelegramPersonaSession): boolean {
+  return session.mode === "check_fill_chain" && Array.isArray(session.pending.aiDrafts);
+}
+
+function draftForField(session: TelegramPersonaSession, field: PersonaField | undefined): TelegramPersonaSessionDraft | undefined {
+  return field ? session.pending.aiDrafts?.find((draft) => draft.field === field) : undefined;
+}
+
+function formatCheckFillAiDraft(session: TelegramPersonaSession): string {
+  const draft = draftForField(session, session.field);
+  if (!draft || !session.field) {
+    return "All fields complete. Use /persona show to review it.";
+  }
+  const drafts = session.pending.aiDrafts ?? [];
+  const position = drafts.findIndex((candidate) => candidate.field === session.field) + 1;
+  const total = drafts.length || allCheckFillFields(session).length;
+  return [
+    `Persona fill draft ${position}/${total}: ${draft.field}`,
+    `AI draft: ${draft.draft || defaultForSetupAiField(draft.field)}`,
+    draft.reasoning ? `Reasoning: ${draft.reasoning}` : undefined,
+    draft.status === "skipped" ? "Warning: this field was skipped by the proposer." : undefined,
+    "",
+    "Commands: /confirm accepts, /answer <text> overrides, /skip asks for another draft, /cancel stops."
+  ].filter(Boolean).join("\n");
+}
+
+async function replaceCheckFillAiDraft(
+  root: string,
+  session: TelegramPersonaSession,
+  field: PersonaField,
+  now: number
+): Promise<TelegramPersonaSessionDraft[]> {
+  const currentDrafts = session.pending.aiDrafts ?? [];
+  const [artistMd, soulMd] = await Promise.all([
+    readFile(join(root, "ARTIST.md"), "utf8").catch(() => ""),
+    readFile(join(root, "SOUL.md"), "utf8").catch(() => "")
+  ]);
+  const result = await proposePersonaFields({
+    fields: [field],
+    source: {
+      artistMd,
+      soulMd,
+      roughInput: `Alternative draft for ${field}. Use the existing ARTIST.md and SOUL.md context.`
+    }
+  });
+  const replacement = result.drafts[0] ?? {
+    field,
+    draft: defaultForSetupAiField(field),
+    reasoning: "fallback default",
+    status: "proposed"
+  };
+  const nextDrafts = currentDrafts.map((draft) =>
+    draft.field === field
+      ? {
+          field,
+          draft: replacement.draft || defaultForSetupAiField(field),
+          reasoning: replacement.reasoning ?? "alternative mock draft",
+          status: replacement.status
+        }
+      : draft
+  );
+  await updateTelegramPersonaSession(root, {
+    pending: {
+      ...session.pending,
+      aiDrafts: nextDrafts,
+      skipCount: { ...session.pending.skipCount, [field]: (session.pending.skipCount?.[field] ?? 0) + 1 }
+    },
+    now
+  });
+  return nextDrafts;
+}
+
+async function skipCheckFillAiDraft(root: string, session: TelegramPersonaSession, now: number): Promise<string> {
+  if (!session.field) {
+    return "All fields complete. Use /persona show to review it.";
+  }
+  const skipCount = session.pending.skipCount?.[session.field] ?? 0;
+  if (skipCount === 0) {
+    const nextDrafts = await replaceCheckFillAiDraft(root, session, session.field, now);
+    return [
+      "Alternative draft generated.",
+      "",
+      formatCheckFillAiDraft({ ...session, pending: { ...session.pending, aiDrafts: nextDrafts } })
+    ].join("\n");
+  }
+  await updateTelegramPersonaSession(root, {
+    pending: { ...session.pending, skipCount: { ...session.pending.skipCount, [session.field]: skipCount + 1 } },
+    now
+  });
+  return `Skip ${session.field}? Reply /confirm skip to leave this field unchanged, or /answer <text> to override.`;
 }
 
 async function handleSetupAiRoughSkip(root: string, session: TelegramPersonaSession, now: number): Promise<string> {
@@ -625,7 +726,7 @@ async function stageEditField(root: string, session: TelegramPersonaSession, val
     return "Edit value is too short. Send a longer value or /cancel.";
   }
   await updateTelegramPersonaSession(root, {
-    pending: { editValue: trimmed } as Partial<PersonaAnswers>,
+    pending: { ...session.pending, editValue: trimmed },
     stepIndex: 1,
     now
   });
@@ -633,12 +734,26 @@ async function stageEditField(root: string, session: TelegramPersonaSession, val
 }
 
 async function confirmEditField(root: string, session: TelegramPersonaSession): Promise<string> {
-  const value = (session.pending as Partial<PersonaAnswers> & { editValue?: string }).editValue;
+  const aiDraft = isCheckFillAiSession(session) ? draftForField(session, session.field) : undefined;
+  const aiDraftSkipCount = aiDraft ? session.pending.skipCount?.[aiDraft.field] ?? 0 : 0;
+  const isSkipConfirm = Boolean(aiDraft && aiDraftSkipCount >= 2);
+  const value = isSkipConfirm
+    ? undefined
+    : (session.pending as Partial<PersonaAnswers> & { editValue?: string }).editValue ?? aiDraft?.draft;
   if (!value) {
+    if (isSkipConfirm && session.mode === "check_fill_chain") {
+      return advanceCheckFillChain(root, session, "Skipped.");
+    }
     return "No pending edit value yet. Send the new value first, or /cancel.";
   }
   const artistKey = artistFieldKey(session.field);
   const soulKey = soulFieldKey(session.field);
+  if (session.mode === "check_fill_chain") {
+    await Promise.all([
+      artistKey ? ensureBackupOnce(root, `check-fill:${session.startedAt}:${session.chatId}:${session.userId}`, "ARTIST") : Promise.resolve(null),
+      soulKey ? ensureBackupOnce(root, `check-fill:${session.startedAt}:${session.chatId}:${session.userId}`, "SOUL") : Promise.resolve(null)
+    ]);
+  }
   if (artistKey) {
     await updateArtistPersonaField(root, artistKey, value);
   } else if (soulKey) {
@@ -650,19 +765,29 @@ async function confirmEditField(root: string, session: TelegramPersonaSession): 
     await cancelTelegramPersonaSession(root);
     return "Persona field saved. Use /persona show to review it.";
   }
+  return advanceCheckFillChain(root, session, "Persona field saved.");
+}
+
+async function advanceCheckFillChain(root: string, session: TelegramPersonaSession, prefix: string): Promise<string> {
   const remaining = session.checkFillQueue ?? [];
   if (remaining.length === 0) {
     await cancelTelegramPersonaSession(root);
-    return "Persona field saved. All fields complete. Use /persona show to review it.";
+    return `${prefix} All fields complete. Use /persona show to review it.`;
   }
   const [nextField, ...rest] = remaining;
+  const nextPending = isCheckFillAiSession(session)
+    ? { ...session.pending, editValue: undefined, skipCount: {}, aiDrafts: session.pending.aiDrafts }
+    : {};
   await updateTelegramPersonaSession(root, {
     field: nextField,
     checkFillQueue: rest,
-    pending: {},
+    pending: nextPending,
     stepIndex: 0
   });
-  return `Persona field saved. Next: ${nextField}. ${formatEditPrompt(nextField)} Send /skip to skip this field.`;
+  if (isCheckFillAiSession(session)) {
+    return `${prefix} Next: ${nextField}. ${formatCheckFillAiDraft({ ...session, field: nextField, checkFillQueue: rest, pending: nextPending })}`;
+  }
+  return `${prefix} Next: ${nextField}. ${formatEditPrompt(nextField)} Send /skip to skip this field.`;
 }
 
 async function advanceArtistSetup(
