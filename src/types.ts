@@ -290,6 +290,7 @@ export interface DailyVoiceDraft {
   charCount: number;
   sourceFragments: string[];
   selectedSource?: { url?: string; author?: string };
+  rationale?: string;
   createdAt: string;
 }
 

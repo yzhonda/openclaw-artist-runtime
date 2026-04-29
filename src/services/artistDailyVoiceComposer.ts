@@ -129,13 +129,38 @@ function selectObservation(observation: string): DailyVoiceObservation | undefin
   return entries.find((entry) => entry.url) ?? entries[0];
 }
 
-function parsePost(raw: string, selected?: DailyVoiceObservation): { opinion: string; url?: string } {
+function parseField(raw: string, field: string): string | undefined {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = raw.match(new RegExp(`^${escaped}:\\s*([\\s\\S]*?)(?=\\n[a-z_]+:\\s*|$)`, "im"));
+  return match?.[1]?.trim() || undefined;
+}
+
+function summarizePersonaBasis(artistMd: string, soulMd: string): { obsession: string; tone: string } {
+  return {
+    obsession: artistMd.match(/obsessions?:\s*(.+)/i)?.[1]?.trim() ?? "artist persona",
+    tone: soulMd.match(/tone:\s*(.+)/i)?.[1]?.trim() ?? "SOUL.md tone"
+  };
+}
+
+function fitRationale(value: string): string {
+  return fitDraft(value).replace(/\n{3,}/g, "\n\n");
+}
+
+function parsePost(raw: string, selected?: DailyVoiceObservation): { opinion: string; url?: string; author?: string; rationale?: string } {
   const normalized = normalizeText(raw);
-  const url = normalized.match(sourceUrlPattern)?.[0] ?? selected?.url;
-  const opinionSource = url ? normalized.replace(url, "") : normalized;
+  const selectedUrl = parseField(normalized, "selected_url");
+  const selectedAuthor = parseField(normalized, "selected_author");
+  const fieldOpinion = parseField(normalized, "opinion");
+  const fieldRationale = parseField(normalized, "rationale");
+  const url = (selectedUrl && selectedUrl !== "none" ? selectedUrl.match(sourceUrlPattern)?.[0] : undefined)
+    ?? normalized.match(sourceUrlPattern)?.[0]
+    ?? selected?.url;
+  const opinionSource = fieldOpinion ?? (url ? normalized.replace(url, "") : normalized);
   return {
     opinion: fitDraft(opinionSource),
-    url
+    url,
+    author: selectedAuthor && selectedAuthor !== "none" ? selectedAuthor.replace(/^@/, "") : selected?.author,
+    rationale: fieldRationale ? fitRationale(fieldRationale) : undefined
   };
 }
 
@@ -174,21 +199,32 @@ async function latestSongFragment(root: string): Promise<string> {
 }
 
 function mockDraft(context: { artistMd: string; soulMd: string; observation: string; fragment: string; selected?: DailyVoiceObservation }): string {
-  const obsession = context.artistMd.match(/obsessions?:\s*(.+)/i)?.[1]?.trim()
+  const basis = summarizePersonaBasis(context.artistMd, context.soulMd);
+  const obsession = basis.obsession
     ?? context.selected?.text
     ?? "街の端が今日も少しだけ欠けていた";
-  const tone = context.soulMd.match(/tone:\s*(.+)/i)?.[1]?.trim() ?? "観察ベースで短く";
+  const tone = basis.tone;
   const anchor = context.selected?.text ?? obsession;
   const opinion = fitDraft(`${tone}。「${anchor.slice(0, 48)}」には、便利さの影だけ出てる。言い切らず、でも目は逸らさない。`);
-  return buildDraftText(opinion, context.selected?.url);
+  const rationale = fitRationale(`ARTIST.md の obsession「${basis.obsession}」と SOUL.md の tone「${basis.tone}」に重なる observation を選択。`);
+  return [
+    `selected_url: ${context.selected?.url ?? "none"}`,
+    `selected_author: ${context.selected?.author ?? "none"}`,
+    `opinion: ${opinion}`,
+    `rationale: ${rationale}`
+  ].join("\n");
 }
 
 function buildPrompt(context: { artistMd: string; soulMd: string; observation: string; heartbeat: string; fragment: string; selected?: DailyVoiceObservation }): string {
   return [
     "Pick exactly one observation that genuinely catches the artist's attention.",
     "Write a single X post as used::honda: a personal opinion or reaction, not a summary of many observations.",
-    "Format exactly: opinion text, then a blank line, then the source URL if one is supplied.",
-    "Output exactly one post. Do not repeat any sentence. Do not summarize many observations.",
+    "Output exactly these fields:",
+    "selected_url: <url-or-none>",
+    "selected_author: <handle-or-none>",
+    "opinion: <text within 257 chars>",
+    "rationale: <one or two short lines explaining which observation was picked, and what part of ARTIST.md/SOUL.md drove the angle>",
+    "Do not repeat any sentence. Do not summarize many observations.",
     "Tone: observational, intelligent, lightly satirical if earned, never bot-like, no boilerplate, no hashtags by default.",
     `Opinion length: ${maxBodyChars} characters max. Do not include secrets.`,
     "",
@@ -230,7 +266,8 @@ export async function composeDailyVoice(root: string, options: ComposeDailyVoice
   assertSafe("daily_voice_ai_response", raw);
   const post = parsePost(raw, selected);
   const draftText = buildDraftText(post.opinion, post.url);
-  assertSafe("daily_voice_final_text", draftText);
+  const rationale = post.rationale;
+  assertSafe("daily_voice_final_text", [draftText, rationale].filter(Boolean).join("\n"));
   return {
     draftText,
     draftHash: hashDailyVoiceDraft(draftText),
@@ -241,7 +278,10 @@ export async function composeDailyVoice(root: string, options: ComposeDailyVoice
       observation ? anon("observation", observation) : undefined,
       fragment ? anon("production", fragment) : undefined
     ].filter((value): value is string => Boolean(value)),
-    selectedSource: selected ? { url: selected.url, author: selected.author } : undefined,
+    selectedSource: (post.url ?? selected?.url ?? post.author ?? selected?.author)
+      ? { url: post.url ?? selected?.url, author: post.author ?? selected?.author }
+      : undefined,
+    rationale,
     createdAt: (options.now ?? new Date()).toISOString()
   };
 }
