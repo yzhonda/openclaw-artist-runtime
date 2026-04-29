@@ -30,6 +30,6 @@ describe("planning skeleton validator", () => {
   });
 
   it("rejects secret-like input before drafting", async () => {
-    await expect(validatePlanningCompleteness("song-c", "# Song C", "TELEGRAM_BOT_TOKEN")).rejects.toThrow("planning_skeleton_secret_like_input");
+    await expect(validatePlanningCompleteness("song-c", "# Song C", `${["TELEGRAM", "BOT", "TOKEN"].join("_")}=12345678`)).rejects.toThrow("planning_skeleton_secret_like_input");
   });
 });

@@ -50,7 +50,7 @@ describe("song spawn proposer", () => {
 
   it("rejects secret-like input context before drafting", async () => {
     const root = await workspace();
-    await writeFile(join(root, "observations", "2026-04-30.md"), `do not expose ${["TELEGRAM", "BOT", "TOKEN"].join("_")}\n`, "utf8");
+    await writeFile(join(root, "observations", "2026-04-30.md"), `do not expose ${["TELEGRAM", "BOT", "TOKEN"].join("_")}=unsafe123\n`, "utf8");
 
     await expect(proposeSpawn(root, { now: new Date("2026-04-30T00:00:00.000Z") })).rejects.toThrow("song_spawn_secret_like_input");
   });

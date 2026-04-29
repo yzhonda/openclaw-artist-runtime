@@ -89,7 +89,7 @@ describe("x publish action registry", () => {
   });
 
   it("rejects secret-like input, AI response, and final text", async () => {
-    const secretLike = ["COOKIE", "leak"].join("=");
+    const secretLike = ["COOKIE", "leak1234"].join("=");
     await expect(buildXPostDraft({
       root: "/tmp/unused",
       songState: song({ title: secretLike }),

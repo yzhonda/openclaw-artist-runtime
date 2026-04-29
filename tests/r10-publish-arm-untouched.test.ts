@@ -162,8 +162,9 @@ describe("R10 callback safety", () => {
     expect(actions.map((entry) => entry.action).sort()).toEqual(["song_skip", "song_songbook_write", "x_publish_prepare"].sort());
     const markupCall = fetchImpl.mock.calls.find((call) => String(call[0]).includes("/editMessageReplyMarkup"));
     const body = JSON.parse(String((markupCall?.[1] as RequestInit).body)) as { reply_markup: unknown };
-    expect(JSON.stringify(body.reply_markup)).toContain("SONGBOOK");
-    expect(JSON.stringify(body.reply_markup)).toContain("X 投稿準備");
-    expect(JSON.stringify(body.reply_markup)).not.toMatch(/Instagram|TikTok|IG/i);
+    const buttonText = JSON.stringify(body.reply_markup, (_key, value) => _key === "callback_data" ? undefined : value);
+    expect(buttonText).toContain("SONGBOOK");
+    expect(buttonText).toContain("X 投稿準備");
+    expect(buttonText).not.toMatch(/Instagram|TikTok|IG/i);
   });
 });

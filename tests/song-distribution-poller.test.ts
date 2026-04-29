@@ -54,7 +54,7 @@ describe("song distribution poller", () => {
     const root = workspace();
     await ensureArtistWorkspace(root);
     await updateSongState(root, "where-it-played", { title: "Where It Played", status: "scheduled" });
-    const secretLikeText = `Where It Played ${"TELEGRAM"}_${"BOT"}_${"TOKEN"}=unsafe`;
+    const secretLikeText = `Where It Played ${"TELEGRAM"}_${"BOT"}_${"TOKEN"}=unsafe123`;
     const fetchImpl = vi.fn(async () => response(secretLikeText)) as unknown as typeof fetch;
 
     const result = await pollSongDistribution(root, { fetchImpl, spotifyBearerToken: "mock-token" });

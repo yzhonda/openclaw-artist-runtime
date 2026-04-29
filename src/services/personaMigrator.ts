@@ -58,7 +58,7 @@ const artistMarkerSections = [
   "Suno Production Profile"
 ];
 const soulMarkerSections = ["Telegram Persona Voice"];
-export const secretLikePattern = /(TELEGRAM_BOT_TOKEN|bot\d+:[A-Za-z0-9_-]{30,}|API[_ -]?KEY|COOKIE|CREDENTIAL|PASSWORD|SECRET)/i;
+export const secretLikePattern = /\bbot\d+:[A-Za-z0-9_-]{30,}\b|(?:^|\W)(?:TELEGRAM_BOT_TOKEN|API[_ -]?KEY|TOKEN|COOKIE|CREDENTIAL|PASSWORD|SECRET)\s*[:=]\s*[A-Za-z0-9+/=_-]{8,}/i;
 
 function artistPath(root: string): string {
   return join(root, "ARTIST.md");

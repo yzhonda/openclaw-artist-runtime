@@ -15,6 +15,6 @@ describe("suno take scorer", () => {
   });
 
   it("rejects secret-like scoring input", () => {
-    expect(() => scoreSunoTakes({ urls: ["TELEGRAM_BOT_TOKEN"] })).toThrow("suno_take_score_secret_like_input");
+    expect(() => scoreSunoTakes({ urls: [`${["TELEGRAM", "BOT", "TOKEN"].join("_")}=12345678`] })).toThrow("suno_take_score_secret_like_input");
   });
 });

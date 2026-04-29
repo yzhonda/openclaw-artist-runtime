@@ -152,7 +152,7 @@ describe("telegram callback handler", () => {
   it("blocks secret-like callback data before lookup", async () => {
     const workspace = root();
     const client = clientMock();
-    const tokenLike = `cb:${"TELEGRAM"}_${"BOT"}_${"TOKEN"}=unsafe`;
+    const tokenLike = `cb:${"TELEGRAM"}_${"BOT"}_${"TOKEN"}=unsafe123`;
 
     const result = await routeTelegramCallback({
       root: workspace,

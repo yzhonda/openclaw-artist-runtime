@@ -21,7 +21,7 @@ describe("iTunes artist lookup", () => {
   });
 
   it("rejects secret-like lookup responses", async () => {
-    const fetchImpl = vi.fn(async () => ({ text: async () => "CREDENTIAL marker should not pass" })) as unknown as typeof fetch;
+    const fetchImpl = vi.fn(async () => ({ text: async () => "CREDENTIAL=marker123 should not pass" })) as unknown as typeof fetch;
     await expect(lookupITunesArtistTracks({ fetchImpl })).rejects.toThrow("itunes_response_contains_secret_like_text");
   });
 });
