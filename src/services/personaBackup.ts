@@ -4,6 +4,17 @@ import { dirname, join } from "node:path";
 
 export type PersonaBackupFile = "ARTIST" | "SOUL";
 
+export interface BackupChangeSetEntry {
+  sourcePath: string;
+  backupPath?: string;
+  skipped: boolean;
+}
+
+export interface BackupChangeSet {
+  sessionId: string;
+  entries: BackupChangeSetEntry[];
+}
+
 const sessionBackups = new Map<string, string | null>();
 
 function personaFilePath(root: string, file: PersonaBackupFile): string {
@@ -66,4 +77,30 @@ export async function ensureBackupOnce(root: string, sessionId: string, file: Pe
   await copyFile(source, backup, constants.COPYFILE_EXCL);
   sessionBackups.set(key, backup);
   return backup;
+}
+
+export async function ensureBackupPathOnce(source: string, sessionId: string): Promise<string | null> {
+  const key = `${source}\0${sessionId}`;
+  if (sessionBackups.has(key)) {
+    return null;
+  }
+  if (!(await exists(source))) {
+    sessionBackups.set(key, null);
+    return null;
+  }
+  const backup = await uniqueBackupPath(source);
+  await mkdir(dirname(backup), { recursive: true });
+  await copyFile(source, backup, constants.COPYFILE_EXCL);
+  sessionBackups.set(key, backup);
+  return backup;
+}
+
+export async function ensureBackupChangeSet(paths: string[], sessionId: string): Promise<BackupChangeSet> {
+  const uniquePaths = [...new Set(paths)];
+  const entries: BackupChangeSetEntry[] = [];
+  for (const sourcePath of uniquePaths) {
+    const backupPath = await ensureBackupPathOnce(sourcePath, sessionId);
+    entries.push({ sourcePath, backupPath: backupPath ?? undefined, skipped: backupPath === null });
+  }
+  return { sessionId, entries };
 }

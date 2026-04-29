@@ -52,6 +52,31 @@ export function isSongProposerEnabled(env: NodeJS.ProcessEnv = process.env): boo
   return env.OPENCLAW_SONG_PROPOSER?.trim().toLowerCase() !== "off";
 }
 
+function positiveNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+  }
+  return undefined;
+}
+
+export async function resolveSunoDailyBudget(
+  root: string = resolveDefaultWorkspaceRoot(),
+  env: NodeJS.ProcessEnv = process.env
+): Promise<number> {
+  const envBudget = positiveNumber(env.OPENCLAW_SUNO_DAILY_BUDGET);
+  if (envBudget !== undefined) {
+    return envBudget;
+  }
+  const overrides = await readConfigOverrides(root);
+  const rawSuno = (overrides as { suno?: { dailyBudget?: unknown } }).suno;
+  const overrideBudget = positiveNumber(rawSuno?.dailyBudget);
+  return overrideBudget ?? 50;
+}
+
 function isRelativeWorkspaceRoot(value: string): boolean {
   return value === "." || value === "./" || value === "" || value.startsWith("./") || value.startsWith("../");
 }
