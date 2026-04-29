@@ -98,6 +98,10 @@ export function isXInlineButtonEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return env.OPENCLAW_X_INLINE_BUTTON?.trim().toLowerCase() !== "off";
 }
 
+export function isTelegramNotifierEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENCLAW_TELEGRAM_NOTIFIER?.trim().toLowerCase() !== "off";
+}
+
 export function isArtistPulseEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const value = env.OPENCLAW_ARTIST_PULSE_ENABLED?.trim().toLowerCase();
   return value === "on" || value === "1" || value === "true";
