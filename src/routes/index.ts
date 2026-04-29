@@ -35,6 +35,7 @@ import { buildSunoArtifactIndex, generateSunoRun, readAllSunoRuns, readLatestSun
 import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
 import { createSongIdea } from "../services/songIdeation.js";
 import { readTakeHistory, selectTake } from "../services/takeSelection.js";
+import { registerRuntimeEventStreamRoute } from "./runtimeEventStream.js";
 import type {
   ArtistRuntimeConfig,
   DistributionSummary,
@@ -1008,6 +1009,8 @@ export async function buildStatusExportResponse(
 }
 
 export function registerRoutes(api: unknown): void {
+  registerRuntimeEventStreamRoute(api);
+
   safeRegisterRoute(api, {
     method: "GET",
     path: "/plugins/artist-runtime",
