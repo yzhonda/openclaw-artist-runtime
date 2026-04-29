@@ -34,8 +34,7 @@
     "docs/PRODUCER_CONSOLE.md",
     "docs/TROUBLESHOOTING.md",
     "docs/ERRORS.md",
-    "docs/PACKAGE_CONTENTS.md",
-    "docs/SUNO_BROWSER_DRIVER.md"
+    "docs/PACKAGE_CONTENTS.md"
   ],
   "scripts": {
     "build:runtime": "tsc -p tsconfig.json",
