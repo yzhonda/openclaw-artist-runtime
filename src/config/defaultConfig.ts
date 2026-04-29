@@ -81,6 +81,9 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     enabled: false,
     minIntervalHours: 12
   },
+  commission: {
+    enabled: false
+  },
   aiReview: {
     provider: "mock"
   },

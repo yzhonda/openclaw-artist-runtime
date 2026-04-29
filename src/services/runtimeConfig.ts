@@ -107,6 +107,15 @@ export function isArtistPulseConfigured(config: Pick<ArtistRuntimeConfig, "artis
   return isArtistPulseEnabled(env) || config.artistPulse.enabled;
 }
 
+export function isCommissionEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.OPENCLAW_COMMISSION_ENABLED?.trim().toLowerCase();
+  return value === "on" || value === "1" || value === "true";
+}
+
+export function isCommissionConfigured(config: Pick<ArtistRuntimeConfig, "commission">, env: NodeJS.ProcessEnv = process.env): boolean {
+  return isCommissionEnabled(env) || config.commission.enabled;
+}
+
 export function getArtistPulseIntervalHours(
   env: NodeJS.ProcessEnv = process.env,
   config?: Pick<ArtistRuntimeConfig, "artistPulse">

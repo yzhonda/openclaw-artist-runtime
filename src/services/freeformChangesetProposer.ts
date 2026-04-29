@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { AiReviewProvider, PersonaField, SongUpdateField, TelegramInlineKeyboard } from "../types.js";
+import type { AiReviewProvider, CommissionBrief, PersonaField, SongUpdateField, TelegramInlineKeyboard } from "../types.js";
 import { proposePersonaFields } from "./personaProposer.js";
 import { secretLikePattern } from "./personaMigrator.js";
 import { proposeSongFields } from "./songProposer.js";
@@ -23,9 +23,10 @@ export interface ChangeSetProposal {
   fields: ChangeSetField[];
   warnings: string[];
   createdAt: string;
-  source: "conversation";
+  source: "conversation" | "commission";
   songId?: string;
   platform?: string;
+  commissionBrief?: CommissionBrief;
 }
 
 export interface FreeformChangeSetRequest {

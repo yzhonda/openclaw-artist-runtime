@@ -2,6 +2,8 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { applyChangeSet, type ChangeSetApplyResult } from "./changeSetApplier.js";
 import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
+import { commissionBriefFromProposal } from "./songCommissionHandler.js";
+import { injectCommissionSong } from "./songStateInjector.js";
 
 export interface ConversationalTurn {
   role: "user" | "artist";
@@ -172,6 +174,7 @@ export interface ProposalAuditEntry {
 
 export interface ProposalResponseApplyResult extends ChangeSetApplyResult {
   auditEntry: ProposalAuditEntry;
+  commissionSongId?: string;
 }
 
 export interface ProposalResponseResult {
@@ -353,23 +356,35 @@ export async function handleProposalResponse(
   }
 
   if (request.action === "yes") {
-    const applyResult = await applyChangeSet(root, session.pendingChangeSet);
+    const commissionBrief = commissionBriefFromProposal(session.pendingChangeSet);
+    const applyResult = commissionBrief
+      ? {
+          applied: session.pendingChangeSet.fields,
+          skipped: [],
+          warnings: [],
+          backups: (await injectCommissionSong(root, commissionBrief, { now: new Date(now) })).backups,
+          commissionSongId: commissionBrief.songId
+        }
+      : await applyChangeSet(root, session.pendingChangeSet);
     await clearProposalFromSession(root, request.proposalId, now);
     const entry = await appendProposalResponseAudit(root, auditEntry(
       request.proposalId,
       request.actor.kind,
-      "proposal_apply_yes",
+      commissionBrief ? "commission_inject_yes" : "proposal_apply_yes",
       session.pendingChangeSet,
       {
         applied: applyResult.applied.length,
         skipped: applyResult.skipped.length,
-        warnings: applyResult.warnings
+        warnings: applyResult.warnings,
+        songId: commissionBrief?.songId
       },
       now
     ));
     return {
       status: "applied",
-      message: `Applied. applied=${applyResult.applied.length}, skipped=${applyResult.skipped.length}${applyResult.warnings.length ? `\nWarnings: ${applyResult.warnings.join("; ")}` : ""}`,
+      message: commissionBrief
+        ? `Injected. songId=${commissionBrief.songId}, stage=planning. Autopilot will continue from planning.`
+        : `Applied. applied=${applyResult.applied.length}, skipped=${applyResult.skipped.length}${applyResult.warnings.length ? `\nWarnings: ${applyResult.warnings.join("; ")}` : ""}`,
       applyResult: { ...applyResult, auditEntry: entry },
       auditEntry: entry
     };

@@ -175,6 +175,10 @@ export interface ArtistPulseConfig {
   minIntervalHours: number;
 }
 
+export interface CommissionConfig {
+  enabled: boolean;
+}
+
 export interface TelegramUser {
   id: number;
   username?: string;
@@ -282,6 +286,25 @@ export interface DailyVoiceDraft {
   createdAt: string;
 }
 
+export interface CommissionBrief {
+  songId: string;
+  title: string;
+  brief: string;
+  lyricsTheme: string;
+  mood: string;
+  tempo: string;
+  styleNotes: string;
+  duration: string;
+  sourceText: string;
+  createdAt: string;
+}
+
+export interface CommissionResult {
+  proposalId: string;
+  commissionBrief: CommissionBrief;
+  warnings: string[];
+}
+
 export interface ArtistPulseState {
   lastPulseAt?: string;
   updatedAt: string;
@@ -299,6 +322,7 @@ export interface ArtistRuntimeConfig {
   distribution: DistributionConfig;
   telegram: TelegramConfig;
   artistPulse: ArtistPulseConfig;
+  commission: CommissionConfig;
   aiReview: AiReviewConfig;
   safety: SafetyConfig;
 }

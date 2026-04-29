@@ -83,6 +83,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
   if (input.workspaceRoot && !isLegacyWizardEnabled()) {
     if (
       command === "/talk"
+      || command === "/commission"
       || command === "/yes"
       || command === "/no"
       || command === "/edit"
@@ -120,6 +121,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/songs - list recent songs",
         "/song <songId> - show song detail",
         "/song create [hint] - ask the artist to make a song",
+        "/commission <brief> - propose a producer commission for autopilot",
         "/regen <songId> - queue a dry-run regeneration note",
         "/review <songId> - run a debug-only mock AI review",
         "/setup - talk with the artist about persona direction",

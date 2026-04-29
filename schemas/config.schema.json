@@ -319,6 +319,19 @@
           "default": true
         }
       }
+    },
+    "commission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "default": {
+        "enabled": false
+      }
     }
   },
   "$defs": {

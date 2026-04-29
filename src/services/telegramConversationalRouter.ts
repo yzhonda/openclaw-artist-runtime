@@ -12,6 +12,8 @@ import {
 } from "./conversationalSession.js";
 import { proposeFreeformChangeSet, type ChangeSetProposal } from "./freeformChangesetProposer.js";
 import { secretLikePattern } from "./personaMigrator.js";
+import { handleCommission } from "./songCommissionHandler.js";
+import { isCommissionEnabled } from "./runtimeConfig.js";
 
 export interface TelegramConversationalRouteInput {
   text: string;
@@ -33,7 +35,7 @@ export interface TelegramProposalButtonsRequest {
 }
 
 function stripCommand(text: string): string {
-  return text.replace(/^\/(persona|song|talk)\b/i, "").trim();
+  return text.replace(/^\/(persona|song|talk|commission)\b/i, "").trim();
 }
 
 function songCreateHint(text: string): string | undefined {
@@ -62,6 +64,16 @@ function formatChangeSet(proposal: ChangeSetProposal): string {
     proposal.summary,
     ...proposal.fields.slice(0, 8).map((field) => `- ${field.field}: ${field.proposedValue}`),
     "反映するなら /yes、やめるなら /no。直すなら /edit <field> <value>。"
+  ].join("\n");
+}
+
+function formatCommissionProposal(proposal: ChangeSetProposal): string {
+  return [
+    "ChangeSet 案できた:",
+    ...proposal.fields.slice(0, 8).map((field) => `- ${field.field}: ${field.proposedValue}`),
+    "",
+    "これで autopilot に投げる?",
+    "[Yes] [No] [Edit]"
   ].join("\n");
 }
 
@@ -105,6 +117,31 @@ export async function routeTelegramConversation(input: TelegramConversationalRou
   const text = input.text.trim();
   if (secretLikePattern.test(text)) {
     return { responseText: "それ、秘密っぽい文字列が混じってる。別の言い方で投げてくれ。", shouldStoreFreeText: true };
+  }
+  if (/^\/commission\b/i.test(text)) {
+    if (!isCommissionEnabled()) {
+      return { responseText: "commission intake is disabled. OPENCLAW_COMMISSION_ENABLED=on で開ける。", shouldStoreFreeText: false };
+    }
+    const brief = stripCommand(text);
+    if (!brief) {
+      return { responseText: "Usage: /commission <曲のお題・方向性>", shouldStoreFreeText: false };
+    }
+    const result = await handleCommission(input.workspaceRoot, {
+      brief,
+      aiReviewProvider: input.aiReviewProvider
+    });
+    await appendConversationTurn(input.workspaceRoot, {
+      chatId: input.chatId,
+      userId: input.fromUserId,
+      topic: { kind: "song", songId: result.commissionBrief.songId },
+      pendingChangeSet: result.proposal,
+      turn: { role: "artist", text: formatCommissionProposal(result.proposal) }
+    });
+    return {
+      responseText: formatCommissionProposal(result.proposal),
+      shouldStoreFreeText: true,
+      proposalButtons: { proposalId: result.proposal.id }
+    };
   }
   const existing = await readConversationalSession(input.workspaceRoot, input.chatId, input.fromUserId);
   const topic = text.startsWith("/song")

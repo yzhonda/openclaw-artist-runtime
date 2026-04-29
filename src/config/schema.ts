@@ -117,6 +117,9 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
   if (config.artistPulse) {
     Object.assign(merged.artistPulse, config.artistPulse);
   }
+  if (config.commission) {
+    Object.assign(merged.commission, config.commission);
+  }
   if (config.aiReview) {
     Object.assign(merged.aiReview, config.aiReview);
   }
@@ -134,7 +137,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     return { ok: false, errors: ["config must be an object"], warnings };
   }
 
-  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "artistPulse", "aiReview", "safety"], errors);
+  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "artistPulse", "commission", "aiReview", "safety"], errors);
 
   if ("schemaVersion" in config && !isIntegerInRange(config.schemaVersion, 1, CURRENT_CONFIG_SCHEMA_VERSION)) {
     errors.push(`config.schemaVersion must be an integer between 1 and ${CURRENT_CONFIG_SCHEMA_VERSION}`);
@@ -331,6 +334,17 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
       }
       if ("minIntervalHours" in config.artistPulse && !isIntegerInRange(config.artistPulse.minIntervalHours, 6, 168)) {
         errors.push("config.artistPulse.minIntervalHours must be an integer between 6 and 168");
+      }
+    }
+  }
+
+  if ("commission" in config) {
+    if (!isRecord(config.commission)) {
+      errors.push("config.commission must be an object");
+    } else {
+      validateKnownKeys("config.commission", config.commission, ["enabled"], errors);
+      if ("enabled" in config.commission && typeof config.commission.enabled !== "boolean") {
+        errors.push("config.commission.enabled must be a boolean");
       }
     }
   }

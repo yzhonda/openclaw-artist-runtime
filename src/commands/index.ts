@@ -116,6 +116,13 @@ export function registerCommands(api: unknown): void {
     handler: (ctx) => handleRoutedCommand("song", ctx as PluginCommandContextLike, apiConfig)
   }, logRegistration);
   safeRegisterCommand(api, {
+    name: "commission",
+    description: "Send a producer song commission to artist-runtime for confirmation and autopilot planning.",
+    acceptsArgs: true,
+    requireAuth: true,
+    handler: (ctx) => handleRoutedCommand("commission", ctx as PluginCommandContextLike, apiConfig)
+  }, logRegistration);
+  safeRegisterCommand(api, {
     name: "setup",
     description: "Start artist-runtime Telegram persona setup.",
     acceptsArgs: true,
