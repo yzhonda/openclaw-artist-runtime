@@ -10,8 +10,6 @@
   "files": [
     "dist/**/*.js",
     "ui/dist/**",
-    "ui/index.html",
-    "ui/package.json",
     "templates/**",
     "prompts/**",
     "schemas/**",
@@ -37,10 +35,7 @@
     "docs/TROUBLESHOOTING.md",
     "docs/ERRORS.md",
     "docs/PACKAGE_CONTENTS.md",
-    "docs/SUNO_BROWSER_DRIVER.md",
-    "docs/X_LIVE_PUBLISH_DESIGN.md",
-    "docs/RUNTIME_CLEANUP.md",
-    "docs/INCIDENT_RESPONSE.md"
+    "docs/SUNO_BROWSER_DRIVER.md"
   ],
   "scripts": {
     "build:runtime": "tsc -p tsconfig.json",
