@@ -22,6 +22,15 @@ export interface BirdAcquireResult {
   nextAllowedAt?: string;
 }
 
+export interface BirdRateLimitStatus {
+  todayCalls: number;
+  dailyMax: number;
+  minIntervalMinutes: number;
+  cooldownUntil?: string;
+  cooldownReason?: string;
+  nextAllowedAt?: string;
+}
+
 const defaultLimits: BirdRateLimitConfig = {
   dailyMax: 5,
   minIntervalMinutes: 60
@@ -118,6 +127,22 @@ export async function tryAcquireBirdCall(root: string, now = new Date()): Promis
   return {
     allowed: true,
     remaining: Math.max(0, limits.dailyMax - ledger.calls.length)
+  };
+}
+
+export async function readBirdRateLimitStatus(root: string, now = new Date()): Promise<BirdRateLimitStatus> {
+  const [limits, ledger, acquire] = await Promise.all([
+    readConfig(root),
+    readLedger(root, now),
+    tryAcquireBirdCall(root, now)
+  ]);
+  return {
+    todayCalls: ledger.calls.length,
+    dailyMax: limits.dailyMax,
+    minIntervalMinutes: limits.minIntervalMinutes,
+    cooldownUntil: ledger.cooldownUntil,
+    cooldownReason: ledger.cooldownReason,
+    nextAllowedAt: acquire.nextAllowedAt
   };
 }
 

@@ -12,6 +12,8 @@ import { listSongStates, readArtistMind, readSongState } from "../services/artis
 import { ArtistAutopilotService, pauseAutopilot, resumeAutopilot } from "../services/autopilotService.js";
 import { AutopilotControlService } from "../services/autopilotControlService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
+import { readBirdRateLimitStatus } from "../services/birdRateLimiter.js";
+import { listPendingProposals } from "../services/conversationalSession.js";
 import { buildPlatformStats, readDistributionEvents } from "../services/distributionLedgerReader.js";
 import { getRuntimeEventBus } from "../services/runtimeEventBus.js";
 import { readRuntimeEvents } from "../services/runtimeEventsLedger.js";
@@ -23,6 +25,7 @@ import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../service
 import { prepareSocialAssets } from "../services/socialAssets.js";
 import { buildSunoArtifactsPage, STATUS_SUNO_ARTIFACT_LIMIT } from "../services/sunoArtifacts.js";
 import { SunoBudgetTracker } from "../services/sunoBudget.js";
+import { readBudgetState as readSunoDailyBudgetState } from "../services/sunoBudgetLedger.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
 import { buildSunoArtifactIndex, generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services/sunoRuns.js";
 import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
@@ -601,13 +604,16 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
   const sunoBudgetTracker = new SunoBudgetTracker(mergedConfig.artist.workspaceRoot);
-  const [sunoBudgetState, sunoBudgetResetHistory, sunoArtifacts] = await Promise.all([
+  const [sunoBudgetState, sunoBudgetResetHistory, sunoArtifacts, sunoDailyBudget, birdRateLimit, pendingApprovals] = await Promise.all([
     sunoBudgetTracker.getState(
       mergedConfig.music.suno.dailyCreditLimit,
       mergedConfig.music.suno.monthlyCreditLimit
     ),
     sunoBudgetTracker.getResetHistory(10),
-    buildSunoArtifactIndex(mergedConfig.artist.workspaceRoot)
+    buildSunoArtifactIndex(mergedConfig.artist.workspaceRoot),
+    readSunoDailyBudgetState(mergedConfig.artist.workspaceRoot),
+    readBirdRateLimitStatus(mergedConfig.artist.workspaceRoot),
+    listPendingProposals(mergedConfig.artist.workspaceRoot)
   ]);
   const [musicSummary, distributionSummary] = await Promise.all([
     buildMusicSummary(mergedConfig),
@@ -633,6 +639,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     suno: {
       budget: {
         ...sunoBudgetState,
+        used: sunoDailyBudget.used,
         resetHistory: sunoBudgetResetHistory
       },
       artifacts: sunoArtifacts.slice(0, STATUS_SUNO_ARTIFACT_LIMIT),
@@ -644,6 +651,16 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     },
     sunoWorker,
     distributionWorker,
+    bird: {
+      rateLimit: birdRateLimit
+    },
+    distribution: {
+      detected: {}
+    },
+    pendingApprovals: {
+      count: pendingApprovals.length,
+      recent: pendingApprovals.slice(0, 3)
+    },
     platforms,
     musicSummary,
     distributionSummary,
@@ -1101,7 +1118,11 @@ export function registerRoutes(api: unknown): void {
     handler: async (input) => {
       const payload = payloadRecord(input);
       const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
-      const result = await getAutopilotTicker().runNow(config);
+      const manualSeedPayload = payload.manualSeed as { hint?: unknown } | undefined;
+      const manualSeed = typeof manualSeedPayload?.hint === "string"
+        ? { hint: manualSeedPayload.hint.trim() }
+        : undefined;
+      const result = await getAutopilotTicker().runNow(config, manualSeed);
       return {
         ...result.state,
         tickerOutcome: result.outcome,

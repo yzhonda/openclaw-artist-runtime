@@ -6,6 +6,9 @@ import { ObservabilityPanel } from "./ObservabilityPanel";
 import { ConnectionBanner } from "./ConnectionBanner";
 import { ErrorToastStack } from "./ErrorToast";
 import { ShortcutHelpOverlay, useKeyboardShortcuts } from "./KeyboardShortcuts";
+import { BudgetRateStatusStrip } from "./components/BudgetRateStatusStrip";
+import { ManualSongCreateCard } from "./components/ManualSongCreateCard";
+import { PendingApprovalsCard } from "./components/PendingApprovalsCard";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
@@ -45,6 +48,7 @@ type StatusResponse = {
   suno: {
     budget: {
       date: string;
+      used?: number;
       consumed: number;
       limit: number;
       remaining: number;
@@ -105,6 +109,33 @@ type StatusResponse = {
     blockedReason?: string;
     postsToday: number;
     repliesToday: number;
+  };
+  bird?: {
+    rateLimit: {
+      todayCalls: number;
+      dailyMax: number;
+      minIntervalMinutes: number;
+      cooldownUntil?: string;
+      cooldownReason?: string;
+      nextAllowedAt?: string;
+    };
+  };
+  distribution?: {
+    detected: {
+      unitedMasters?: { url: string; detectedAt: string };
+      spotify?: { url: string; detectedAt: string };
+      appleMusic?: { url: string; detectedAt: string };
+    };
+  };
+  pendingApprovals?: {
+    count: number;
+    recent: Array<{
+      id: string;
+      domain: "persona" | "song";
+      summary: string;
+      fieldCount: number;
+      createdAt: string;
+    }>;
   };
   musicSummary: {
     monthlyRuns: number;
@@ -631,6 +662,22 @@ export function App() {
       const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
       setError(message);
       showErrorToast("runtime", `${action}_failed`, message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const runManualSongCreate = async <T,>(path: string, body?: unknown): Promise<T> => {
+    setBusy("manual-song-create");
+    try {
+      const result = await apiPost<T>(path, body ?? {});
+      await refresh(selectedSongId);
+      return result;
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "manual_song_create_failed", message);
+      throw caughtError;
     } finally {
       setBusy(null);
     }
@@ -1183,6 +1230,30 @@ export function App() {
     </article>
   );
 
+  const cockpitStrip = (
+    <BudgetRateStatusStrip
+      suno={status?.suno.budget}
+      bird={status?.bird?.rateLimit}
+      distribution={status?.distribution?.detected}
+    />
+  );
+
+  const manualSongCreatePanel = (
+    <ManualSongCreateCard
+      busy={busy !== null}
+      onCreate={runManualSongCreate}
+      onCreated={(message) => showErrorToast("runtime", "manual_song_create_requested", message)}
+    />
+  );
+
+  const pendingApprovalsPanel = (
+    <PendingApprovalsCard
+      count={status?.pendingApprovals?.count}
+      recent={status?.pendingApprovals?.recent}
+      onViewDomain={(domain) => setActiveView(domain === "song" ? "songs" : "artist-mind")}
+    />
+  );
+
   const alertsPanel = (
     <article className="panel">
       <div className="section-title">Alerts</div>
@@ -1423,7 +1494,7 @@ export function App() {
         ))}
       </nav>
 
-      {activeView === "dashboard" ? <section className="two-column">{lastCyclePanel}{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
+      {activeView === "dashboard" ? <section className="two-column">{cockpitStrip}{manualSongCreatePanel}{pendingApprovalsPanel}{lastCyclePanel}{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
       {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}

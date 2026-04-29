@@ -58,12 +58,12 @@ export class AutopilotTicker {
     return (await this.runNow(configOverride)).outcome;
   }
 
-  async runNow(configOverride?: PartialDeep<ArtistRuntimeConfig>): Promise<AutopilotManualRunResult> {
+  async runNow(configOverride?: PartialDeep<ArtistRuntimeConfig>, manualSeed?: { hint: string }): Promise<AutopilotManualRunResult> {
     const baseConfig = configOverride ?? this.options.getConfig?.();
     const resolved = applyConfigDefaults(baseConfig);
     const workspaceRoot = resolved.artist.workspaceRoot;
 
-    if (!resolved.autopilot.enabled) {
+    if (!manualSeed && !resolved.autopilot.enabled) {
       return {
         outcome: this.emit("skipped:disabled"),
         state: await readAutopilotRunState(workspaceRoot)
@@ -85,7 +85,8 @@ export class AutopilotTicker {
     try {
       const nextState = await new ArtistAutopilotService().runCycle({
         workspaceRoot,
-        config: resolved
+        config: resolved,
+        manualSeed
       });
       return {
         outcome: this.emit("ran"),

@@ -499,6 +499,7 @@ export interface MusicSummary {
 
 export interface SunoBudgetStatus {
   date: string;
+  used?: number;
   consumed: number;
   limit: number;
   remaining: number;
@@ -865,6 +866,33 @@ export interface StatusResponse {
   };
   sunoWorker: SunoWorkerStatus;
   distributionWorker: SocialDistributionWorkerStatus;
+  bird?: {
+    rateLimit: {
+      todayCalls: number;
+      dailyMax: number;
+      minIntervalMinutes: number;
+      cooldownUntil?: string;
+      cooldownReason?: string;
+      nextAllowedAt?: string;
+    };
+  };
+  distribution?: {
+    detected: {
+      unitedMasters?: { url: string; detectedAt: string };
+      spotify?: { url: string; detectedAt: string };
+      appleMusic?: { url: string; detectedAt: string };
+    };
+  };
+  pendingApprovals?: {
+    count: number;
+    recent: Array<{
+      id: string;
+      domain: "persona" | "song";
+      summary: string;
+      fieldCount: number;
+      createdAt: string;
+    }>;
+  };
   platforms: Record<SocialPlatform, PlatformStatus>;
   musicSummary: MusicSummary;
   distributionSummary: DistributionSummary;

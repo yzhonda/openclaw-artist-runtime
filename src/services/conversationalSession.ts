@@ -135,3 +135,28 @@ export async function clearConversationalSession(root: string, chatId: number, u
     sessions: store.sessions.filter((session) => sessionKey(session.chatId, session.userId) !== key)
   });
 }
+
+export interface PendingProposalSummary {
+  id: string;
+  domain: ChangeSetProposal["domain"];
+  summary: string;
+  fieldCount: number;
+  createdAt: string;
+}
+
+export async function listPendingProposals(root: string, now = Date.now()): Promise<PendingProposalSummary[]> {
+  const store = await readStore(root);
+  return store.sessions
+    .filter((session) => session.expiresAt > now && Boolean(session.pendingChangeSet))
+    .map((session) => {
+      const proposal = session.pendingChangeSet as ChangeSetProposal;
+      return {
+        id: proposal.id,
+        domain: proposal.domain,
+        summary: proposal.summary,
+        fieldCount: proposal.fields.length,
+        createdAt: proposal.createdAt
+      };
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
