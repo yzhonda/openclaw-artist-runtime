@@ -7,7 +7,9 @@ import { applyChangeSet } from "./changeSetApplier.js";
 import { handleProposalResponse } from "./conversationalSession.js";
 import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
 import { secretLikePattern } from "./personaMigrator.js";
-import { isArtistPulseEnabled, isXInlineButtonEnabled } from "./runtimeConfig.js";
+import { isArtistPulseEnabled, isSongSpawnEnabled, isXInlineButtonEnabled } from "./runtimeConfig.js";
+import { injectCommissionSong } from "./songStateInjector.js";
+import { markSpawned } from "./songSpawnRateLimiter.js";
 import { handleSongPublishActionRequest, type SongPublishAction } from "./songPublishActionRegistry.js";
 import type { TelegramClient } from "./telegramClient.js";
 import { executeXPublishAction, type XPublishActionInput } from "./xPublishActionRegistry.js";
@@ -296,6 +298,47 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
     }));
     await ctx.client.editMessageText(entry.chatId, entry.messageId, `X投稿完了。URL: ${published.tweetUrl}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
     return { processed: true, result: "applied", reason: "daily_voice_published", callbackId };
+  }
+
+  if (entry.action === "song_spawn_inject" || entry.action === "song_spawn_skip" || entry.action === "song_spawn_edit") {
+    if (!isSongSpawnEnabled()) {
+      return finish(ctx, callbackId, entry, "failed", "song_spawn_disabled", "Song spawn disabled", "failed");
+    }
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    if (entry.action === "song_spawn_edit") {
+      await markCallbackResolved(ctx.root, callbackId, { status: "updated", reason: "song_spawn_edit_requested", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "updated", "song_spawn_edit_requested"));
+      await ctx.client.sendMessage(entry.chatId, "修正するなら /commission に方向性を書き直して投げてくれ。callback に本文は載せない。").catch(() => undefined);
+      await ctx.client.editMessageReplyMarkup(entry.chatId, entry.messageId, { inline_keyboard: [] }).catch(() => undefined);
+      return { processed: true, result: "updated", reason: "song_spawn_edit_requested", callbackId };
+    }
+    if (entry.action === "song_spawn_skip") {
+      await markSpawned(ctx.root, new Date(now));
+      await markCallbackResolved(ctx.root, callbackId, { status: "discarded", reason: "song_spawn_skipped", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "discarded", "song_spawn_skipped"));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "今は見送った。次の spawn 候補はまた間隔を置いて見る。", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "discarded", reason: "song_spawn_skipped", callbackId };
+    }
+    if (!entry.commissionBrief) {
+      await markCallbackResolved(ctx.root, callbackId, { status: "failed", reason: "song_spawn_missing_brief", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "failed", "song_spawn_missing_brief"));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "spawn brief が見つからない。もう一度作り直す。", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "failed", reason: "song_spawn_missing_brief", callbackId };
+    }
+    try {
+      const injected = await injectCommissionSong(ctx.root, entry.commissionBrief, { now: new Date(now) });
+      await markSpawned(ctx.root, new Date(now));
+      await markCallbackResolved(ctx.root, callbackId, { status: "applied", reason: "song_spawn_injected", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "applied", "song_spawn_injected"));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, `inject した。songId=${injected.songId}、stage=planning。autopilot cycle で進む。`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "applied", reason: "song_spawn_injected", callbackId };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "song_spawn_inject_failed";
+      await markCallbackResolved(ctx.root, callbackId, { status: "failed", reason, now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "failed", reason));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "spawn injection failed. Check the runtime log.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "failed", reason, callbackId };
+    }
   }
 
   if (entry.action === "x_publish_prepare" || entry.action === "x_publish_confirm" || entry.action === "x_publish_cancel") {

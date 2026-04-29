@@ -43,6 +43,9 @@ export class TelegramNotifier {
     if (event.type === "artist_pulse_drafted") {
       await this.attachDailyVoiceButtons(event, sent.message_id).catch(() => undefined);
     }
+    if (event.type === "song_spawn_proposed") {
+      await this.attachSongSpawnButtons(event, sent.message_id).catch(() => undefined);
+    }
   }
 
   private async attachSongCompletionButtons(event: Extract<RuntimeEvent, { type: "song_take_completed" }>, messageId: number): Promise<void> {
@@ -169,6 +172,48 @@ export class TelegramNotifier {
       ]]
     });
   }
+
+  private async attachSongSpawnButtons(event: Extract<RuntimeEvent, { type: "song_spawn_proposed" }>, messageId: number): Promise<void> {
+    if (!isInlineButtonsEnabled() || !this.options.workspaceRoot || typeof this.options.chatId !== "number") {
+      return;
+    }
+    const [inject, skip, edit] = await Promise.all([
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "song_spawn_inject",
+        songId: event.candidateSongId,
+        commissionBrief: event.brief,
+        spawnReason: event.reason,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "song_spawn_skip",
+        songId: event.candidateSongId,
+        commissionBrief: event.brief,
+        spawnReason: event.reason,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "song_spawn_edit",
+        songId: event.candidateSongId,
+        commissionBrief: event.brief,
+        spawnReason: event.reason,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      })
+    ]);
+    await this.client.editMessageReplyMarkup(this.options.chatId, messageId, {
+      inline_keyboard: [[
+        { text: "✓ 進める", callback_data: `cb:${inject.callbackId}` },
+        { text: "✗ 今は要らない", callback_data: `cb:${skip.callbackId}` },
+        { text: "✏️ 修正", callback_data: `cb:${edit.callbackId}` }
+      ]]
+    });
+  }
 }
 
 async function artistReport(event: RuntimeEvent, fallback: string, options: Pick<TelegramNotifierOptions, "workspaceRoot" | "aiReviewProvider">): Promise<string> {
@@ -235,6 +280,17 @@ export async function formatRuntimeEvent(
         `chars:${event.charCount} hash:${event.draftHash.slice(-8)}`,
         event.sourceFragments.length ? `source: ${event.sourceFragments.slice(0, 2).join(" / ")}` : undefined
       ].filter(Boolean).join("\n");
+    case "song_spawn_proposed":
+      return [
+        "次の曲、こんな感じはどう?",
+        "",
+        `- songId: ${event.candidateSongId}`,
+        `- title: ${event.brief.title}`,
+        `- mood: ${event.brief.mood}`,
+        `- tempo: ${event.brief.tempo}`,
+        `- duration: ${event.brief.duration}`,
+        `- reason: ${event.reason}`
+      ].join("\n");
     case "error":
       return `Runtime error: ${event.source} ${event.reason}${event.songId ? ` (${event.songId})` : ""}`;
   }

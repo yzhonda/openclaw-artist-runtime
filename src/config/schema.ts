@@ -120,6 +120,9 @@ export function applyConfigDefaults(config?: PartialDeep<ArtistRuntimeConfig>): 
   if (config.commission) {
     Object.assign(merged.commission, config.commission);
   }
+  if (config.songSpawn) {
+    Object.assign(merged.songSpawn, config.songSpawn);
+  }
   if (config.aiReview) {
     Object.assign(merged.aiReview, config.aiReview);
   }
@@ -137,7 +140,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     return { ok: false, errors: ["config must be an object"], warnings };
   }
 
-  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "artistPulse", "commission", "aiReview", "safety"], errors);
+  validateKnownKeys("config", config, ["schemaVersion", "artist", "autopilot", "music", "distribution", "telegram", "artistPulse", "commission", "songSpawn", "aiReview", "safety"], errors);
 
   if ("schemaVersion" in config && !isIntegerInRange(config.schemaVersion, 1, CURRENT_CONFIG_SCHEMA_VERSION)) {
     errors.push(`config.schemaVersion must be an integer between 1 and ${CURRENT_CONFIG_SCHEMA_VERSION}`);
@@ -345,6 +348,20 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
       validateKnownKeys("config.commission", config.commission, ["enabled"], errors);
       if ("enabled" in config.commission && typeof config.commission.enabled !== "boolean") {
         errors.push("config.commission.enabled must be a boolean");
+      }
+    }
+  }
+
+  if ("songSpawn" in config) {
+    if (!isRecord(config.songSpawn)) {
+      errors.push("config.songSpawn must be an object");
+    } else {
+      validateKnownKeys("config.songSpawn", config.songSpawn, ["enabled", "minIntervalHours"], errors);
+      if ("enabled" in config.songSpawn && typeof config.songSpawn.enabled !== "boolean") {
+        errors.push("config.songSpawn.enabled must be a boolean");
+      }
+      if ("minIntervalHours" in config.songSpawn && !isIntegerInRange(config.songSpawn.minIntervalHours, 12, 168)) {
+        errors.push("config.songSpawn.minIntervalHours must be an integer between 12 and 168");
       }
     }
   }

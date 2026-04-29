@@ -1,0 +1,167 @@
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { AiReviewProvider, CommissionBrief, SongState, SpawnProposal } from "../types.js";
+import { callAiProvider } from "./aiProviderClient.js";
+import { listSongStates } from "./artistState.js";
+import { secretLikePattern } from "./personaMigrator.js";
+import { readBudgetState } from "./sunoBudgetLedger.js";
+
+export interface ProposeSpawnOptions {
+  aiReviewProvider?: AiReviewProvider;
+  now?: Date;
+}
+
+function assertSafe(stage: string, value: string): void {
+  if (secretLikePattern.test(value)) {
+    throw new Error(`song_spawn_secret_like_${stage}`);
+  }
+}
+
+function shortHash(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 6);
+}
+
+async function latestObservation(root: string): Promise<string> {
+  const dir = join(root, "observations");
+  const entries = await readdir(dir).catch(() => []);
+  const latest = entries.filter((entry) => entry.endsWith(".md")).sort().at(-1);
+  return latest ? readFile(join(dir, latest), "utf8").catch(() => "") : "";
+}
+
+function hasRestMood(heartbeat: string, soulMd: string): boolean {
+  return /(?:\brest\b|\bpause\b|\bsleep\b|休|静養|停止|休む)/i.test(`${heartbeat}\n${soulMd}`);
+}
+
+function recentCompletedTooClose(songs: SongState[], now: Date): boolean {
+  const latest = songs.find((song) => ["published", "scheduled", "take_selected"].includes(song.status));
+  if (!latest) {
+    return false;
+  }
+  return now.getTime() - new Date(latest.updatedAt).getTime() < 6 * 60 * 60 * 1000;
+}
+
+function titleFromSeed(seed: string): string {
+  const first = seed.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? "静かな夜の勘定書";
+  return first.replace(/^#+\s*/, "").slice(0, 32) || "静かな夜の勘定書";
+}
+
+function buildBrief(context: { observation: string; soulMd: string; budgetRemaining: number; now: Date }): CommissionBrief {
+  const seed = context.observation || context.soulMd || "観察が薄い夜に、街の温度だけ残っている。";
+  const title = titleFromSeed(seed);
+  const songId = `spawn_${shortHash(`${seed}:${context.now.toISOString()}`)}`;
+  return {
+    songId,
+    title,
+    brief: seed.slice(0, 280),
+    lyricsTheme: seed.split(/\r?\n/).find(Boolean)?.slice(0, 160) ?? title,
+    mood: "observational, slight sarcasm, late-night urban pressure",
+    tempo: "artist decides",
+    styleNotes: "thick bass, restrained drums, unsentimental vocal delivery",
+    duration: "artist decides",
+    sourceText: "autopilot song spawn",
+    createdAt: context.now.toISOString()
+  };
+}
+
+function buildPrompt(context: {
+  artistMd: string;
+  soulMd: string;
+  observation: string;
+  heartbeat: string;
+  recentSongs: SongState[];
+  budgetRemaining: number;
+}): string {
+  return [
+    "Decide whether the artist used::honda should start a new song now.",
+    "Return compact field directives. If not enough signal, set spawn: no.",
+    "Fields: spawn, title, brief, lyricsTheme, mood, tempo, duration, style, reason.",
+    "Never include secrets. Keep the brief lean enough for autopilot planning.",
+    "",
+    `Budget remaining: ${context.budgetRemaining}`,
+    `Recent songs: ${context.recentSongs.slice(0, 5).map((song) => `${song.songId}:${song.status}:${song.title}`).join(" | ")}`,
+    "",
+    "ARTIST.md:",
+    context.artistMd.slice(0, 1600),
+    "",
+    "SOUL.md:",
+    context.soulMd.slice(0, 1000),
+    "",
+    "Latest observations:",
+    context.observation.slice(0, 1200),
+    "",
+    "Heartbeat:",
+    context.heartbeat.slice(0, 500)
+  ].join("\n");
+}
+
+function parseDirective(raw: string, key: string): string | undefined {
+  const line = raw.split(/\r?\n/).find((candidate) => candidate.toLowerCase().startsWith(`${key.toLowerCase()}:`));
+  return line?.slice(line.indexOf(":") + 1).trim();
+}
+
+function briefFromAi(raw: string, fallback: CommissionBrief, now: Date): { brief: CommissionBrief; reason: string; spawn: boolean } {
+  const spawnValue = parseDirective(raw, "spawn")?.toLowerCase();
+  const spawn = !spawnValue || /^(yes|true|1|go|進める|作る)/i.test(spawnValue);
+  const title = parseDirective(raw, "title") || fallback.title;
+  const brief = parseDirective(raw, "brief") || fallback.brief;
+  return {
+    spawn,
+    reason: parseDirective(raw, "reason") || "AI judged the observations and budget as suitable for a next song.",
+    brief: {
+      ...fallback,
+      title,
+      brief,
+      lyricsTheme: parseDirective(raw, "lyricsTheme") || parseDirective(raw, "lyrics") || brief,
+      mood: parseDirective(raw, "mood") || fallback.mood,
+      tempo: parseDirective(raw, "tempo") || fallback.tempo,
+      duration: parseDirective(raw, "duration") || fallback.duration,
+      styleNotes: parseDirective(raw, "style") || fallback.styleNotes,
+      createdAt: now.toISOString()
+    }
+  };
+}
+
+export async function proposeSpawn(root: string, options: ProposeSpawnOptions = {}): Promise<SpawnProposal | null> {
+  const now = options.now ?? new Date();
+  const [artistMd, soulMd, heartbeat, observation, songs, budget] = await Promise.all([
+    readFile(join(root, "ARTIST.md"), "utf8").catch(() => ""),
+    readFile(join(root, "SOUL.md"), "utf8").catch(() => ""),
+    readFile(join(root, "runtime", "heartbeat-state.json"), "utf8").catch(() => ""),
+    latestObservation(root),
+    listSongStates(root).catch(() => []),
+    readBudgetState(root, now)
+  ]);
+  const budgetRemaining = budget.limit - budget.used;
+  if (budgetRemaining <= 1 || hasRestMood(heartbeat, soulMd) || recentCompletedTooClose(songs, now) || observation.trim().length < 12) {
+    return null;
+  }
+  const inputContext = [artistMd, soulMd, heartbeat, observation, JSON.stringify(songs.slice(0, 5)), JSON.stringify(budget)].join("\n");
+  assertSafe("input", inputContext);
+
+  const fallback = buildBrief({ observation, soulMd, budgetRemaining, now });
+  const provider = options.aiReviewProvider ?? "mock";
+  const raw = provider === "mock"
+    ? [
+      "spawn: yes",
+      `title: ${fallback.title}`,
+      `brief: ${fallback.brief}`,
+      `lyricsTheme: ${fallback.lyricsTheme}`,
+      `mood: ${fallback.mood}`,
+      `tempo: ${fallback.tempo}`,
+      `duration: ${fallback.duration}`,
+      `style: ${fallback.styleNotes}`,
+      `reason: observations have enough signal and Suno budget remains ${budgetRemaining}/${budget.limit}.`
+    ].join("\n")
+    : await callAiProvider(buildPrompt({ artistMd, soulMd, observation, heartbeat, recentSongs: songs, budgetRemaining }), { provider });
+  assertSafe("ai_response", raw);
+  const parsed = briefFromAi(raw, fallback, now);
+  const finalText = JSON.stringify(parsed.brief) + parsed.reason;
+  assertSafe("final", finalText);
+  return parsed.spawn ? {
+    spawn: true,
+    brief: parsed.brief,
+    reason: parsed.reason,
+    candidateSongId: parsed.brief.songId
+  } : null;
+}

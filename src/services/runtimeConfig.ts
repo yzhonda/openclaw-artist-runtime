@@ -116,6 +116,15 @@ export function isCommissionConfigured(config: Pick<ArtistRuntimeConfig, "commis
   return isCommissionEnabled(env) || config.commission.enabled;
 }
 
+export function isSongSpawnEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.OPENCLAW_SONG_SPAWN_ENABLED?.trim().toLowerCase();
+  return value === "on" || value === "1" || value === "true";
+}
+
+export function isSongSpawnConfigured(config: Pick<ArtistRuntimeConfig, "songSpawn">, env: NodeJS.ProcessEnv = process.env): boolean {
+  return isSongSpawnEnabled(env) || config.songSpawn.enabled;
+}
+
 export function getArtistPulseIntervalHours(
   env: NodeJS.ProcessEnv = process.env,
   config?: Pick<ArtistRuntimeConfig, "artistPulse">
@@ -125,6 +134,17 @@ export function getArtistPulseIntervalHours(
     return Math.max(6, config?.artistPulse.minIntervalHours ?? 12);
   }
   return Math.max(6, parsed);
+}
+
+export function getSongSpawnIntervalHours(
+  env: NodeJS.ProcessEnv = process.env,
+  config?: Pick<ArtistRuntimeConfig, "songSpawn">
+): number {
+  const parsed = Number.parseInt(env.OPENCLAW_SONG_SPAWN_HOURS ?? "", 10);
+  if (!Number.isFinite(parsed)) {
+    return Math.max(12, config?.songSpawn.minIntervalHours ?? 24);
+  }
+  return Math.max(12, parsed);
 }
 
 function positiveNumber(value: unknown): number | undefined {

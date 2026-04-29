@@ -179,6 +179,11 @@ export interface CommissionConfig {
   enabled: boolean;
 }
 
+export interface SongSpawnConfig {
+  enabled: boolean;
+  minIntervalHours: number;
+}
+
 export interface TelegramUser {
   id: number;
   username?: string;
@@ -305,8 +310,20 @@ export interface CommissionResult {
   warnings: string[];
 }
 
+export interface SpawnProposal {
+  spawn: boolean;
+  brief: CommissionBrief;
+  reason: string;
+  candidateSongId: string;
+}
+
 export interface ArtistPulseState {
   lastPulseAt?: string;
+  updatedAt: string;
+}
+
+export interface SongSpawnState {
+  lastSpawnAt?: string;
   updatedAt: string;
 }
 
@@ -323,6 +340,7 @@ export interface ArtistRuntimeConfig {
   telegram: TelegramConfig;
   artistPulse: ArtistPulseConfig;
   commission: CommissionConfig;
+  songSpawn: SongSpawnConfig;
   aiReview: AiReviewConfig;
   safety: SafetyConfig;
 }

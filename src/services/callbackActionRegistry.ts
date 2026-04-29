@@ -1,6 +1,7 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
+import type { CommissionBrief } from "../types.js";
 
 export type CallbackActionStatus =
   | "pending"
@@ -23,6 +24,8 @@ export interface CallbackActionEntry {
   draftCharCount?: number;
   draftUrl?: string;
   tweetUrl?: string;
+  commissionBrief?: CommissionBrief;
+  spawnReason?: string;
   chatId: number;
   messageId: number;
   userId: number;
@@ -43,6 +46,8 @@ export interface RegisterCallbackActionInput {
   draftCharCount?: number;
   draftUrl?: string;
   tweetUrl?: string;
+  commissionBrief?: CommissionBrief;
+  spawnReason?: string;
   chatId: number;
   messageId: number;
   userId: number;
@@ -118,6 +123,8 @@ export async function registerCallbackAction(root: string, input: RegisterCallba
     draftCharCount: input.draftCharCount,
     draftUrl: input.draftUrl,
     tweetUrl: input.tweetUrl,
+    commissionBrief: input.commissionBrief,
+    spawnReason: input.spawnReason,
     chatId: input.chatId,
     messageId: input.messageId,
     userId: input.userId,

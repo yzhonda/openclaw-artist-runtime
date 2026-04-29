@@ -24,7 +24,9 @@ import { collectObservations } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
 import { pollSongDistribution } from "./songDistributionPoller.js";
 import { cleanupExpiredCallbacks } from "./callbackLedgerMaintenance.js";
-import { getArtistPulseIntervalHours, isArtistPulseConfigured } from "./runtimeConfig.js";
+import { getArtistPulseIntervalHours, getSongSpawnIntervalHours, isArtistPulseConfigured, isSongSpawnConfigured } from "./runtimeConfig.js";
+import { proposeSpawn } from "./songSpawnProposer.js";
+import { shouldSpawn } from "./songSpawnRateLimiter.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -233,6 +235,29 @@ export class ArtistAutopilotService {
       }).catch((error) => {
         const reason = error instanceof Error ? error.message : String(error);
         console.warn(`[artist-runtime] artist pulse failed: ${reason}`);
+      });
+    }
+    if (isSongSpawnConfigured(config)) {
+      await shouldSpawn(input.workspaceRoot, { minIntervalHours: getSongSpawnIntervalHours(process.env, config) }).then(async (allowed) => {
+        if (!allowed) {
+          return;
+        }
+        const proposal = await proposeSpawn(input.workspaceRoot, {
+          aiReviewProvider: config.aiReview.provider
+        });
+        if (!proposal) {
+          return;
+        }
+        emitRuntimeEvent({
+          type: "song_spawn_proposed",
+          brief: proposal.brief,
+          reason: proposal.reason,
+          candidateSongId: proposal.candidateSongId,
+          timestamp: Date.now()
+        });
+      }).catch((error) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(`[artist-runtime] song spawn proposal failed: ${reason}`);
       });
     }
     const existing = await readAutopilotRunState(input.workspaceRoot);

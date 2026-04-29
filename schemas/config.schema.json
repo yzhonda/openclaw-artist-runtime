@@ -332,6 +332,26 @@
       "default": {
         "enabled": false
       }
+    },
+    "songSpawn": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "minIntervalHours": {
+          "type": "integer",
+          "minimum": 12,
+          "maximum": 168,
+          "default": 24
+        }
+      },
+      "default": {
+        "enabled": false,
+        "minIntervalHours": 24
+      }
     }
   },
   "$defs": {
