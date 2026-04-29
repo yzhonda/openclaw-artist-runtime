@@ -8,7 +8,7 @@ import {
   readAutopilotState,
   writeAutopilotState
 } from "./autopilotRecovery.js";
-import { listSongStates, readSongState, updateSongState } from "./artistState.js";
+import { listSongStates, readArtistMind, readSongState, updateSongState } from "./artistState.js";
 import { createSongIdea } from "./songIdeation.js";
 import { draftLyrics } from "./lyricsDrafting.js";
 import { prepareSocialAssets } from "./socialAssets.js";
@@ -17,6 +17,9 @@ import { generateSunoRun } from "./sunoRuns.js";
 import { publishSocialAction } from "./socialPublishing.js";
 import { selectTake } from "./takeSelection.js";
 import { emitRuntimeEvent } from "./runtimeEventBus.js";
+import { resetIfNewDay, tryConsumeBudget } from "./sunoBudgetLedger.js";
+import { collectObservations } from "./xObservationCollector.js";
+import { proposeTheme } from "./themeProposer.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -227,6 +230,7 @@ export class ArtistAutopilotService {
         lastRunAt: nowIso()
       });
     }
+    await resetIfNewDay(input.workspaceRoot);
 
     const song = await currentSong(input.workspaceRoot);
     const stage = stageFromSong(song);
@@ -282,7 +286,35 @@ export class ArtistAutopilotService {
 
     try {
       if (!song) {
-        const idea = await createSongIdea({ workspaceRoot: input.workspaceRoot, config });
+        const artistMind = await readArtistMind(input.workspaceRoot);
+        const observation = await collectObservations(input.workspaceRoot, {
+          personaText: `${artistMind.artist}\n${artistMind.socialVoice}`,
+          query: "music OR society OR culture"
+        });
+        if (observation.status === "cooldown") {
+          emitRuntimeEvent({
+            type: "bird_cooldown_triggered",
+            reason: observation.reason ?? "bird cool-down active",
+            cooldownUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            timestamp: Date.now()
+          });
+        }
+        const theme = await proposeTheme(input.workspaceRoot, {
+          observations: observation.observations,
+          aiReviewProvider: config.aiReview.provider
+        });
+        emitRuntimeEvent({
+          type: "theme_generated",
+          theme: theme.theme,
+          reason: theme.reason,
+          timestamp: Date.now()
+        });
+        const idea = await createSongIdea({
+          workspaceRoot: input.workspaceRoot,
+          config,
+          theme: theme.theme,
+          artistReason: theme.reason
+        });
         return writeStageState(input.workspaceRoot, existing, {
           ...baseState,
           currentSongId: idea.songId,
@@ -308,6 +340,25 @@ export class ArtistAutopilotService {
           });
         }
         case "suno_generation": {
+          const budget = await tryConsumeBudget(input.workspaceRoot, 1);
+          if (!budget.ok) {
+            emitRuntimeEvent({
+              type: "budget_exhausted",
+              reason: budget.reason ?? "daily Suno budget exhausted",
+              limit: budget.state.limit,
+              used: budget.state.used,
+              timestamp: Date.now()
+            });
+            return writeStageState(input.workspaceRoot, existing, {
+              ...baseState,
+              currentSongId: song.songId,
+              stage: "suno_generation",
+              blockedReason: budget.reason,
+              lastError: budget.reason,
+              lastSuccessfulStage: existing.lastSuccessfulStage,
+              cycleCount: existing.cycleCount + 1
+            });
+          }
           const run = await generateSunoRun({ workspaceRoot: input.workspaceRoot, songId: song.songId, config });
           return writeStageState(input.workspaceRoot, existing, {
             ...baseState,
@@ -320,7 +371,14 @@ export class ArtistAutopilotService {
           });
         }
         case "take_selection": {
-          await selectTake({ workspaceRoot: input.workspaceRoot, songId: song.songId });
+          const selection = await selectTake({ workspaceRoot: input.workspaceRoot, songId: song.songId });
+          emitRuntimeEvent({
+            type: "song_take_completed",
+            songId: song.songId,
+            selectedTakeId: selection.selectedTakeId,
+            urls: selection.sourceUrls,
+            timestamp: Date.now()
+          });
           return writeStageState(input.workspaceRoot, existing, {
             ...baseState,
             currentSongId: song.songId,

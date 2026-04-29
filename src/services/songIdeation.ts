@@ -77,13 +77,14 @@ export interface CreateSongIdeaInput {
   config?: Partial<ArtistRuntimeConfig>;
   title?: string;
   artistReason?: string;
+  theme?: string;
 }
 
 export async function createSongIdea(input: CreateSongIdeaInput): Promise<SongIdeaResult> {
   await ensureArtistWorkspace(input.workspaceRoot);
   const artistMind = await readArtistMind(input.workspaceRoot);
   const sequence = await nextSongNumber(input.workspaceRoot);
-  const theme = chooseTheme(artistMind.artist, artistMind.currentState);
+  const theme = input.theme?.trim() || chooseTheme(artistMind.artist, artistMind.currentState);
   const title = input.title?.trim() || buildTitle(theme, sequence);
   const songId = `song-${String(sequence).padStart(3, "0")}`;
   const artistReason = input.artistReason ?? `caught on ${theme}`;

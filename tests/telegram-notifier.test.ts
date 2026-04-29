@@ -11,14 +11,14 @@ function jsonResponse(body: unknown): Response {
 }
 
 describe("TelegramNotifier", () => {
-  it("formats stage events for Telegram", () => {
-    expect(formatRuntimeEvent({
+  it("formats stage events for Telegram", async () => {
+    await expect(formatRuntimeEvent({
       type: "autopilot_stage_changed",
       songId: "song-001",
       from: "planning",
       to: "prompt_pack",
       timestamp: 1
-    })).toBe("Autopilot stage: planning -> prompt_pack (song-001)");
+    })).resolves.toBe("Autopilot stage: planning -> prompt_pack (song-001)");
   });
 
   it("sends runtime events through TelegramClient with a mock fetch", async () => {
