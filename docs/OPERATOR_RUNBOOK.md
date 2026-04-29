@@ -550,6 +550,169 @@ you. If the operator wants scheduled checks, add entries manually with
 Keep cron output under `runtime/`; it is excluded from package artifacts and
 public PRs.
 
+## Plan v9.16 Operational foundation (2026-04-29)
+
+Plan v9.16 は運用基盤強化 3 phase。R10 publish controls untouched、default 動作 unchanged、技術的負債解消が中心。
+
+### Phase A: birdRunner consolidation (`8fd40bc`)
+
+`src/services/birdRunner.ts` (192 lines) に bird CLI 関連を集約:
+
+- `runBirdCommand(args, options)` (低レベル spawn argv 構築、shell 不使用)
+- 共通 failure mapping: `bird_cli_not_installed` / `bird_auth_missing` / `bird_auth_expired` / `bird_rate_limited` / `bird_publish_failed` / `bird_command_failed`
+- 高レベル wrappers: `birdWhoami` / `birdComposeDryRun` / `birdTweet`
+- `buildBirdArgs` / `parseTweetUrl` helpers 統合
+
+`xBirdConnector` (-181 lines) と `xPublishActionRegistry` (-116 lines) は全て shared runner import に置換。`spawnImpl` 注入 pattern は維持されているので既存 test も pass。
+
+### Phase B: callback ledger 24h cleanup (`81cc348`)
+
+`runtime/callback-actions.jsonl` の expired entry が永続蓄積する問題を解消:
+
+- `src/services/callbackLedgerMaintenance.ts`: `cleanupExpiredCallbacks(root, options)`
+- 退避: `expired` + `retentionMs` (default 7 日) 経過 entry を filter 削除
+- rate limit: `runtime/callback-cleanup-state.json` で `lastCleanupAt` 永続化、default 24h interval
+- atomic write + backup (R11 整合)
+- `callback-audit.jsonl` は touch しない (audit 別管理)
+- autopilotService cycle 開始時に呼び出し、failure は warn log のみで cycle 継続
+
+操作:
+- 自動: autopilot cycle で 24h に 1 回実行
+- 手動 trigger は不要 (cycle hook で十分)
+
+### Phase C: Producer Console SSE realtime (`11ea6d2`)
+
+Producer Console UI の event 反映を polling から SSE push に移行:
+
+- 新規 endpoint: `GET /plugins/artist-runtime/api/events/stream` (text/event-stream)
+- runtimeEventBus subscribe → event を SSE format で push
+- heartbeat 30s interval (`:hb\n\n`) で proxy timeout 回避
+- secret guard: secretLikePattern 含む payload は filter / redact
+- client disconnect 時に subscription 解除
+- WebSocket 不採用 (one-way、HTTP 互換、proxy/CDN 対応容易)
+
+UI:
+- `RuntimeActionMirrorCard.tsx` が EventSource subscription 追加
+- 既存 polling は fallback として維持 (SSE 切断時に degrade graceful)
+
+操作: 自動有効化、退路 flag なし (UI 改善で安全)。
+
+## Plan v9.17: Artist normal operation (2026-04-29)
+
+御大の 3 希望 (普段ツイート / 新規曲お題 / 自発曲提案) を Phase A/B/C で実装。完成曲 X publish は Plan v9.15 Phase 4f-b 既存。すべて default disabled、御大が退路 flag を enable で発火開始。
+
+### Phase A: Artist Daily Voice (`61fd8aa`)
+
+artist (used::honda) の「曲ではない普段の X tweet」を AI が自発生成 → Telegram 二段階確認で publish。
+
+退路 flag:
+- `OPENCLAW_ARTIST_PULSE_ENABLED` (default `off`、`on` で発火開始)
+- `OPENCLAW_ARTIST_PULSE_HOURS` (default `12`、最短 6h)
+
+操作 walkthrough:
+```
+[autopilot cycle で半日経過 + pulse rate limit OK]
+AI (Telegram push):
+  preview (256 char 以内 draft + charCount + 簡易 source 表示)
+  [▶ X 投稿] [✏️ 修正] [✗ 取消]
+
+御大: [▶ X 投稿] タップ
+→ hash 再検証 → bird tweet → tweetUrl 取得 → audit 記録 (raw text 不在)
+```
+
+input source:
+- `ARTIST.md` (persona, obsessions, tone)
+- `SOUL.md` (mood)
+- `.local/openclaw/workspace/observations/` 直近
+- `runtime/heartbeat-state.json` (rhythm)
+- 直近の制作 fragment (lyrics draft, 不採用 take, style.md)
+
+tone constraint: bot 臭くしない、定型句 NG、artist persona 反映 (社会風刺、知的、観察ベース、二面性)、街/制作/読書 fragment ベース。
+
+### Phase B: /commission (`5909f7b`)
+
+御大が Telegram で「◯◯系の曲を作って」とお題投げる → AI が brief 化 → 既存 ChangeSet inline button で確認 → autopilot song state inject。
+
+退路 flag:
+- `OPENCLAW_COMMISSION_ENABLED` (default `off`、`on` で `/commission` 受付開始)
+
+操作 walkthrough:
+```
+御大: /commission 都市の境界線で見えなくなる音、4 分くらい、太い bass + jazz drum
+AI (Telegram):
+  ChangeSet 案できた:
+  - songId (suggested): commission_d8f3a1
+  - title (draft): 境界の音
+  - mood: dub-influenced city pop, urban displacement
+  - tempo: 132 BPM
+  - duration: 4 分
+  - style notes: bass を太く、jazz drum brushed pattern
+
+  これで autopilot に投げる?
+  [✓ Yes] [✗ No] [✏️ Edit]
+
+御大: [✓ Yes] タップ
+→ songStateInjector で workspace/songs/<id>/ skeleton 構築 + autopilot-state.json に inject
+→ autopilot cycle で planning → suno → take_select → song_take_completed
+```
+
+完成時 Plan v9.15 Phase 4f-b の Journey I で X publish 確認。
+
+### Phase C: Song Spawn Proposer (`3e5cf63`)
+
+autopilot が observations / heartbeat / 直近完成曲 / SOUL から「次に何作る?」AI 判定 → 御大の Telegram 確認 → autopilot inject。
+
+退路 flag:
+- `OPENCLAW_SONG_SPAWN_ENABLED` (default `off`、`on` で発火開始)
+- `OPENCLAW_SONG_SPAWN_HOURS` (default `24`、最短 12h)
+
+操作 walkthrough:
+```
+[autopilot cycle で 24h 経過 + spawn rate limit OK + observations あり]
+AI (Telegram push):
+  次の曲、こんな感じはどう?
+
+  - songId: spawn_e7c3b2
+  - title (draft): 静かな夜の勘定書
+  - mood: late-night, observational, slight sarcasm
+  - tempo: 128 BPM
+  - duration: 4 分
+  - reason: 直近の observations で「再開発の経済合理性」というテーマが繰り返し出てる、SOUL.md mood "observational" と整合、budget 残 33/50 OK
+
+  [✓ 進める] [✗ 今は要らない] [✏️ 修正]
+
+御大: [✓ 進める] タップ
+→ Phase B injector 流用で autopilot に inject
+```
+
+skip 条件: 直近完成曲との距離短い / 予算ぎりぎり / observations 乏しい / heartbeat mood "rest" 系。
+
+### Plan v9.17 通常運転手順
+
+1. **gateway 再起動** で Plan v9.16/v9.17 反映 (現プロセスは古い dist を memory に保持):
+   ```bash
+   source scripts/openclaw-local-env.sh
+   .local/openclaw/bin/openclaw gateway stop
+   scripts/openclaw-local-gateway start
+   ```
+2. **退路 flag enable** (御大の運用シナリオに応じて):
+   ```bash
+   export OPENCLAW_ARTIST_PULSE_ENABLED=on
+   export OPENCLAW_COMMISSION_ENABLED=on
+   export OPENCLAW_SONG_SPAWN_ENABLED=on
+   ```
+3. **bird auth 確認**: `bird --firefox-profile rlff0kyr.artist-x whoami --plain` で artist account (`@used00honda`) を確認
+4. **Telegram で動作開始**: bot worker が Telegram 経由で event push、御大が button 操作
+
+### R10 守備 (Plan v9.17 全 Phase)
+
+publish gate / liveGoArmed / autopilot.dryRun=false **完全 untouched**。
+
+- Phase A: daily voice の bird tweet は御大の `[▶ X 投稿]` button タップ + hash 一致 が唯一の判断 path
+- Phase B: commission inject 後も autopilot.dryRun / liveGoArmed 触らない
+- Phase C: song spawn inject 後も同上
+- 各 phase に R10 untouched dedicated test 同梱 (`r10-daily-voice-untouched.test.ts` / `r10-commission-untouched.test.ts` / `r10-song-spawn-untouched.test.ts`)
+
 ## See also
 
 - `docs/RUNTIME_CLEANUP.md`
