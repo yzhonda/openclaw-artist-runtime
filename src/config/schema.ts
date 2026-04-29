@@ -172,7 +172,7 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
     if (!isRecord(config.autopilot)) {
       errors.push("config.autopilot must be an object");
     } else {
-      validateKnownKeys("config.autopilot", config.autopilot, ["enabled", "dryRun", "songsPerWeek", "cycleIntervalMinutes", "producerDigest"], errors);
+      validateKnownKeys("config.autopilot", config.autopilot, ["enabled", "dryRun", "songsPerWeek", "cycleIntervalMinutes", "planningTimeoutDays", "producerDigest"], errors);
       if ("enabled" in config.autopilot && typeof config.autopilot.enabled !== "boolean") {
         errors.push("config.autopilot.enabled must be a boolean");
       }
@@ -184,6 +184,9 @@ export function validateConfig(config: unknown): ValidationResult<ArtistRuntimeC
       }
       if ("cycleIntervalMinutes" in config.autopilot && !isIntegerInRange(config.autopilot.cycleIntervalMinutes, 15, 1440)) {
         errors.push("config.autopilot.cycleIntervalMinutes must be an integer between 15 and 1440");
+      }
+      if ("planningTimeoutDays" in config.autopilot && !isIntegerInRange(config.autopilot.planningTimeoutDays, 1, 30)) {
+        errors.push("config.autopilot.planningTimeoutDays must be an integer between 1 and 30");
       }
       if ("producerDigest" in config.autopilot) {
         validateEnum("config.autopilot.producerDigest", config.autopilot.producerDigest, producerDigestModes, errors);

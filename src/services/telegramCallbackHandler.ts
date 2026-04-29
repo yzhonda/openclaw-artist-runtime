@@ -10,6 +10,7 @@ import { secretLikePattern } from "./personaMigrator.js";
 import { isArtistPulseEnabled, isSongSpawnEnabled, isXInlineButtonEnabled } from "./runtimeConfig.js";
 import { injectCommissionSong } from "./songStateInjector.js";
 import { markSpawned } from "./songSpawnRateLimiter.js";
+import { readAutopilotRunState, writeAutopilotRunState } from "./autopilotService.js";
 import { handleSongPublishActionRequest, type SongPublishAction } from "./songPublishActionRegistry.js";
 import type { TelegramClient } from "./telegramClient.js";
 import { executeXPublishAction, type XPublishActionInput } from "./xPublishActionRegistry.js";
@@ -339,6 +340,58 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
       await ctx.client.editMessageText(entry.chatId, entry.messageId, "spawn injection failed. Check the runtime log.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
       return { processed: true, result: "failed", reason, callbackId };
     }
+  }
+
+  if (entry.action === "planning_skeleton_apply" || entry.action === "planning_skeleton_skip" || entry.action === "planning_skeleton_edit") {
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    if (entry.action === "planning_skeleton_edit") {
+      const proposalResult = await handleProposalResponse(ctx.root, {
+        proposalId: entry.proposalId ?? "",
+        action: "edit",
+        actor: { kind: "telegram_callback", chatId: entry.chatId, userId: entry.userId },
+        now
+      });
+      await markCallbackResolved(ctx.root, callbackId, { status: "updated", reason: "planning_skeleton_edit_requested", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "updated", proposalResult.status));
+      await ctx.client.sendMessage(entry.chatId, "補完案を直すなら /edit <field> <value>、または Producer Console で触ってくれ。").catch(() => undefined);
+      await ctx.client.editMessageReplyMarkup(entry.chatId, entry.messageId, { inline_keyboard: [] }).catch(() => undefined);
+      return { processed: true, result: "updated", reason: proposalResult.status, callbackId };
+    }
+    const proposalResult = await handleProposalResponse(ctx.root, {
+      proposalId: entry.proposalId ?? "",
+      action: entry.action === "planning_skeleton_apply" ? "yes" : "no",
+      actor: { kind: "telegram_callback", chatId: entry.chatId, userId: entry.userId },
+      now
+    });
+    if (entry.action === "planning_skeleton_apply" && (proposalResult.status === "applied" || proposalResult.status === "already_resolved")) {
+      const state = await readAutopilotRunState(ctx.root);
+      await writeAutopilotRunState(ctx.root, {
+        ...state,
+        currentSongId: entry.songId ?? state.currentSongId,
+        stage: "prompt_pack",
+        blockedReason: undefined,
+        lastError: undefined,
+        lastSuccessfulStage: "planning",
+        lastRunAt: new Date(now).toISOString()
+      });
+    }
+    const callbackStatus: Exclude<CallbackActionStatus, "pending"> =
+      proposalResult.status === "applied" ? "applied"
+        : proposalResult.status === "discarded" ? "discarded"
+          : proposalResult.status === "already_resolved" ? "duplicate"
+            : "failed";
+    const callbackResult: TelegramCallbackResult["result"] =
+      callbackStatus === "applied" ? "applied"
+        : callbackStatus === "discarded" ? "discarded"
+          : callbackStatus === "duplicate" ? "duplicate"
+            : "failed";
+    await markCallbackResolved(ctx.root, callbackId, { status: callbackStatus, reason: proposalResult.status, now });
+    await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, callbackResult, proposalResult.status));
+    const message = entry.action === "planning_skeleton_apply"
+      ? `Planning補完を反映した。${entry.songId ?? ""} は prompt_pack へ進める。 ${proposalResult.message}`
+      : `Planning補完は見送った。${proposalResult.message}`;
+    await ctx.client.editMessageText(entry.chatId, entry.messageId, message, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+    return { processed: true, result: callbackResult, reason: proposalResult.status, callbackId };
   }
 
   if (entry.action === "x_publish_prepare" || entry.action === "x_publish_confirm" || entry.action === "x_publish_cancel") {

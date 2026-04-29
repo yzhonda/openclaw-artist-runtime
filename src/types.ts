@@ -81,6 +81,7 @@ export interface AutopilotConfig {
   dryRun: boolean;
   songsPerWeek: number;
   cycleIntervalMinutes: number;
+  planningTimeoutDays: number;
   producerDigest: ProducerDigestMode;
 }
 
@@ -325,6 +326,14 @@ export interface ArtistPulseState {
 export interface SongSpawnState {
   lastSpawnAt?: string;
   updatedAt: string;
+}
+
+export interface PlanningSkeletonDraft {
+  songId: string;
+  complete: boolean;
+  missing: string[];
+  completedBrief?: string;
+  proposalId?: string;
 }
 
 export interface AiReviewConfig {

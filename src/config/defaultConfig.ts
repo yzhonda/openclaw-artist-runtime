@@ -13,6 +13,7 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     dryRun: true,
     songsPerWeek: 3,
     cycleIntervalMinutes: 180,
+    planningTimeoutDays: 7,
     producerDigest: "daily"
   },
   music: {

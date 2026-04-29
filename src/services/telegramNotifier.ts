@@ -46,6 +46,9 @@ export class TelegramNotifier {
     if (event.type === "song_spawn_proposed") {
       await this.attachSongSpawnButtons(event, sent.message_id).catch(() => undefined);
     }
+    if (event.type === "planning_skeleton_incomplete") {
+      await this.attachPlanningSkeletonButtons(event, sent.message_id, text).catch(() => undefined);
+    }
   }
 
   private async attachSongCompletionButtons(event: Extract<RuntimeEvent, { type: "song_take_completed" }>, messageId: number): Promise<void> {
@@ -214,6 +217,52 @@ export class TelegramNotifier {
       ]]
     });
   }
+
+  private async attachPlanningSkeletonButtons(event: Extract<RuntimeEvent, { type: "planning_skeleton_incomplete" }>, messageId: number, text: string): Promise<void> {
+    if (!isInlineButtonsEnabled() || !this.options.workspaceRoot || typeof this.options.chatId !== "number") {
+      return;
+    }
+    await appendConversationTurn(this.options.workspaceRoot, {
+      chatId: this.options.chatId,
+      userId: this.options.chatId,
+      topic: { kind: "song", songId: event.songId },
+      pendingChangeSet: event.proposal,
+      turn: { role: "artist", text }
+    });
+    const [apply, skip, edit] = await Promise.all([
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "planning_skeleton_apply",
+        proposalId: event.proposal.id,
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "planning_skeleton_skip",
+        proposalId: event.proposal.id,
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "planning_skeleton_edit",
+        proposalId: event.proposal.id,
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      })
+    ]);
+    await this.client.editMessageReplyMarkup(this.options.chatId, messageId, {
+      inline_keyboard: [[
+        { text: "✓ Yes", callback_data: `cb:${apply.callbackId}` },
+        { text: "✗ No", callback_data: `cb:${skip.callbackId}` },
+        { text: "✏️ Edit", callback_data: `cb:${edit.callbackId}` }
+      ]]
+    });
+  }
 }
 
 async function artistReport(event: RuntimeEvent, fallback: string, options: Pick<TelegramNotifierOptions, "workspaceRoot" | "aiReviewProvider">): Promise<string> {
@@ -290,6 +339,13 @@ export async function formatRuntimeEvent(
         `- tempo: ${event.brief.tempo}`,
         `- duration: ${event.brief.duration}`,
         `- reason: ${event.reason}`
+      ].join("\n");
+    case "planning_skeleton_incomplete":
+      return [
+        `Planning skeleton incomplete: ${event.songId}`,
+        "",
+        `missing: ${event.missing.join(", ")}`,
+        "補完案を作った。進めるなら Yes。"
       ].join("\n");
     case "error":
       return `Runtime error: ${event.source} ${event.reason}${event.songId ? ` (${event.songId})` : ""}`;

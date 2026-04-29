@@ -27,6 +27,8 @@ import { cleanupExpiredCallbacks } from "./callbackLedgerMaintenance.js";
 import { getArtistPulseIntervalHours, getSongSpawnIntervalHours, isArtistPulseConfigured, isSongSpawnConfigured } from "./runtimeConfig.js";
 import { proposeSpawn } from "./songSpawnProposer.js";
 import { shouldSpawn } from "./songSpawnRateLimiter.js";
+import { validatePlanningFiles } from "./planningSkeletonValidator.js";
+import { applyChangeSet } from "./changeSetApplier.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -142,8 +144,12 @@ function stageFromSong(song?: SongState): AutopilotStage {
   }
 }
 
-async function currentSong(root: string): Promise<SongState | undefined> {
+async function currentSong(root: string, preferredSongId?: string): Promise<SongState | undefined> {
   const songs = await listSongStates(root);
+  const preferred = preferredSongId ? songs.find((song) => song.songId === preferredSongId) : undefined;
+  if (preferred && !["scheduled", "published", "archived", "failed"].includes(preferred.status)) {
+    return preferred;
+  }
   return songs.find((song) => song.status !== "scheduled" && song.status !== "published" && song.status !== "archived" && song.status !== "failed");
 }
 
@@ -173,6 +179,63 @@ async function createPromptPackForSong(root: string, song: SongState, config?: P
     configSnapshot: config
   });
   return readSongState(root, readySong.songId);
+}
+
+function planningStalled(existing: AutopilotRunState, timeoutDays: number): boolean {
+  const anchor = existing.lastRunAt ?? existing.updatedAt;
+  if (!anchor) {
+    return false;
+  }
+  return Date.now() - new Date(anchor).getTime() >= timeoutDays * 24 * 60 * 60 * 1000;
+}
+
+async function handlePlanningStage(
+  root: string,
+  song: SongState,
+  existing: AutopilotRunState,
+  baseState: AutopilotRunState,
+  config: ArtistRuntimeConfig
+): Promise<AutopilotRunState | undefined> {
+  if (planningStalled(existing, config.autopilot.planningTimeoutDays)) {
+    return writeStageState(root, existing, {
+      ...baseState,
+      currentSongId: song.songId,
+      stage: "paused",
+      paused: true,
+      pausedReason: `planning_stalled_${config.autopilot.planningTimeoutDays}days`,
+      blockedReason: `planning_stalled_${config.autopilot.planningTimeoutDays}days`,
+      lastError: undefined,
+      cycleCount: existing.cycleCount + 1
+    });
+  }
+  const validation = await validatePlanningFiles(root, song.songId, {
+    aiReviewProvider: config.aiReview.provider
+  });
+  if (validation.complete) {
+    return undefined;
+  }
+  if (!validation.proposal) {
+    return undefined;
+  }
+  if (config.telegram.enabled) {
+    emitRuntimeEvent({
+      type: "planning_skeleton_incomplete",
+      songId: song.songId,
+      missing: validation.missing,
+      proposal: validation.proposal,
+      timestamp: Date.now()
+    });
+    return writeStageState(root, existing, {
+      ...baseState,
+      currentSongId: song.songId,
+      stage: "planning",
+      blockedReason: `planning_skeleton_incomplete:${validation.missing.join(",")}`,
+      lastError: undefined,
+      cycleCount: existing.cycleCount + 1
+    });
+  }
+  await applyChangeSet(root, validation.proposal);
+  return undefined;
 }
 
 async function choosePublishPlatform(config: ArtistRuntimeConfig): Promise<"x" | "instagram" | "tiktok"> {
@@ -295,7 +358,7 @@ export class ArtistAutopilotService {
       });
     });
 
-    const song = await currentSong(input.workspaceRoot);
+    const song = await currentSong(input.workspaceRoot, existing.currentSongId);
     const stage = stageFromSong(song);
     const runId = !song && existing.lastSuccessfulStage === "completed"
       ? `auto_${Date.now().toString(36)}`
@@ -307,6 +370,13 @@ export class ArtistAutopilotService {
       stage,
       lastRunAt: nowIso()
     };
+
+    if (song && existing.stage === "planning") {
+      const planningResult = await handlePlanningStage(input.workspaceRoot, song, existing, baseState, config);
+      if (planningResult) {
+        return planningResult;
+      }
+    }
 
     if (
       !song

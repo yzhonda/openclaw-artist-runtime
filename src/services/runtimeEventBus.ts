@@ -11,6 +11,7 @@ export type RuntimeEvent =
   | { type: "budget_exhausted"; reason: string; limit: number; used: number; timestamp: number }
   | { type: "bird_cooldown_triggered"; reason: string; cooldownUntil: string; timestamp: number }
   | { type: "distribution_change_detected"; songId: string; platform: "unitedMasters" | "spotify" | "appleMusic"; url: string; proposalId?: string; proposal?: ChangeSetProposal; timestamp: number }
+  | { type: "planning_skeleton_incomplete"; songId: string; missing: string[]; proposal: ChangeSetProposal; timestamp: number }
   | { type: "song_songbook_written"; songId: string; timestamp: number }
   | { type: "song_publish_skipped"; songId: string; timestamp: number }
   | ({ type: "artist_pulse_drafted"; timestamp: number } & DailyVoiceDraft)
