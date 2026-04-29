@@ -259,11 +259,62 @@ Journey B, filling an imported persona:
 5. `/persona check suggest` returns the same proposed drafts in read-only mode;
    it does not create a session and does not write files.
 
-Retreat flag: set `OPENCLAW_PERSONA_PROPOSER=off` before gateway start to force
-the older handwritten wizard for `/setup` and `/persona check fill`. This does
-not rename commands or change OpenClaw permissions. Secret-like input or AI
-responses are rejected for the affected field and surfaced as warnings instead
-of being written to ARTIST.md or SOUL.md.
+Historical retreat flag: before Plan v9.13, `OPENCLAW_PERSONA_PROPOSER=off`
+forced the older handwritten wizard for `/setup` and `/persona check fill`.
+Plan v9.13 removes that wizard implementation; the flag now only disables
+persona proposer calls on any remaining proposer-backed path. It does not rename
+commands or change OpenClaw permissions. Secret-like input or AI responses are
+rejected for the affected field and surfaced as warnings instead of being
+written to ARTIST.md or SOUL.md.
+
+## Conversational artist and distribution polling (Plan v9.13)
+
+Plan v9.13 changes Telegram from chained wizard prompts into producer-to-artist
+conversation. The OpenClaw artist-runtime is the artist, the operator is the
+producer, and Telegram is the channel between them. The artist answers as
+itself, proposes ChangeSets when files should change, and waits for producer
+confirmation before writing managed files.
+
+Core journeys:
+
+1. Persona refinement: talk to the artist with `/persona ...` or plain text.
+   When a ChangeSet is proposed, use `/yes` to apply, `/no` to discard, or
+   `/edit <field> <value>` to revise before applying.
+2. Song discussion: use `/song <id> ...` to discuss a song. The artist can
+   propose brief, lyric, note, status, or public-link changes using the same
+   ChangeSet confirmation path.
+3. Autonomous production: autopilot can observe, generate a theme, build a song,
+   and report completed takes. `autopilot.dryRun=true` remains the protected
+   default for real Suno and social side effects.
+4. Distribution autoupdate: scheduled songs are polled against UnitedMasters,
+   Spotify, and Apple Music/iTunes lookup. When a public DSP link appears, the
+   runtime emits a distribution-change event so the artist can ask whether
+   SONGBOOK should be updated.
+
+Operational flags:
+
+- `OPENCLAW_LEGACY_WIZARD=on`: keeps legacy command surfaces safe, but the
+  removed wizard implementation is not revived in new builds.
+- `OPENCLAW_PERSONA_PROPOSER=off`: disables persona AI proposer calls.
+- `OPENCLAW_SONG_PROPOSER=off`: disables song proposer flows that still depend
+  on the proposer service.
+
+Runtime safety knobs:
+
+- Suno daily budget: set `runtime/config-overrides.json` under
+  `suno.dailyBudget`, or set `OPENCLAW_SUNO_DAILY_BUDGET`.
+- X observation pacing: set `bird.rateLimits.dailyMax` and
+  `bird.rateLimits.minIntervalMinutes` in `runtime/config-overrides.json`, or
+  use `OPENCLAW_BIRD_DAILY_MAX` and `OPENCLAW_BIRD_MIN_INTERVAL_MINUTES`.
+  Defaults are deliberately slow to reduce X/Bird ban risk.
+- Apple Music lookup: the default used::honda profile uses iTunes artist id
+  `1889924232` with JP locale. The poller calls
+  `https://itunes.apple.com/lookup?id=1889924232&entity=song&limit=200` and
+  matches scheduled song titles.
+
+The older `/answer` wizard flow is gone. `/skip` and `/back` are no longer
+production runtime command registrations; if typed, the bot should steer the
+producer back to natural conversation.
 
 ### Debug AI review command
 
