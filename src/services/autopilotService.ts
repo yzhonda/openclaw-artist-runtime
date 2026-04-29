@@ -19,7 +19,9 @@ import { generateSunoRun } from "./sunoRuns.js";
 import { publishSocialAction } from "./socialPublishing.js";
 import { selectTake } from "./takeSelection.js";
 import { emitRuntimeEvent } from "./runtimeEventBus.js";
-import { resetIfNewDay, tryConsumeBudget } from "./sunoBudgetLedger.js";
+import { resetIfNewDay } from "./sunoBudgetLedger.js";
+import { reserveSunoGenerationBudget } from "./sunoBudgetGuard.js";
+import { classifySunoGenerateFailure, nextSunoRetryDecision } from "./sunoRetryHandler.js";
 import { collectObservations } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
 import { pollSongDistribution } from "./songDistributionPoller.js";
@@ -236,6 +238,52 @@ async function handlePlanningStage(
   }
   await applyChangeSet(root, validation.proposal);
   return undefined;
+}
+
+async function handleSunoGenerateFailure(
+  root: string,
+  existing: AutopilotRunState,
+  baseState: AutopilotRunState,
+  song: SongState,
+  reason: string
+): Promise<AutopilotRunState> {
+  const retryCount = existing.retryCount + 1;
+  if (retryCount >= 3) {
+    emitRuntimeEvent({
+      type: "suno_generate_failed",
+      songId: song.songId,
+      reason,
+      retryCount,
+      timestamp: Date.now()
+    });
+    return writeStageState(root, existing, {
+      ...baseState,
+      currentSongId: song.songId,
+      stage: "paused",
+      paused: true,
+      pausedReason: `suno_generate_failed:${reason}`,
+      blockedReason: `suno_generate_failed:${reason}`,
+      lastError: reason,
+      retryCount,
+      cycleCount: existing.cycleCount + 1
+    });
+  }
+  emitRuntimeEvent({
+    type: "suno_generate_retry",
+    songId: song.songId,
+    reason,
+    retryCount,
+    timestamp: Date.now()
+  });
+  return writeStageState(root, existing, {
+    ...baseState,
+    currentSongId: song.songId,
+    stage: "suno_generation",
+    blockedReason: `suno_generate_retry:${reason}`,
+    lastError: reason,
+    retryCount,
+    cycleCount: existing.cycleCount + 1
+  });
 }
 
 async function choosePublishPlatform(config: ArtistRuntimeConfig): Promise<"x" | "instagram" | "tiktok"> {
@@ -474,8 +522,40 @@ export class ArtistAutopilotService {
           });
         }
         case "suno_generation": {
-          const budget = await tryConsumeBudget(input.workspaceRoot, 1);
+          const retryDecision = nextSunoRetryDecision(existing);
+          if (retryDecision.action === "wait") {
+            emitRuntimeEvent({
+              type: "suno_generate_retry",
+              songId: song.songId,
+              reason: retryDecision.reason,
+              retryCount: existing.retryCount,
+              nextRetryAt: retryDecision.nextRetryAt,
+              timestamp: Date.now()
+            });
+            return writeStageState(input.workspaceRoot, existing, {
+              ...baseState,
+              currentSongId: song.songId,
+              stage: "suno_generation",
+              lastRunAt: existing.lastRunAt,
+              blockedReason: retryDecision.reason,
+              lastError: undefined,
+              lastSuccessfulStage: existing.lastSuccessfulStage,
+              cycleCount: existing.cycleCount + 1
+            });
+          }
+          if (retryDecision.action === "failed") {
+            return handleSunoGenerateFailure(input.workspaceRoot, existing, baseState, song, retryDecision.reason);
+          }
+          const budget = await reserveSunoGenerationBudget(input.workspaceRoot, 1);
           if (!budget.ok) {
+            emitRuntimeEvent({
+              type: "suno_budget_low",
+              songId: song.songId,
+              reason: budget.reason ?? "daily Suno budget low",
+              limit: budget.state.limit,
+              used: budget.state.used,
+              timestamp: Date.now()
+            });
             emitRuntimeEvent({
               type: "budget_exhausted",
               reason: budget.reason ?? "daily Suno budget exhausted",
@@ -493,7 +573,17 @@ export class ArtistAutopilotService {
               cycleCount: existing.cycleCount + 1
             });
           }
-          const run = await generateSunoRun({ workspaceRoot: input.workspaceRoot, songId: song.songId, config });
+          let generateError: unknown;
+          const run = await generateSunoRun({ workspaceRoot: input.workspaceRoot, songId: song.songId, config }).catch((error) => {
+            generateError = error;
+            return undefined;
+          });
+          if (!run) {
+            return handleSunoGenerateFailure(input.workspaceRoot, existing, baseState, song, classifySunoGenerateFailure(generateError));
+          }
+          if (run.status === "failed" || run.status === "blocked_authority") {
+            return handleSunoGenerateFailure(input.workspaceRoot, existing, baseState, song, run.error?.message ?? run.authorityDecision.reason);
+          }
           return writeStageState(input.workspaceRoot, existing, {
             ...baseState,
             currentSongId: song.songId,
@@ -501,6 +591,7 @@ export class ArtistAutopilotService {
             blockedReason: run.status === "accepted" || run.status === "blocked_dry_run" ? "waiting for Suno result import" : run.authorityDecision.reason,
             lastError: run.error?.message,
             lastSuccessfulStage: "suno_generation",
+            retryCount: 0,
             cycleCount: existing.cycleCount + 1
           });
         }

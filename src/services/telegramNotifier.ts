@@ -306,6 +306,12 @@ export async function formatRuntimeEvent(
       );
     case "theme_generated":
       return artistReport(event, `Theme generated: ${event.theme}. Reason: ${event.reason}`, options);
+    case "suno_budget_low":
+      return artistReport(event, `Suno budget low: ${event.reason} (${event.used}/${event.limit})`, options);
+    case "suno_generate_retry":
+      return artistReport(event, `Suno generate retry: ${event.songId} retry=${event.retryCount} ${event.reason}${event.nextRetryAt ? ` next=${event.nextRetryAt}` : ""}`, options);
+    case "suno_generate_failed":
+      return artistReport(event, `Suno generate failed: ${event.songId} retry=${event.retryCount} ${event.reason}`, options);
     case "budget_exhausted":
       return artistReport(event, `Suno budget exhausted: ${event.reason} (${event.used}/${event.limit})`, options);
     case "bird_cooldown_triggered":
