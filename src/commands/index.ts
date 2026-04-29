@@ -97,12 +97,12 @@ async function handleSessionCommand(name: string, ctx: PluginCommandContextLike,
   if (!text) {
     return { text: "Usage: /answer <wizard answer>" };
   }
-  const personaResponse = await handleTelegramPersonaSessionMessage(config.artist.workspaceRoot, text);
-  if (personaResponse) {
-    return { text: personaResponse };
-  }
   const songResponse = await handleTelegramSongSessionMessage(config.artist.workspaceRoot, text);
-  return { text: songResponse ?? "No active artist-runtime wizard. Use /setup, /persona check fill, /song update <id>, or /song add first." };
+  if (songResponse) {
+    return { text: songResponse };
+  }
+  const personaResponse = await handleTelegramPersonaSessionMessage(config.artist.workspaceRoot, text);
+  return { text: personaResponse ?? "No active artist-runtime wizard. Use /setup, /persona check fill, /song update <id>, or /song add first." };
 }
 
 function logRegistration(ok: boolean, name: string): void {
