@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { markCallbackResolved, resolveCallbackAction, type CallbackActionEntry, type CallbackActionStatus } from "./callbackActionRegistry.js";
 import { handleProposalResponse } from "./conversationalSession.js";
 import { secretLikePattern } from "./personaMigrator.js";
+import { runSongPublishAction, type SongPublishAction } from "./songPublishActionRegistry.js";
 import type { TelegramClient } from "./telegramClient.js";
 
 export interface TelegramCallbackContext {
@@ -152,6 +153,29 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
     await ctx.client.sendMessage(entry.chatId, "Edit dialog opened. Send /edit <field> <value>, or use Producer Console to adjust fields.").catch(() => undefined);
     await ctx.client.editMessageReplyMarkup(entry.chatId, entry.messageId, { inline_keyboard: [] }).catch(() => undefined);
     return { processed: true, result: "updated", reason: proposalResult.status, callbackId };
+  }
+
+  if (entry.action === "song_songbook_write" || entry.action === "song_skip") {
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    try {
+      const actionResult = await runSongPublishAction(entry.action as SongPublishAction, {
+        root: ctx.root,
+        songId: entry.songId ?? "",
+        now
+      });
+      const callbackStatus: Exclude<CallbackActionStatus, "pending"> = actionResult.status === "applied" ? "applied" : "discarded";
+      const callbackResult: TelegramCallbackResult["result"] = actionResult.status === "applied" ? "applied" : "discarded";
+      await markCallbackResolved(ctx.root, callbackId, { status: callbackStatus, reason: actionResult.status, now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, callbackResult, actionResult.status));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, actionResult.message, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: callbackResult, reason: actionResult.status, callbackId };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "song_publish_action_failed";
+      await markCallbackResolved(ctx.root, callbackId, { status: "failed", reason, now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "failed", reason));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "Song action failed. Check the runtime log.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "failed", reason, callbackId };
+    }
   }
 
   await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "Unsupported action" });

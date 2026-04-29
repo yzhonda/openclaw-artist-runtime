@@ -33,9 +33,40 @@ export class TelegramNotifier {
       aiReviewProvider: this.options.aiReviewProvider
     });
     const sent = await this.client.sendMessage(this.options.chatId, text);
+    if (event.type === "song_take_completed") {
+      await this.attachSongCompletionButtons(event, sent.message_id).catch(() => undefined);
+    }
     if (event.type === "distribution_change_detected") {
       await this.attachDistributionButtons(event, sent.message_id, text).catch(() => undefined);
     }
+  }
+
+  private async attachSongCompletionButtons(event: Extract<RuntimeEvent, { type: "song_take_completed" }>, messageId: number): Promise<void> {
+    if (!this.options.workspaceRoot || typeof this.options.chatId !== "number") {
+      return;
+    }
+    const [write, skip] = await Promise.all([
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "song_songbook_write",
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "song_skip",
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      })
+    ]);
+    await this.client.editMessageReplyMarkup(this.options.chatId, messageId, {
+      inline_keyboard: [[
+        { text: "📝 SONGBOOK 反映", callback_data: `cb:${write.callbackId}` },
+        { text: "⏸ 後で", callback_data: `cb:${skip.callbackId}` }
+      ]]
+    });
   }
 
   private async attachDistributionButtons(event: Extract<RuntimeEvent, { type: "distribution_change_detected" }>, messageId: number, text: string): Promise<void> {
@@ -136,6 +167,10 @@ export async function formatRuntimeEvent(
         `Distribution change detected: ${event.platform} has a public link for ${event.songId}. ${event.url}${event.proposalId ? ` Proposal: ${event.proposalId}` : ""}`,
         options
       );
+    case "song_songbook_written":
+      return artistReport(event, `SONGBOOK updated: ${event.songId} is now marked published.`, options);
+    case "song_publish_skipped":
+      return artistReport(event, `Song completion skipped for now: ${event.songId}.`, options);
     case "error":
       return `Runtime error: ${event.source} ${event.reason}${event.songId ? ` (${event.songId})` : ""}`;
   }
