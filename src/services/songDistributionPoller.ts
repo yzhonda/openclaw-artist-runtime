@@ -174,7 +174,7 @@ async function pollAppleMusic(fetchImpl: typeof fetch, title: string, options: S
   )?.trackViewUrl;
 }
 
-function proposalForDetection(detection: Omit<SongDistributionDetection, "proposal">): ChangeSetProposal {
+export function proposalForDetection(detection: Omit<SongDistributionDetection, "proposal">): ChangeSetProposal {
   const field = detection.platform === "spotify"
     ? "publicLinksSpotify"
     : detection.platform === "appleMusic"
@@ -198,7 +198,8 @@ function proposalForDetection(detection: Omit<SongDistributionDetection, "propos
     warnings: [],
     createdAt: detection.detectedAt,
     source: "conversation",
-    songId: detection.songId
+    songId: detection.songId,
+    platform: detection.platform
   };
 }
 
@@ -256,6 +257,7 @@ export async function pollSongDistribution(root: string, options: SongDistributi
             platform,
             url,
             proposalId: proposal.id,
+            proposal,
             timestamp: now.getTime()
           });
         }

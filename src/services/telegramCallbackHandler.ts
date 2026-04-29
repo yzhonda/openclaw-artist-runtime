@@ -111,11 +111,12 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
     return { processed: true, result: "duplicate", reason: `already_${entry.status}`, callbackId };
   }
 
-  if (entry.action === "proposal_yes" || entry.action === "proposal_no") {
+  if (entry.action === "proposal_yes" || entry.action === "proposal_no" || entry.action === "dist_apply" || entry.action === "dist_skip") {
     await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    const isApply = entry.action === "proposal_yes" || entry.action === "dist_apply";
     const proposalResult = await handleProposalResponse(ctx.root, {
       proposalId: entry.proposalId ?? "",
-      action: entry.action === "proposal_yes" ? "yes" : "no",
+      action: isApply ? "yes" : "no",
       actor: { kind: "telegram_callback", chatId: entry.chatId, userId: entry.userId },
       now
     });
@@ -131,7 +132,10 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
           : callbackStatus === "duplicate" ? "duplicate"
             : "failed";
     await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, callbackResult, proposalResult.status));
-    await ctx.client.editMessageText(entry.chatId, entry.messageId, proposalResult.message, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+    const message = entry.action.startsWith("dist_")
+      ? `${proposalResult.status === "applied" ? "Applied ✓" : proposalResult.status === "discarded" ? "Skipped" : "Already resolved"}${entry.platform ? ` ${entry.platform}` : ""}${entry.songId ? ` for ${entry.songId}` : ""}. ${proposalResult.message}`
+      : proposalResult.message;
+    await ctx.client.editMessageText(entry.chatId, entry.messageId, message, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
     return { processed: true, result: callbackResult, reason: proposalResult.status, callbackId };
   }
 

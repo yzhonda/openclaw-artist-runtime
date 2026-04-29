@@ -25,6 +25,7 @@ export interface ChangeSetProposal {
   createdAt: string;
   source: "conversation";
   songId?: string;
+  platform?: string;
 }
 
 export interface FreeformChangeSetRequest {
