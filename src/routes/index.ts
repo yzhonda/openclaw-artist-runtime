@@ -14,8 +14,7 @@ import { ArtistAutopilotService, pauseAutopilot, resumeAutopilot } from "../serv
 import { AutopilotControlService } from "../services/autopilotControlService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
 import { readBirdLedgerDetail, readBirdRateLimitStatus } from "../services/birdRateLimiter.js";
-import * as changeSetApplier from "../services/changeSetApplier.js";
-import { applyProposalToSession, clearProposalFromSession, listPendingProposalDetails, listPendingProposals, resolvePendingProposal, updateProposalFields } from "../services/conversationalSession.js";
+import { handleProposalResponse, listPendingProposalDetails, listPendingProposals } from "../services/conversationalSession.js";
 import { buildPlatformStats, readDistributionEvents } from "../services/distributionLedgerReader.js";
 import { getRuntimeEventBus } from "../services/runtimeEventBus.js";
 import { readRuntimeEvents } from "../services/runtimeEventsLedger.js";
@@ -501,23 +500,6 @@ function proposalFieldsFromPayload(payload: Record<string, unknown>): Record<str
     Object.entries(rawFields)
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .map(([field, value]) => [field, value])
-  );
-}
-
-async function appendProposalAudit(
-  workspaceRoot: string,
-  eventType: string,
-  proposalId: string,
-  details: Record<string, unknown>
-): Promise<void> {
-  await appendAuditLog(
-    join(workspaceRoot, "runtime", "proposal-audit.jsonl"),
-    createAuditEvent({
-      eventType,
-      actor: "producer",
-      sourceRefs: [proposalId],
-      details
-    })
   );
 }
 
@@ -1115,43 +1097,27 @@ export function registerRoutes(api: unknown): void {
           const proposalId = segments[0] ?? "";
           const action = segments[1];
           if (action === "yes") {
-            const proposal = await resolvePendingProposal(workspaceRoot, proposalId);
-            if (!proposal) {
-              return { error: "proposal_not_found", proposalId };
-            }
-            const result = await changeSetApplier.applyChangeSet(workspaceRoot, proposal);
-            await applyProposalToSession(workspaceRoot, proposalId);
-            await appendProposalAudit(workspaceRoot, "proposal_apply_yes", proposalId, {
-              domain: proposal.domain,
-              fieldCount: proposal.fields.length,
-              applied: result.applied.length,
-              skipped: result.skipped.length,
-              warnings: result.warnings
+            return await handleProposalResponse(workspaceRoot, {
+              proposalId,
+              action: "yes",
+              actor: { kind: "ui_api" }
             });
-            return result;
           }
           if (action === "no") {
-            const cleared = await clearProposalFromSession(workspaceRoot, proposalId);
-            if (!cleared) {
-              return { error: "proposal_not_found", proposalId };
-            }
-            await appendProposalAudit(workspaceRoot, "proposal_cancel_no", proposalId, {
-              domain: cleared.domain,
-              fieldCount: cleared.fields.length
+            return await handleProposalResponse(workspaceRoot, {
+              proposalId,
+              action: "no",
+              actor: { kind: "ui_api" }
             });
-            return { cleared: true, proposalId };
           }
           if (action === "edit") {
             const fields = proposalFieldsFromPayload(payload);
-            const updated = await updateProposalFields(workspaceRoot, proposalId, fields);
-            if (!updated) {
-              return { error: "proposal_not_found", proposalId };
-            }
-            await appendProposalAudit(workspaceRoot, "proposal_edit", proposalId, {
-              domain: updated.domain,
-              fields: Object.keys(fields)
+            return await handleProposalResponse(workspaceRoot, {
+              proposalId,
+              action: "edit",
+              actor: { kind: "ui_api" },
+              fieldUpdates: fields
             });
-            return { proposal: updated };
           }
         }
       } catch (error) {

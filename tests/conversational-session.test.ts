@@ -35,17 +35,25 @@ describe("conversational session", () => {
     await expect(readFile(conversationalSessionPath(root), "utf8")).resolves.toContain("turn-11");
   });
 
-  it("keeps pending action and clears a chat session", async () => {
+  it("keeps pending ChangeSet state and clears a chat session", async () => {
     const root = makeRoot();
     await appendConversationTurn(root, {
       chatId: 10,
       userId: 20,
       turn: { role: "user", text: "save this lyric" },
-      pendingAction: { kind: "lyrics_save", payload: { songId: "song-1" } },
+      pendingChangeSet: {
+        id: "changeset-test",
+        domain: "song",
+        summary: "Change a note.",
+        fields: [],
+        warnings: [],
+        createdAt: "2026-04-29T00:00:00.000Z",
+        source: "conversation"
+      },
       now: 100
     });
 
-    expect((await readConversationalSession(root, 10, 20, 101))?.pendingAction).toMatchObject({ kind: "lyrics_save" });
+    expect((await readConversationalSession(root, 10, 20, 101))?.pendingChangeSet?.id).toBe("changeset-test");
     await clearConversationalSession(root, 10, 20);
     await expect(readConversationalSession(root, 10, 20, 102)).resolves.toBeUndefined();
   });

@@ -3,13 +3,11 @@ import { join } from "node:path";
 import type { AiReviewProvider, AutopilotStatus } from "../types.js";
 import { ArtistAutopilotService } from "./autopilotService.js";
 import { readArtistVoiceContext, generateArtistResponse } from "./artistVoiceResponder.js";
-import { applyChangeSet } from "./changeSetApplier.js";
 import {
   appendConversationTurn,
-  clearConversationalSession,
   createConversationalSession,
+  handleProposalResponse,
   readConversationalSession,
-  writeConversationalSession,
   type ConversationalSession
 } from "./conversationalSession.js";
 import { proposeFreeformChangeSet, type ChangeSetProposal } from "./freeformChangesetProposer.js";
@@ -27,6 +25,11 @@ export interface TelegramConversationalRouteInput {
 export interface TelegramConversationalRouteResult {
   responseText: string;
   shouldStoreFreeText: boolean;
+  proposalButtons?: TelegramProposalButtonsRequest;
+}
+
+export interface TelegramProposalButtonsRequest {
+  proposalId: string;
 }
 
 function stripCommand(text: string): string {
@@ -128,23 +131,34 @@ export async function routeTelegramConversation(input: TelegramConversationalRou
   }
 
   if (session.pendingChangeSet && affirmative(text)) {
-    const result = await applyChangeSet(input.workspaceRoot, session.pendingChangeSet);
-    await clearConversationalSession(input.workspaceRoot, input.chatId, input.fromUserId);
+    const result = await handleProposalResponse(input.workspaceRoot, {
+      proposalId: session.pendingChangeSet.id,
+      action: "yes",
+      actor: { kind: "telegram_text", chatId: input.chatId, userId: input.fromUserId }
+    });
     return {
-      responseText: `反映した。applied=${result.applied.length}, skipped=${result.skipped.length}${result.warnings.length ? `\nWarnings: ${result.warnings.join("; ")}` : ""}`,
+      responseText: result.message,
       shouldStoreFreeText: false
     };
   }
   if (session.pendingChangeSet && negative(text)) {
-    await writeConversationalSession(input.workspaceRoot, { ...session, pendingChangeSet: undefined, updatedAt: Date.now() });
-    return { responseText: "やめておく。話は続けられる。", shouldStoreFreeText: false };
+    const result = await handleProposalResponse(input.workspaceRoot, {
+      proposalId: session.pendingChangeSet.id,
+      action: "no",
+      actor: { kind: "telegram_text", chatId: input.chatId, userId: input.fromUserId }
+    });
+    return { responseText: result.message, shouldStoreFreeText: false };
   }
   const edit = text.match(/^\/edit\s+(\S+)\s+([\s\S]+)$/i);
   if (session.pendingChangeSet && edit) {
     const [, field, value] = edit;
-    const fields = session.pendingChangeSet.fields.map((candidate) => candidate.field === field ? { ...candidate, proposedValue: value } : candidate);
-    const proposal = { ...session.pendingChangeSet, fields };
-    await writeConversationalSession(input.workspaceRoot, { ...session, pendingChangeSet: proposal, updatedAt: Date.now() });
+    const result = await handleProposalResponse(input.workspaceRoot, {
+      proposalId: session.pendingChangeSet.id,
+      action: "edit",
+      actor: { kind: "telegram_text", chatId: input.chatId, userId: input.fromUserId },
+      fieldUpdates: { [field]: value }
+    });
+    const proposal = result.proposal ?? session.pendingChangeSet;
     return { responseText: formatChangeSet(proposal), shouldStoreFreeText: false };
   }
 
@@ -154,15 +168,18 @@ export async function routeTelegramConversation(input: TelegramConversationalRou
   const proposal = await proposeFromConversation(input.workspaceRoot, cleanText, session, input.aiReviewProvider);
   const artistText = await respondAsArtist(input.workspaceRoot, cleanText, session, input.aiReviewProvider);
   if (proposal && proposal.fields.length > 0) {
-    const next = await appendConversationTurn(input.workspaceRoot, {
+    await appendConversationTurn(input.workspaceRoot, {
       chatId: input.chatId,
       userId: input.fromUserId,
       topic,
       pendingChangeSet: proposal,
       turn: { role: "artist", text: artistText }
     });
-    await writeConversationalSession(input.workspaceRoot, next);
-    return { responseText: `${artistText}\n\n${formatChangeSet(proposal)}`, shouldStoreFreeText: true };
+    return {
+      responseText: `${artistText}\n\n${formatChangeSet(proposal)}`,
+      shouldStoreFreeText: true,
+      proposalButtons: { proposalId: proposal.id }
+    };
   }
   await appendConversationTurn(input.workspaceRoot, { chatId: input.chatId, userId: input.fromUserId, topic, turn: { role: "artist", text: artistText } });
   return { responseText: artistText, shouldStoreFreeText: true };

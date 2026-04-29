@@ -272,7 +272,7 @@ describe("telegram bot worker", () => {
   it("routes callback_query updates through the callback handler", async () => {
     const root = makeRoot();
     const entry = await registerCallbackAction(root, {
-      action: "proposal_yes",
+      action: "unknown_action",
       chatId: 555,
       messageId: 10,
       userId: 123

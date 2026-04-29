@@ -14,7 +14,9 @@ function root(): string {
 function clientMock(): TelegramClient {
   return {
     answerCallbackQuery: vi.fn().mockResolvedValue(true),
-    editMessageReplyMarkup: vi.fn().mockResolvedValue(true)
+    editMessageReplyMarkup: vi.fn().mockResolvedValue(true),
+    editMessageText: vi.fn().mockResolvedValue(true),
+    sendMessage: vi.fn().mockResolvedValue({ message_id: 201, chat: { id: 100 } })
   } as unknown as TelegramClient;
 }
 
@@ -28,7 +30,7 @@ describe("telegram callback handler", () => {
     const workspace = root();
     const client = clientMock();
     const entry = await registerCallbackAction(workspace, {
-      action: "proposal_yes",
+      action: "unknown_action",
       proposalId: "proposal-1",
       chatId: 100,
       messageId: 200,
@@ -54,7 +56,7 @@ describe("telegram callback handler", () => {
     expect(await auditLines(workspace)).toEqual([
       expect.objectContaining({
         callbackId: entry.callbackId,
-        action: "proposal_yes",
+        action: "unknown_action",
         proposalId: "proposal-1",
         result: "failed",
         reason: "unsupported_action"

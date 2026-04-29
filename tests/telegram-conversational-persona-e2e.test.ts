@@ -31,7 +31,7 @@ describe("telegram conversational persona e2e", () => {
 
     const applied = await routeTelegramCommand({ text: "/yes", fromUserId: 1, chatId: 2, workspaceRoot: root });
 
-    expect(applied.responseText).toContain("反映した");
+    expect(applied.responseText).toContain("Applied.");
     expect(readFileSync(join(root, "ARTIST.md"), "utf8")).toContain("artist-runtime:persona:core:start");
   });
 });

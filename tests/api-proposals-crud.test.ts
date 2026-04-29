@@ -153,7 +153,10 @@ describe("proposals route CRUD", () => {
     const response = await invoke(handler, "POST", `/plugins/artist-runtime/api/proposals/${pending.id}/yes`, root);
 
     expect(response.readStatus()).toBe(200);
-    expect(response.json()).toMatchObject({ applied: [{ field: "notes" }], skipped: [], warnings: [] });
+    expect(response.json()).toMatchObject({
+      status: "applied",
+      applyResult: { applied: [{ field: "notes" }], skipped: [], warnings: [] }
+    });
     expect(applySpy).toHaveBeenCalledWith(root, pending);
     expect(await listPendingProposalDetails(root)).toEqual([]);
   });
@@ -168,7 +171,7 @@ describe("proposals route CRUD", () => {
 
     const response = await invoke(handler, "POST", `/plugins/artist-runtime/api/proposals/${pending.id}/no`, root);
 
-    expect(response.json()).toEqual({ cleared: true, proposalId: pending.id });
+    expect(response.json()).toMatchObject({ status: "discarded" });
     expect(applySpy).not.toHaveBeenCalled();
     expect(await listPendingProposalDetails(root)).toEqual([]);
   });
@@ -189,6 +192,7 @@ describe("proposals route CRUD", () => {
     );
 
     expect(response.json()).toMatchObject({
+      status: "updated",
       proposal: {
         id: pending.id,
         fields: [{ field: "notes", proposedValue: "edited note from console", status: "proposed" }]
@@ -203,7 +207,7 @@ describe("proposals route CRUD", () => {
     const handler = registerProposalHandler();
 
     let response = await invoke(handler, "POST", "/plugins/artist-runtime/api/proposals/missing/yes", root);
-    expect(response.json()).toEqual({ error: "proposal_not_found", proposalId: "missing" });
+    expect(response.json()).toMatchObject({ status: "already_resolved" });
 
     await seedSession(root, proposal("dup"), 10);
     await seedSession(root, proposal("dup"), 11);

@@ -12,7 +12,7 @@ import { createTelegramPersonaSession, handleTelegramPersonaSessionMessage } fro
 import { formatPersonaMigratePlan, planPersonaMigrate } from "./personaMigrator.js";
 import { isLegacyWizardEnabled } from "./runtimeConfig.js";
 import { readSoulPersonaSummary } from "./soulFileBuilder.js";
-import { isConversationalSongCreate, routeTelegramConversation } from "./telegramConversationalRouter.js";
+import { isConversationalSongCreate, routeTelegramConversation, type TelegramProposalButtonsRequest } from "./telegramConversationalRouter.js";
 
 export type TelegramCommandKind =
   | "help"
@@ -41,6 +41,7 @@ export interface TelegramRouteResult {
   kind: TelegramCommandKind;
   responseText: string;
   shouldStoreFreeText: boolean;
+  proposalButtons?: TelegramProposalButtonsRequest;
 }
 
 function inboxPath(root: string): string {

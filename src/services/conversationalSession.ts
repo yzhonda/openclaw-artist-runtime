@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { applyChangeSet, type ChangeSetApplyResult } from "./changeSetApplier.js";
 import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
 
 export interface ConversationalTurn {
@@ -14,7 +15,6 @@ export interface ConversationalSession {
   topic: { kind: "persona" | "song" | "free"; songId?: string };
   history: ConversationalTurn[];
   pendingChangeSet?: ChangeSetProposal;
-  pendingAction?: { kind: "regenerate_suno" | "publish_arm_switch" | "lyrics_save"; payload: unknown };
   startedAt: number;
   updatedAt: number;
   expiresAt: number;
@@ -83,7 +83,6 @@ export async function createConversationalSession(
     userId: number;
     topic?: ConversationalSession["topic"];
     pendingChangeSet?: ChangeSetProposal;
-    pendingAction?: ConversationalSession["pendingAction"];
     now?: number;
     ttlMs?: number;
   }
@@ -95,7 +94,6 @@ export async function createConversationalSession(
     topic: input.topic ?? { kind: "free" },
     history: [],
     pendingChangeSet: input.pendingChangeSet,
-    pendingAction: input.pendingAction,
     startedAt: now,
     updatedAt: now,
     expiresAt: now + (input.ttlMs ?? CONVERSATIONAL_SESSION_TTL_MS)
@@ -110,7 +108,6 @@ export async function appendConversationTurn(
     turn: Omit<ConversationalTurn, "timestamp"> & { timestamp?: number };
     topic?: ConversationalSession["topic"];
     pendingChangeSet?: ChangeSetProposal;
-    pendingAction?: ConversationalSession["pendingAction"];
     now?: number;
   }
 ): Promise<ConversationalSession> {
@@ -121,7 +118,6 @@ export async function appendConversationTurn(
     ...current,
     topic: input.topic ?? current.topic,
     pendingChangeSet: input.pendingChangeSet ?? current.pendingChangeSet,
-    pendingAction: input.pendingAction ?? current.pendingAction,
     history: [...current.history, { ...input.turn, timestamp: input.turn.timestamp ?? now }].slice(-historyLimit),
     updatedAt: now,
     expiresAt: now + CONVERSATIONAL_SESSION_TTL_MS
@@ -155,6 +151,66 @@ function assertSingleProposalSession(sessions: ConversationalSession[], proposal
     throw new Error(`proposal_id_not_unique:${proposalId}`);
   }
   return sessions[0];
+}
+
+function proposalAuditPath(root: string): string {
+  return join(root, "runtime", "proposal-audit.jsonl");
+}
+
+export type ProposalResponseAction = "yes" | "no" | "edit";
+export type ProposalResponseStatus = "applied" | "discarded" | "updated" | "already_resolved" | "unauthorized" | "expired";
+
+export interface ProposalAuditEntry {
+  timestamp: number;
+  eventType: string;
+  proposalId: string;
+  actorKind: "telegram_text" | "telegram_callback" | "ui_api";
+  domain?: ChangeSetProposal["domain"];
+  fieldCount?: number;
+  details?: Record<string, unknown>;
+}
+
+export interface ProposalResponseApplyResult extends ChangeSetApplyResult {
+  auditEntry: ProposalAuditEntry;
+}
+
+export interface ProposalResponseResult {
+  status: ProposalResponseStatus;
+  message: string;
+  applyResult?: ProposalResponseApplyResult;
+  auditEntry?: ProposalAuditEntry;
+  proposal?: PendingProposalDetail;
+}
+
+async function appendProposalResponseAudit(root: string, entry: ProposalAuditEntry): Promise<ProposalAuditEntry> {
+  const path = proposalAuditPath(root);
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${JSON.stringify(entry)}\n`, "utf8");
+  return entry;
+}
+
+function auditEntry(
+  proposalId: string,
+  actorKind: ProposalAuditEntry["actorKind"],
+  eventType: string,
+  proposal?: ChangeSetProposal,
+  details?: Record<string, unknown>,
+  now = Date.now()
+): ProposalAuditEntry {
+  return {
+    timestamp: now,
+    eventType,
+    proposalId,
+    actorKind,
+    domain: proposal?.domain,
+    fieldCount: proposal?.fields.length,
+    details
+  };
+}
+
+async function resolvePendingProposalSession(root: string, proposalId: string, now: number): Promise<ConversationalSession | undefined> {
+  const store = await readStore(root);
+  return assertSingleProposalSession(activeProposalSessions(store, proposalId, now), proposalId);
 }
 
 export async function listPendingProposals(root: string, now = Date.now()): Promise<PendingProposalSummary[]> {
@@ -246,4 +302,127 @@ export async function updateProposalFields(root: string, proposalId: string, par
   );
   await writeStore(root, { sessions: nextSessions });
   return updatedProposal;
+}
+
+export async function handleProposalResponse(
+  root: string,
+  request: {
+    proposalId: string;
+    action: ProposalResponseAction;
+    actor: { kind: "telegram_text" | "telegram_callback" | "ui_api"; chatId?: number; userId?: number };
+    fieldUpdates?: Record<string, string>;
+    now?: number;
+  }
+): Promise<ProposalResponseResult> {
+  const now = request.now ?? Date.now();
+  const session = await resolvePendingProposalSession(root, request.proposalId, now);
+  if (!session?.pendingChangeSet) {
+    const entry = await appendProposalResponseAudit(root, auditEntry(
+      request.proposalId,
+      request.actor.kind,
+      "proposal_already_resolved",
+      undefined,
+      { action: request.action },
+      now
+    ));
+    return {
+      status: "already_resolved",
+      message: "That proposal is already resolved.",
+      auditEntry: entry
+    };
+  }
+
+  if (
+    request.actor.kind !== "ui_api"
+    && (request.actor.chatId !== session.chatId || request.actor.userId !== session.userId)
+  ) {
+    const entry = await appendProposalResponseAudit(root, auditEntry(
+      request.proposalId,
+      request.actor.kind,
+      "proposal_unauthorized",
+      session.pendingChangeSet,
+      { action: request.action },
+      now
+    ));
+    return {
+      status: "unauthorized",
+      message: "Not authorized for this proposal.",
+      auditEntry: entry,
+      proposal: session.pendingChangeSet
+    };
+  }
+
+  if (request.action === "yes") {
+    const applyResult = await applyChangeSet(root, session.pendingChangeSet);
+    await clearProposalFromSession(root, request.proposalId, now);
+    const entry = await appendProposalResponseAudit(root, auditEntry(
+      request.proposalId,
+      request.actor.kind,
+      "proposal_apply_yes",
+      session.pendingChangeSet,
+      {
+        applied: applyResult.applied.length,
+        skipped: applyResult.skipped.length,
+        warnings: applyResult.warnings
+      },
+      now
+    ));
+    return {
+      status: "applied",
+      message: `Applied. applied=${applyResult.applied.length}, skipped=${applyResult.skipped.length}${applyResult.warnings.length ? `\nWarnings: ${applyResult.warnings.join("; ")}` : ""}`,
+      applyResult: { ...applyResult, auditEntry: entry },
+      auditEntry: entry
+    };
+  }
+
+  if (request.action === "no") {
+    await clearProposalFromSession(root, request.proposalId, now);
+    const entry = await appendProposalResponseAudit(root, auditEntry(
+      request.proposalId,
+      request.actor.kind,
+      "proposal_cancel_no",
+      session.pendingChangeSet,
+      undefined,
+      now
+    ));
+    return {
+      status: "discarded",
+      message: "Discarded. No files were changed.",
+      auditEntry: entry
+    };
+  }
+
+  const fields = request.fieldUpdates ?? {};
+  if (Object.keys(fields).length === 0) {
+    const entry = await appendProposalResponseAudit(root, auditEntry(
+      request.proposalId,
+      request.actor.kind,
+      "proposal_edit_open",
+      session.pendingChangeSet,
+      undefined,
+      now
+    ));
+    return {
+      status: "updated",
+      message: "Edit mode opened. Send /edit <field> <value> or edit from Producer Console.",
+      auditEntry: entry,
+      proposal: session.pendingChangeSet
+    };
+  }
+
+  const updated = await updateProposalFields(root, request.proposalId, fields, now);
+  const entry = await appendProposalResponseAudit(root, auditEntry(
+    request.proposalId,
+    request.actor.kind,
+    "proposal_edit",
+    updated ?? session.pendingChangeSet,
+    { fields: Object.keys(fields) },
+    now
+  ));
+  return {
+    status: "updated",
+    message: "Updated proposal fields.",
+    auditEntry: entry,
+    proposal: updated ?? session.pendingChangeSet
+  };
 }

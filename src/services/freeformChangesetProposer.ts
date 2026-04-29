@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { AiReviewProvider, PersonaField, SongUpdateField } from "../types.js";
+import type { AiReviewProvider, PersonaField, SongUpdateField, TelegramInlineKeyboard } from "../types.js";
 import { proposePersonaFields } from "./personaProposer.js";
 import { secretLikePattern } from "./personaMigrator.js";
 import { proposeSongFields } from "./songProposer.js";
@@ -39,6 +39,20 @@ export interface FreeformChangeSetRequest {
   briefMd?: string;
   songbookEntry?: string;
   currentState?: string;
+}
+
+export interface ProposalInlineKeyboardCallbacks {
+  yes: string;
+  no: string;
+  edit: string;
+}
+
+export function buildProposalInlineKeyboard(callbacks: ProposalInlineKeyboardCallbacks): TelegramInlineKeyboard {
+  return [[
+    { text: "Yes", callback_data: callbacks.yes },
+    { text: "No", callback_data: callbacks.no },
+    { text: "Edit", callback_data: callbacks.edit }
+  ]];
 }
 
 function proposalId(domain: ChangeSetDomain): string {

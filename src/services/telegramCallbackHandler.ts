@@ -2,6 +2,7 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { markCallbackResolved, resolveCallbackAction, type CallbackActionEntry, type CallbackActionStatus } from "./callbackActionRegistry.js";
+import { handleProposalResponse } from "./conversationalSession.js";
 import { secretLikePattern } from "./personaMigrator.js";
 import type { TelegramClient } from "./telegramClient.js";
 
@@ -18,7 +19,7 @@ export interface TelegramCallbackContext {
 
 export interface TelegramCallbackResult {
   processed: boolean;
-  result: "ignored" | "expired" | "unauthorized" | "duplicate" | "failed";
+  result: "ignored" | "expired" | "unauthorized" | "duplicate" | "failed" | "applied" | "discarded" | "updated";
   reason?: string;
   callbackId?: string;
 }
@@ -108,6 +109,45 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
     await markCallbackResolved(ctx.root, callbackId, { status: "duplicate", reason: `already_${entry.status}`, now });
     await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "duplicate", `already_${entry.status}`));
     return { processed: true, result: "duplicate", reason: `already_${entry.status}`, callbackId };
+  }
+
+  if (entry.action === "proposal_yes" || entry.action === "proposal_no") {
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    const proposalResult = await handleProposalResponse(ctx.root, {
+      proposalId: entry.proposalId ?? "",
+      action: entry.action === "proposal_yes" ? "yes" : "no",
+      actor: { kind: "telegram_callback", chatId: entry.chatId, userId: entry.userId },
+      now
+    });
+    const callbackStatus: Exclude<CallbackActionStatus, "pending"> =
+      proposalResult.status === "applied" ? "applied"
+        : proposalResult.status === "discarded" ? "discarded"
+          : proposalResult.status === "already_resolved" ? "duplicate"
+            : "failed";
+    await markCallbackResolved(ctx.root, callbackId, { status: callbackStatus, reason: proposalResult.status, now });
+    const callbackResult: TelegramCallbackResult["result"] =
+      callbackStatus === "applied" ? "applied"
+        : callbackStatus === "discarded" ? "discarded"
+          : callbackStatus === "duplicate" ? "duplicate"
+            : "failed";
+    await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, callbackResult, proposalResult.status));
+    await ctx.client.editMessageText(entry.chatId, entry.messageId, proposalResult.message, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+    return { processed: true, result: callbackResult, reason: proposalResult.status, callbackId };
+  }
+
+  if (entry.action === "proposal_edit_open") {
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    const proposalResult = await handleProposalResponse(ctx.root, {
+      proposalId: entry.proposalId ?? "",
+      action: "edit",
+      actor: { kind: "telegram_callback", chatId: entry.chatId, userId: entry.userId },
+      now
+    });
+    await markCallbackResolved(ctx.root, callbackId, { status: "updated", reason: "edit_opened", now });
+    await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "updated", proposalResult.status));
+    await ctx.client.sendMessage(entry.chatId, "Edit dialog opened. Send /edit <field> <value>, or use Producer Console to adjust fields.").catch(() => undefined);
+    await ctx.client.editMessageReplyMarkup(entry.chatId, entry.messageId, { inline_keyboard: [] }).catch(() => undefined);
+    return { processed: true, result: "updated", reason: proposalResult.status, callbackId };
   }
 
   await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "Unsupported action" });

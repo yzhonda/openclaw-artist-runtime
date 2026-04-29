@@ -8,6 +8,9 @@ import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } fr
 import { routeTelegramCallback } from "./telegramCallbackHandler.js";
 import { handleTelegramPersonaSessionMessage, readTelegramPersonaSession } from "./telegramPersonaSession.js";
 import { isLegacyWizardEnabled } from "./runtimeConfig.js";
+import { registerCallbackAction } from "./callbackActionRegistry.js";
+import { buildProposalInlineKeyboard } from "./freeformChangesetProposer.js";
+import type { TelegramProposalButtonsRequest } from "./telegramConversationalRouter.js";
 
 export interface TelegramBotWorkerOptions {
   root: string;
@@ -198,7 +201,7 @@ export class TelegramBotWorker {
     const session = isLegacyWizardEnabled() ? await readTelegramPersonaSession(this.options.root) : undefined;
     const sessionResponse = session ? await handleTelegramPersonaSessionMessage(this.options.root, text) : undefined;
     const route = sessionResponse
-      ? { shouldStoreFreeText: false, responseText: sessionResponse }
+      ? { shouldStoreFreeText: false, responseText: sessionResponse, proposalButtons: undefined }
       : await routeTelegramCommand({
           text,
           fromUserId: from.id,
@@ -218,8 +221,52 @@ export class TelegramBotWorker {
       });
     }
     const responseText = await this.withPersonaSetupAnnouncement(route.responseText);
-    await client.sendMessage(message.chat.id, responseText);
+    const sent = await client.sendMessage(message.chat.id, responseText);
+    if (route.proposalButtons) {
+      await this.attachProposalButtons(client, {
+        ...route.proposalButtons,
+        chatId: message.chat.id,
+        messageId: sent.message_id,
+        userId: from.id
+      });
+    }
     return true;
+  }
+
+  private async attachProposalButtons(
+    client: TelegramClient,
+    input: TelegramProposalButtonsRequest & { chatId: number; messageId: number; userId: number }
+  ): Promise<void> {
+    const [yes, no, edit] = await Promise.all([
+      registerCallbackAction(this.options.root, {
+        action: "proposal_yes",
+        proposalId: input.proposalId,
+        chatId: input.chatId,
+        messageId: input.messageId,
+        userId: input.userId
+      }),
+      registerCallbackAction(this.options.root, {
+        action: "proposal_no",
+        proposalId: input.proposalId,
+        chatId: input.chatId,
+        messageId: input.messageId,
+        userId: input.userId
+      }),
+      registerCallbackAction(this.options.root, {
+        action: "proposal_edit_open",
+        proposalId: input.proposalId,
+        chatId: input.chatId,
+        messageId: input.messageId,
+        userId: input.userId
+      })
+    ]);
+    await client.editMessageReplyMarkup(input.chatId, input.messageId, {
+      inline_keyboard: buildProposalInlineKeyboard({
+        yes: `cb:${yes.callbackId}`,
+        no: `cb:${no.callbackId}`,
+        edit: `cb:${edit.callbackId}`
+      })
+    });
   }
 
   private async rememberChatId(chatId: number): Promise<void> {

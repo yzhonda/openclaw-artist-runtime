@@ -6,6 +6,7 @@ export type CallbackActionStatus =
   | "pending"
   | "applied"
   | "discarded"
+  | "updated"
   | "duplicate"
   | "expired"
   | "unauthorized"
