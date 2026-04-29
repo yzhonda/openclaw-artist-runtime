@@ -70,6 +70,12 @@ export async function formatRuntimeEvent(
       return artistReport(event, `Suno budget exhausted: ${event.reason} (${event.used}/${event.limit})`, options);
     case "bird_cooldown_triggered":
       return artistReport(event, `X observation cool-down triggered until ${event.cooldownUntil}: ${event.reason}`, options);
+    case "distribution_change_detected":
+      return artistReport(
+        event,
+        `Distribution change detected: ${event.platform} has a public link for ${event.songId}. ${event.url}${event.proposalId ? ` Proposal: ${event.proposalId}` : ""}`,
+        options
+      );
     case "error":
       return `Runtime error: ${event.source} ${event.reason}${event.songId ? ` (${event.songId})` : ""}`;
   }

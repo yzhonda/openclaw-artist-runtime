@@ -25,6 +25,7 @@ import { publishSocialAction, readLatestSocialAction } from "../services/socialP
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../services/socialDryRunResolver.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
+import { readDistributionDetectionState } from "../services/songDistributionPoller.js";
 import { buildSunoArtifactsPage, STATUS_SUNO_ARTIFACT_LIMIT } from "../services/sunoArtifacts.js";
 import { SunoBudgetTracker } from "../services/sunoBudget.js";
 import { readBudgetDetail as readSunoDailyBudgetDetail, readBudgetState as readSunoDailyBudgetState } from "../services/sunoBudgetLedger.js";
@@ -860,7 +861,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
   const sunoBudgetTracker = new SunoBudgetTracker(mergedConfig.artist.workspaceRoot);
-  const [sunoBudgetState, sunoBudgetResetHistory, sunoArtifacts, sunoDailyBudget, sunoBudgetDetail, birdRateLimit, birdLedger, pendingApprovals] = await Promise.all([
+  const [sunoBudgetState, sunoBudgetResetHistory, sunoArtifacts, sunoDailyBudget, sunoBudgetDetail, birdRateLimit, birdLedger, distributionDetection, pendingApprovals] = await Promise.all([
     sunoBudgetTracker.getState(
       mergedConfig.music.suno.dailyCreditLimit,
       mergedConfig.music.suno.monthlyCreditLimit
@@ -871,6 +872,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     readSunoDailyBudgetDetail(mergedConfig.artist.workspaceRoot),
     readBirdRateLimitStatus(mergedConfig.artist.workspaceRoot),
     readBirdLedgerDetail(mergedConfig.artist.workspaceRoot),
+    readDistributionDetectionState(mergedConfig.artist.workspaceRoot),
     listPendingProposals(mergedConfig.artist.workspaceRoot)
   ]);
   const [musicSummary, distributionSummary] = await Promise.all([
@@ -884,7 +886,6 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   ]);
   const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
   const effectiveDryRunMap = buildEffectiveDryRunMap(mergedConfig);
-  const distributionLastCheckedAt = new Date().toISOString();
   const rawConfigOverrides = await readConfigOverrides(mergedConfig.artist.workspaceRoot) as { suno?: { dailyBudget?: unknown } };
   const hasRuntimeSunoBudget = positiveIntegerFromEnv(process.env.OPENCLAW_SUNO_DAILY_BUDGET) !== undefined
     || hasOwnRecordKey(rawConfigOverrides.suno, "dailyBudget");
@@ -928,11 +929,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
       ledger: birdLedger
     },
     distribution: {
-      detected: {
-        unitedMasters: { lastCheckedAt: distributionLastCheckedAt },
-        spotify: { lastCheckedAt: distributionLastCheckedAt },
-        appleMusic: { lastCheckedAt: distributionLastCheckedAt }
-      }
+      detected: distributionDetection.detected
     },
     pendingApprovals: {
       count: pendingApprovals.length,

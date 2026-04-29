@@ -8,6 +8,7 @@ export type RuntimeEvent =
   | { type: "theme_generated"; theme: string; reason: string; timestamp: number }
   | { type: "budget_exhausted"; reason: string; limit: number; used: number; timestamp: number }
   | { type: "bird_cooldown_triggered"; reason: string; cooldownUntil: string; timestamp: number }
+  | { type: "distribution_change_detected"; songId: string; platform: "unitedMasters" | "spotify" | "appleMusic"; url: string; proposalId?: string; timestamp: number }
   | { type: "error"; source: string; reason: string; songId?: string; timestamp: number };
 
 export type RuntimeEventHandler = (event: RuntimeEvent) => void | Promise<void>;

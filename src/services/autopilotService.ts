@@ -20,6 +20,7 @@ import { emitRuntimeEvent } from "./runtimeEventBus.js";
 import { resetIfNewDay, tryConsumeBudget } from "./sunoBudgetLedger.js";
 import { collectObservations } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
+import { pollSongDistribution } from "./songDistributionPoller.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -235,6 +236,14 @@ export class ArtistAutopilotService {
       });
     }
     await resetIfNewDay(input.workspaceRoot);
+    await pollSongDistribution(input.workspaceRoot).catch((error) => {
+      emitRuntimeEvent({
+        type: "error",
+        source: "distribution_polling",
+        reason: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now()
+      });
+    });
 
     const song = await currentSong(input.workspaceRoot);
     const stage = stageFromSong(song);
