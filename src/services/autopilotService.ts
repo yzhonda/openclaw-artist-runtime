@@ -47,6 +47,7 @@ export interface AutopilotTickInput {
 export interface RunAutopilotCycleInput {
   workspaceRoot: string;
   config?: Partial<ArtistRuntimeConfig>;
+  manualSeed?: { hint: string };
 }
 
 function nowIso(): string {
@@ -204,7 +205,10 @@ export class ArtistAutopilotService {
   }
 
   async runCycle(input: RunAutopilotCycleInput): Promise<AutopilotRunState> {
-    const config = applyConfigDefaults(input.config);
+    const resolvedConfig = applyConfigDefaults(input.config);
+    const config = input.manualSeed
+      ? { ...resolvedConfig, autopilot: { ...resolvedConfig.autopilot, enabled: true } }
+      : resolvedConfig;
     const existing = await readAutopilotRunState(input.workspaceRoot);
     if (!config.autopilot.enabled) {
       return writeStageState(input.workspaceRoot, existing, {
@@ -289,7 +293,8 @@ export class ArtistAutopilotService {
         const artistMind = await readArtistMind(input.workspaceRoot);
         const observation = await collectObservations(input.workspaceRoot, {
           personaText: `${artistMind.artist}\n${artistMind.socialVoice}`,
-          query: "music OR society OR culture"
+          query: input.manualSeed?.hint ? undefined : "music OR society OR culture",
+          manualSeed: input.manualSeed
         });
         if (observation.status === "cooldown") {
           emitRuntimeEvent({
@@ -313,7 +318,7 @@ export class ArtistAutopilotService {
           workspaceRoot: input.workspaceRoot,
           config,
           theme: theme.theme,
-          artistReason: theme.reason
+          artistReason: input.manualSeed?.hint ? `${theme.reason}; producer hint: ${input.manualSeed.hint}` : theme.reason
         });
         return writeStageState(input.workspaceRoot, existing, {
           ...baseState,

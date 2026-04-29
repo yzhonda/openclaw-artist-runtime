@@ -1,7 +1,7 @@
 import type { ArtistRuntimeConfig } from "../types.js";
 import { safeRegisterCommand } from "../pluginApi.js";
 import { ArtistAutopilotService } from "../services/autopilotService.js";
-import { resolveRuntimeConfig } from "../services/runtimeConfig.js";
+import { isLegacyWizardEnabled, resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { routeTelegramCommand } from "../services/telegramCommandRouter.js";
 import { handleTelegramPersonaSessionMessage } from "../services/telegramPersonaSession.js";
 import { handleTelegramSongSessionMessage } from "../services/telegramSongSession.js";
@@ -102,7 +102,13 @@ async function handleSessionCommand(name: string, ctx: PluginCommandContextLike,
     return { text: songResponse };
   }
   const personaResponse = await handleTelegramPersonaSessionMessage(config.artist.workspaceRoot, text);
-  return { text: personaResponse ?? "No active artist-runtime wizard. Use /setup, /persona check fill, /song update <id>, or /song add first." };
+  if (personaResponse) {
+    return { text: personaResponse };
+  }
+  if (!isLegacyWizardEnabled()) {
+    return handleRoutedCommand(name, ctx, api);
+  }
+  return { text: "No active artist-runtime wizard. Use /setup, /persona check fill, /song update <id>, or /song add first." };
 }
 
 function logRegistration(ok: boolean, name: string): void {
@@ -145,6 +151,15 @@ export function registerCommands(api: unknown): void {
       acceptsArgs: true,
       requireAuth: true,
       handler: (ctx) => handleSessionCommand(name, ctx as PluginCommandContextLike, apiConfig)
+    }, logRegistration);
+  }
+  for (const name of ["yes", "no", "edit", "one", "talk"]) {
+    safeRegisterCommand(api, {
+      name,
+      description: `Talk with the artist-runtime conversational artist using /${name}.`,
+      acceptsArgs: true,
+      requireAuth: true,
+      handler: (ctx) => handleRoutedCommand(name, ctx as PluginCommandContextLike, apiConfig)
     }, logRegistration);
   }
 }

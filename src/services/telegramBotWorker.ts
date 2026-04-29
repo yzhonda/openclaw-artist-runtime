@@ -6,6 +6,7 @@ import { getTelegramOwnerUserIds } from "./telegramAuth.js";
 import { TelegramClient, type TelegramFetch, type TelegramUpdate } from "./telegramClient.js";
 import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } from "./telegramCommandRouter.js";
 import { handleTelegramPersonaSessionMessage, readTelegramPersonaSession } from "./telegramPersonaSession.js";
+import { isLegacyWizardEnabled } from "./runtimeConfig.js";
 
 export interface TelegramBotWorkerOptions {
   root: string;
@@ -171,7 +172,7 @@ export class TelegramBotWorker {
     }
     await this.rememberChatId(message.chat.id);
 
-    const session = await readTelegramPersonaSession(this.options.root);
+    const session = isLegacyWizardEnabled() ? await readTelegramPersonaSession(this.options.root) : undefined;
     const sessionResponse = session ? await handleTelegramPersonaSessionMessage(this.options.root, text) : undefined;
     const route = sessionResponse
       ? { shouldStoreFreeText: false, responseText: sessionResponse }

@@ -8,17 +8,18 @@ import { readArtistPersonaSummary } from "./personaFileBuilder.js";
 import { proposePersonaFields, type PersonaFieldDraft } from "./personaProposer.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
-import { createTelegramPersonaSession } from "./telegramPersonaSession.js";
+import { createTelegramPersonaSession, handleTelegramPersonaSessionMessage } from "./telegramPersonaSession.js";
 import {
   handleTelegramSongSessionMessage,
   startTelegramSongAddSession,
   startTelegramSongUpdateSession
 } from "./telegramSongSession.js";
 import { formatPersonaMigratePlan, planPersonaMigrate } from "./personaMigrator.js";
-import { isPersonaProposerEnabled, isSongProposerEnabled } from "./runtimeConfig.js";
+import { isLegacyWizardEnabled, isPersonaProposerEnabled, isSongProposerEnabled } from "./runtimeConfig.js";
 import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
 import { formatSoulPersonaQuestion, readSoulPersonaSummary } from "./soulFileBuilder.js";
 import type { PersonaField } from "../types.js";
+import { isConversationalSongCreate, routeTelegramConversation } from "./telegramConversationalRouter.js";
 
 export type TelegramCommandKind =
   | "help"
@@ -81,10 +82,45 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     if (songSessionResponse) {
       return { kind: "song", responseText: songSessionResponse, shouldStoreFreeText: false };
     }
+    const personaSessionResponse = await handleTelegramPersonaSessionMessage(input.workspaceRoot, text);
+    if (personaSessionResponse) {
+      return { kind: "persona", responseText: personaSessionResponse, shouldStoreFreeText: false };
+    }
   }
 
   const [commandRaw, ...args] = text.split(/\s+/);
   const command = commandRaw.toLowerCase();
+  if (input.workspaceRoot && !isLegacyWizardEnabled()) {
+    if (
+      command === "/talk"
+      || command === "/yes"
+      || command === "/no"
+      || command === "/edit"
+      || command === "/one"
+      || command === "/confirm"
+      || command === "/cancel"
+      || (command === "/persona" && !["check", "show", "fields", "edit", "reset", "migrate"].includes(args[0]?.toLowerCase() ?? ""))
+      || (command === "/song" && (isConversationalSongCreate(text) || (args.length > 1 && !["update", "add"].includes(args[0]?.toLowerCase() ?? ""))))
+      || !command.startsWith("/")
+    ) {
+      const routed = await routeTelegramConversation({
+        text,
+        fromUserId: input.fromUserId,
+        chatId: input.chatId,
+        workspaceRoot: input.workspaceRoot,
+        autopilotStatus: input.autopilotStatus,
+        aiReviewProvider: input.aiReviewProvider
+      });
+      return { kind: command === "/song" ? "song" : command === "/persona" ? "persona" : "free_text", ...routed };
+    }
+    if (command === "/skip" || command === "/back" || command === "/answer") {
+      return {
+        kind: "free_text",
+        responseText: "もうその wizard 用の言葉は使わなくていい。普通に話してくれれば拾う。",
+        shouldStoreFreeText: false
+      };
+    }
+  }
   if (command === "/help" || command === "/start") {
     return {
       kind: "help",

@@ -52,6 +52,10 @@ export function isSongProposerEnabled(env: NodeJS.ProcessEnv = process.env): boo
   return env.OPENCLAW_SONG_PROPOSER?.trim().toLowerCase() !== "off";
 }
 
+export function isLegacyWizardEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENCLAW_LEGACY_WIZARD?.trim().toLowerCase() === "on";
+}
+
 function positiveNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return value;

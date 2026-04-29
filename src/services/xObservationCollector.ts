@@ -3,10 +3,13 @@ import { dirname, join } from "node:path";
 import { isBirdBanIndication, recordBirdCall, triggerCooldown, tryAcquireBirdCall } from "./birdRateLimiter.js";
 import { emitRuntimeEvent } from "./runtimeEventBus.js";
 import { secretLikePattern } from "./personaMigrator.js";
+import { planQueryStrategy } from "./xQueryStrategyPlanner.js";
 
 export interface XObservationContext {
   personaText?: string;
   query?: string;
+  observationHistory?: string;
+  manualSeed?: { hint?: string };
   now?: Date;
   runner?: () => Promise<{ stdout: string; stderr?: string }>;
 }
@@ -85,12 +88,17 @@ export async function collectObservations(root: string, context: XObservationCon
   if (cached) {
     return { status: "cached", path, observations: cached };
   }
+  const strategy = await planQueryStrategy({
+    personaText: context.personaText,
+    observationHistory: context.observationHistory,
+    manualSeed: context.manualSeed
+  });
   const gate = await tryAcquireBirdCall(root, now);
   if (!gate.allowed) {
     const status = gate.cooldownUntil ? "cooldown" : "skipped";
     return { status, path, observations: "", reason: gate.reason };
   }
-  const runner = context.runner ?? defaultRunner(context.query);
+  const runner = context.runner ?? defaultRunner(context.query ?? strategy.query);
   try {
     const result = await runner();
     const combined = `${result.stdout}\n${result.stderr ?? ""}`;
@@ -109,7 +117,7 @@ export async function collectObservations(root: string, context: XObservationCon
       throw new Error("x_observation_contains_secret_like_text");
     }
     await recordBirdCall(root, now);
-    const observations = renderObservation(filterObservationLines(result.stdout, context.personaText), now, context.query);
+    const observations = renderObservation(filterObservationLines(result.stdout, context.personaText), now, context.query ?? strategy.query);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, `${observations.trim()}\n`, "utf8");
     return { status: "collected", path, observations };
