@@ -5,6 +5,7 @@ import type { AiReviewProvider } from "../types.js";
 import { registerCallbackAction } from "./callbackActionRegistry.js";
 import { appendConversationTurn } from "./conversationalSession.js";
 import { proposalForDetection } from "./songDistributionPoller.js";
+import { isInlineButtonsEnabled } from "./runtimeConfig.js";
 
 export interface TelegramNotifierOptions {
   token: string;
@@ -42,7 +43,7 @@ export class TelegramNotifier {
   }
 
   private async attachSongCompletionButtons(event: Extract<RuntimeEvent, { type: "song_take_completed" }>, messageId: number): Promise<void> {
-    if (!this.options.workspaceRoot || typeof this.options.chatId !== "number") {
+    if (!isInlineButtonsEnabled() || !this.options.workspaceRoot || typeof this.options.chatId !== "number") {
       return;
     }
     const [write, skip] = await Promise.all([
@@ -70,7 +71,7 @@ export class TelegramNotifier {
   }
 
   private async attachDistributionButtons(event: Extract<RuntimeEvent, { type: "distribution_change_detected" }>, messageId: number, text: string): Promise<void> {
-    if (!this.options.workspaceRoot || typeof this.options.chatId !== "number") {
+    if (!isInlineButtonsEnabled() || !this.options.workspaceRoot || typeof this.options.chatId !== "number") {
       return;
     }
     const proposal = event.proposal ?? proposalForDetection({

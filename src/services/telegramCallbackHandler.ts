@@ -30,6 +30,8 @@ interface CallbackAuditEntry {
   callbackId?: string;
   action?: string;
   proposalId?: string;
+  songId?: string;
+  platform?: string;
   chatIdHash?: string;
   userIdHash?: string;
   result: TelegramCallbackResult["result"];
@@ -59,6 +61,8 @@ function auditBase(ctx: TelegramCallbackContext, callbackId: string | undefined,
     callbackId,
     action: entry?.action,
     proposalId: entry?.proposalId,
+    songId: entry?.songId,
+    platform: entry?.platform,
     chatIdHash: hashIdentifier(ctx.chatId),
     userIdHash: hashIdentifier(ctx.fromUserId),
     result,

@@ -7,7 +7,7 @@ import { TelegramClient, type TelegramFetch, type TelegramUpdate } from "./teleg
 import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } from "./telegramCommandRouter.js";
 import { routeTelegramCallback } from "./telegramCallbackHandler.js";
 import { handleTelegramPersonaSessionMessage, readTelegramPersonaSession } from "./telegramPersonaSession.js";
-import { isLegacyWizardEnabled } from "./runtimeConfig.js";
+import { isInlineButtonsEnabled, isLegacyWizardEnabled } from "./runtimeConfig.js";
 import { registerCallbackAction } from "./callbackActionRegistry.js";
 import { buildProposalInlineKeyboard } from "./freeformChangesetProposer.js";
 import type { TelegramProposalButtonsRequest } from "./telegramConversationalRouter.js";
@@ -222,7 +222,7 @@ export class TelegramBotWorker {
     }
     const responseText = await this.withPersonaSetupAnnouncement(route.responseText);
     const sent = await client.sendMessage(message.chat.id, responseText);
-    if (route.proposalButtons) {
+    if (route.proposalButtons && isInlineButtonsEnabled()) {
       await this.attachProposalButtons(client, {
         ...route.proposalButtons,
         chatId: message.chat.id,

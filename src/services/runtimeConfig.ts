@@ -90,6 +90,10 @@ export function isLegacyWizardEnabled(env: NodeJS.ProcessEnv = process.env): boo
   return env.OPENCLAW_LEGACY_WIZARD?.trim().toLowerCase() === "on";
 }
 
+export function isInlineButtonsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENCLAW_INLINE_BUTTONS?.trim().toLowerCase() !== "off";
+}
+
 function positiveNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return value;

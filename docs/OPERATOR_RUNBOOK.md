@@ -267,6 +267,77 @@ commands or change OpenClaw permissions. Secret-like input or AI responses are
 rejected for the affected field and surfaced as warnings instead of being
 written to ARTIST.md or SOUL.md.
 
+## Plan v9.14: Inline Button Confirmation Path (2026-04-29)
+
+Plan v9.14 adds Telegram inline buttons to the existing text-command
+confirmation path. The producer can tap buttons on the artist's message, while
+`/yes`, `/no`, and `/edit` remain available as text fallbacks.
+
+### Journey F: ChangeSet inline button (persona/song)
+
+When the artist proposes a persona or song ChangeSet, the Telegram message can
+include `[✓ Yes] [✗ No] [✏️ Edit]`.
+
+- Yes applies the ChangeSet through the same backup-protected writer used by
+  `/yes` and the Producer Console proposal API.
+- No discards the pending ChangeSet and keeps the conversation going.
+- Edit opens guidance only. Field updates are still entered with
+  `/edit <field> <value>` or through the Producer Console; callback payloads do
+  not carry free-form field updates.
+
+### Journey G: Distribution apply inline button
+
+When the distribution poller detects a public DSP URL for a scheduled song, the
+artist pushes a message with `[✓ 反映する] [⏸ 後で]`.
+
+- 反映する writes the detected Spotify / Apple Music / UnitedMasters URL into
+  the relevant SONGBOOK field through the ChangeSet applier.
+- 後で discards the pending proposal without changing files.
+- The same callback action is idempotent; repeated taps resolve as already
+  handled.
+
+### Journey H: Song completion inline button
+
+When the artist reports a completed take, the message includes
+`[📝 SONGBOOK 反映] [⏸ 後で]`.
+
+- SONGBOOK 反映 marks the local song state as `published`, updates
+  `artist/SONGBOOK.md`, and takes backups for `songs/<id>/song.md` and
+  `artist/SONGBOOK.md`.
+- 後で is a no-op for files; the producer can revisit the song later.
+- No X / Instagram / TikTok publish button is shown in Plan v9.14. If the
+  producer posts to X manually, later distribution polling can still detect the
+  public release and use Journey G for local SONGBOOK reflection.
+
+### Retreat Flag
+
+- `OPENCLAW_INLINE_BUTTONS=off` disables inline button attachment and returns
+  operation to text-command-only confirmation.
+- `/yes`, `/no`, and `/edit` always remain active and share the same
+  `handleProposalResponse()` path as callback and Producer Console API actions.
+
+### Callback Ledger / Audit Shape
+
+- Lookup ledger: `runtime/callback-actions.jsonl`, append-only, with 24-hour
+  default expiry.
+- Audit log: `runtime/callback-audit.jsonl`, append-only, with no raw chat text.
+  It records `{timestamp, callbackId, action, proposalId?, songId?, platform?,
+  chatIdHash, userIdHash, result, reason?}`.
+- `callback_data` is only `cb:<shortId>`. Telegram payloads are treated as
+  modifiable input, so authority metadata lives in the local lookup ledger.
+- Owner check requires `callback_query.from.id`, chat id, and message id to
+  match the registered action.
+
+### Why X / IG / TikTok Buttons Are Absent
+
+- X real publish is deferred to a Plan v9.15 candidate with a two-step
+  confirmation path and preview hash before any Bird one-shot post.
+- Instagram and TikTok buttons stay hidden until auth and platform-specific
+  publish readiness are established. Disabled buttons are intentionally not
+  shown to avoid misleading the producer.
+- Plan v9.14 only reflects local files and pending ChangeSets; it does not
+  change publish gates, `liveGoArmed`, or `autopilot.dryRun=false`.
+
 ## Conversational artist and distribution polling (Plan v9.13)
 
 Plan v9.13 changes Telegram from chained wizard prompts into producer-to-artist
