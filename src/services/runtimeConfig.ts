@@ -94,6 +94,10 @@ export function isInlineButtonsEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return env.OPENCLAW_INLINE_BUTTONS?.trim().toLowerCase() !== "off";
 }
 
+export function isXInlineButtonEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.OPENCLAW_X_INLINE_BUTTON?.trim().toLowerCase() !== "off";
+}
+
 function positiveNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return value;

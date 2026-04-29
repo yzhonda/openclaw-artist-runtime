@@ -18,6 +18,11 @@ export interface CallbackActionEntry {
   proposalId?: string;
   songId?: string;
   platform?: string;
+  draftText?: string;
+  draftHash?: string;
+  draftCharCount?: number;
+  draftUrl?: string;
+  tweetUrl?: string;
   chatId: number;
   messageId: number;
   userId: number;
@@ -33,6 +38,11 @@ export interface RegisterCallbackActionInput {
   proposalId?: string;
   songId?: string;
   platform?: string;
+  draftText?: string;
+  draftHash?: string;
+  draftCharCount?: number;
+  draftUrl?: string;
+  tweetUrl?: string;
   chatId: number;
   messageId: number;
   userId: number;
@@ -103,6 +113,11 @@ export async function registerCallbackAction(root: string, input: RegisterCallba
     proposalId: input.proposalId,
     songId: input.songId,
     platform: input.platform,
+    draftText: input.draftText,
+    draftHash: input.draftHash,
+    draftCharCount: input.draftCharCount,
+    draftUrl: input.draftUrl,
+    tweetUrl: input.tweetUrl,
     chatId: input.chatId,
     messageId: input.messageId,
     userId: input.userId,
