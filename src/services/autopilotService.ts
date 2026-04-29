@@ -184,6 +184,44 @@ async function createPromptPackForSong(root: string, song: SongState, config?: P
   return readSongState(root, readySong.songId);
 }
 
+async function writeCompletedStage(
+  root: string,
+  existing: AutopilotRunState,
+  baseState: AutopilotRunState,
+  songId?: string,
+  blockedReason?: string | null
+): Promise<AutopilotRunState> {
+  try {
+    if (songId) {
+      await updateSongState(root, songId, { status: "published" });
+    }
+    return writeStageState(root, existing, {
+      ...baseState,
+      currentSongId: songId,
+      stage: "completed",
+      blockedReason,
+      lastError: undefined,
+      lastSuccessfulStage: "completed",
+      retryCount: 0,
+      cycleCount: existing.cycleCount + 1
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    emitRuntimeEvent({ type: "error", source: "song_completion", reason: message, songId, timestamp: Date.now() });
+    return writeStageState(root, existing, {
+      ...baseState,
+      currentSongId: songId,
+      stage: "paused",
+      paused: true,
+      pausedReason: "song_completion_failed",
+      blockedReason: `song_completion_failed: ${message}`,
+      lastError: message,
+      retryCount: existing.retryCount + 1,
+      cycleCount: existing.cycleCount + 1
+    });
+  }
+}
+
 function planningStalled(existing: AutopilotRunState, timeoutDays: number): boolean {
   const anchor = existing.lastRunAt ?? existing.updatedAt;
   if (!anchor) {
@@ -433,15 +471,7 @@ export class ArtistAutopilotService {
       && config.autopilot.dryRun
       && existing.blockedReason?.includes("dry-run")
     ) {
-      return writeStageState(input.workspaceRoot, existing, {
-        ...baseState,
-        currentSongId: existing.currentSongId,
-        stage: "completed",
-        blockedReason: existing.blockedReason,
-        lastError: undefined,
-        lastSuccessfulStage: "completed",
-        cycleCount: existing.cycleCount + 1
-      });
+      return writeCompletedStage(input.workspaceRoot, existing, baseState, existing.currentSongId, existing.blockedReason);
     }
 
     if (
@@ -451,15 +481,7 @@ export class ArtistAutopilotService {
       && config.autopilot.dryRun
       && existing.blockedReason?.includes("dry-run")
     ) {
-      return writeStageState(input.workspaceRoot, existing, {
-        ...baseState,
-        currentSongId: song.songId,
-        stage: "completed",
-        blockedReason: existing.blockedReason,
-        lastError: undefined,
-        lastSuccessfulStage: "completed",
-        cycleCount: existing.cycleCount + 1
-      });
+      return writeCompletedStage(input.workspaceRoot, existing, baseState, song.songId, existing.blockedReason);
     }
 
     if (existing.runId === runId && existing.lastSuccessfulStage === stage && stage !== "planning") {
@@ -698,15 +720,7 @@ export class ArtistAutopilotService {
           });
         }
         case "completed": {
-          return writeStageState(input.workspaceRoot, existing, {
-            ...baseState,
-            currentSongId: song.songId,
-            stage: "completed",
-            blockedReason: undefined,
-            lastError: undefined,
-            lastSuccessfulStage: "completed",
-            cycleCount: existing.cycleCount + 1
-          });
+          return writeCompletedStage(input.workspaceRoot, existing, baseState, song.songId);
         }
         case "failed_closed": {
           return writeStageState(input.workspaceRoot, existing, {
