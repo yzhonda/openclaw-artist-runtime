@@ -18,6 +18,7 @@ import { createAndPersistSunoPromptPack } from "./sunoPromptPackFiles.js";
 import { generateSunoRun } from "./sunoRuns.js";
 import { publishSocialAction } from "./socialPublishing.js";
 import { selectTake } from "./takeSelection.js";
+import { evaluateSunoTakeSelection } from "./sunoTakeSelector.js";
 import { emitRuntimeEvent } from "./runtimeEventBus.js";
 import { resetIfNewDay } from "./sunoBudgetLedger.js";
 import { reserveSunoGenerationBudget } from "./sunoBudgetGuard.js";
@@ -596,6 +597,41 @@ export class ArtistAutopilotService {
           });
         }
         case "take_selection": {
+          const decision = await evaluateSunoTakeSelection(input.workspaceRoot, song.songId);
+          if (decision.status === "pending") {
+            emitRuntimeEvent({
+              type: "take_select_pending",
+              songId: song.songId,
+              reason: decision.reason,
+              timestamp: Date.now()
+            });
+            return writeStageState(input.workspaceRoot, existing, {
+              ...baseState,
+              currentSongId: song.songId,
+              stage: "take_selection",
+              blockedReason: decision.reason,
+              lastError: undefined,
+              cycleCount: existing.cycleCount + 1
+            });
+          }
+          if (decision.status === "low_score") {
+            emitRuntimeEvent({
+              type: "take_select_low_score",
+              songId: song.songId,
+              bestTakeId: decision.best.takeId,
+              score: decision.best.total,
+              reason: decision.reason,
+              timestamp: Date.now()
+            });
+            return writeStageState(input.workspaceRoot, existing, {
+              ...baseState,
+              currentSongId: song.songId,
+              stage: "take_selection",
+              blockedReason: decision.reason,
+              lastError: undefined,
+              cycleCount: existing.cycleCount + 1
+            });
+          }
           const selection = await selectTake({ workspaceRoot: input.workspaceRoot, songId: song.songId });
           emitRuntimeEvent({
             type: "song_take_completed",

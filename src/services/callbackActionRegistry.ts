@@ -24,6 +24,7 @@ export interface CallbackActionEntry {
   draftCharCount?: number;
   draftUrl?: string;
   tweetUrl?: string;
+  selectedTakeId?: string;
   commissionBrief?: CommissionBrief;
   spawnReason?: string;
   chatId: number;
@@ -46,6 +47,7 @@ export interface RegisterCallbackActionInput {
   draftCharCount?: number;
   draftUrl?: string;
   tweetUrl?: string;
+  selectedTakeId?: string;
   commissionBrief?: CommissionBrief;
   spawnReason?: string;
   chatId: number;
@@ -123,6 +125,7 @@ export async function registerCallbackAction(root: string, input: RegisterCallba
     draftCharCount: input.draftCharCount,
     draftUrl: input.draftUrl,
     tweetUrl: input.tweetUrl,
+    selectedTakeId: input.selectedTakeId,
     commissionBrief: input.commissionBrief,
     spawnReason: input.spawnReason,
     chatId: input.chatId,

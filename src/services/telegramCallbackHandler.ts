@@ -2,7 +2,7 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { markCallbackResolved, registerCallbackAction, resolveCallbackAction, type CallbackActionEntry, type CallbackActionStatus } from "./callbackActionRegistry.js";
-import { readSongState } from "./artistState.js";
+import { readSongState, updateSongState } from "./artistState.js";
 import { applyChangeSet } from "./changeSetApplier.js";
 import { handleProposalResponse } from "./conversationalSession.js";
 import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
@@ -12,6 +12,8 @@ import { injectCommissionSong } from "./songStateInjector.js";
 import { markSpawned } from "./songSpawnRateLimiter.js";
 import { readAutopilotRunState, writeAutopilotRunState } from "./autopilotService.js";
 import { handleSongPublishActionRequest, type SongPublishAction } from "./songPublishActionRegistry.js";
+import { selectTake } from "./takeSelection.js";
+import { emitRuntimeEvent } from "./runtimeEventBus.js";
 import type { TelegramClient } from "./telegramClient.js";
 import { executeXPublishAction, type XPublishActionInput } from "./xPublishActionRegistry.js";
 
@@ -392,6 +394,49 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
       : `Planning補完は見送った。${proposalResult.message}`;
     await ctx.client.editMessageText(entry.chatId, entry.messageId, message, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
     return { processed: true, result: callbackResult, reason: proposalResult.status, callbackId };
+  }
+
+  if (entry.action === "take_select_accept" || entry.action === "take_select_regenerate" || entry.action === "take_select_skip") {
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    if (entry.action === "take_select_accept") {
+      const selected = await selectTake({
+        workspaceRoot: ctx.root,
+        songId: entry.songId ?? "",
+        selectedTakeId: entry.selectedTakeId,
+        reason: "producer accepted low-score take"
+      });
+      emitRuntimeEvent({
+        type: "song_take_completed",
+        songId: selected.songId,
+        selectedTakeId: selected.selectedTakeId,
+        urls: selected.sourceUrls,
+        timestamp: Date.now()
+      });
+      await markCallbackResolved(ctx.root, callbackId, { status: "applied", reason: "take_selected", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "applied", "take_selected"));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, `Take selected: ${selected.selectedTakeId}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "applied", reason: "take_selected", callbackId };
+    }
+    if (entry.action === "take_select_regenerate") {
+      await updateSongState(ctx.root, entry.songId ?? "", { status: "suno_prompt_pack", reason: "take_select_regenerate_requested" });
+      const state = await readAutopilotRunState(ctx.root);
+      await writeAutopilotRunState(ctx.root, {
+        ...state,
+        currentSongId: entry.songId ?? state.currentSongId,
+        stage: "suno_generation",
+        retryCount: 0,
+        blockedReason: "take_select_regenerate_requested",
+        lastError: undefined
+      });
+      await markCallbackResolved(ctx.root, callbackId, { status: "updated", reason: "take_select_regenerate_requested", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "updated", "take_select_regenerate_requested"));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "Suno regeneration queued.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "updated", reason: "take_select_regenerate_requested", callbackId };
+    }
+    await markCallbackResolved(ctx.root, callbackId, { status: "discarded", reason: "take_select_skipped", now });
+    await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "discarded", "take_select_skipped"));
+    await ctx.client.editMessageText(entry.chatId, entry.messageId, "Take selection skipped for now.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+    return { processed: true, result: "discarded", reason: "take_select_skipped", callbackId };
   }
 
   if (entry.action === "x_publish_prepare" || entry.action === "x_publish_confirm" || entry.action === "x_publish_cancel") {

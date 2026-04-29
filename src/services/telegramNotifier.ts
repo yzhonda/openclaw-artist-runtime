@@ -49,6 +49,9 @@ export class TelegramNotifier {
     if (event.type === "planning_skeleton_incomplete") {
       await this.attachPlanningSkeletonButtons(event, sent.message_id, text).catch(() => undefined);
     }
+    if (event.type === "take_select_low_score") {
+      await this.attachTakeSelectButtons(event, sent.message_id).catch(() => undefined);
+    }
   }
 
   private async attachSongCompletionButtons(event: Extract<RuntimeEvent, { type: "song_take_completed" }>, messageId: number): Promise<void> {
@@ -263,6 +266,43 @@ export class TelegramNotifier {
       ]]
     });
   }
+
+  private async attachTakeSelectButtons(event: Extract<RuntimeEvent, { type: "take_select_low_score" }>, messageId: number): Promise<void> {
+    if (!isInlineButtonsEnabled() || !this.options.workspaceRoot || typeof this.options.chatId !== "number") {
+      return;
+    }
+    const [accept, regen, skip] = await Promise.all([
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "take_select_accept",
+        songId: event.songId,
+        selectedTakeId: event.bestTakeId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "take_select_regenerate",
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      }),
+      registerCallbackAction(this.options.workspaceRoot, {
+        action: "take_select_skip",
+        songId: event.songId,
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      })
+    ]);
+    await this.client.editMessageReplyMarkup(this.options.chatId, messageId, {
+      inline_keyboard: [[
+        { text: "✓ 採用", callback_data: `cb:${accept.callbackId}` },
+        { text: "↻ Suno再生成", callback_data: `cb:${regen.callbackId}` },
+        { text: "⏸ 後で", callback_data: `cb:${skip.callbackId}` }
+      ]]
+    });
+  }
 }
 
 async function artistReport(event: RuntimeEvent, fallback: string, options: Pick<TelegramNotifierOptions, "workspaceRoot" | "aiReviewProvider">): Promise<string> {
@@ -312,6 +352,10 @@ export async function formatRuntimeEvent(
       return artistReport(event, `Suno generate retry: ${event.songId} retry=${event.retryCount} ${event.reason}${event.nextRetryAt ? ` next=${event.nextRetryAt}` : ""}`, options);
     case "suno_generate_failed":
       return artistReport(event, `Suno generate failed: ${event.songId} retry=${event.retryCount} ${event.reason}`, options);
+    case "take_select_pending":
+      return artistReport(event, `Take selection pending: ${event.songId} ${event.reason}`, options);
+    case "take_select_low_score":
+      return artistReport(event, `Take score is low: ${event.songId} best=${event.bestTakeId} score=${event.score}. ${event.reason}`, options);
     case "budget_exhausted":
       return artistReport(event, `Suno budget exhausted: ${event.reason} (${event.used}/${event.limit})`, options);
     case "bird_cooldown_triggered":

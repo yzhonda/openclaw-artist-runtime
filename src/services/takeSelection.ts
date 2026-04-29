@@ -4,6 +4,7 @@ import type { TakeSelectionRecord } from "../types.js";
 import { updateSongState } from "./artistState.js";
 import { appendPromptLedger, createPromptLedgerEntry, getSongPromptLedgerPath } from "./promptLedger.js";
 import { emitRuntimeEvent } from "./runtimeEventBus.js";
+import { evaluateSunoTakeSelection } from "./sunoTakeSelector.js";
 
 export interface SelectTakeInput {
   workspaceRoot: string;
@@ -43,9 +44,13 @@ export async function selectTake(input: SelectTakeInput): Promise<TakeSelectionR
     throw new Error(`no imported Suno results available for ${input.songId}`);
   }
 
-  const selectedTakeId = input.selectedTakeId ?? latestResults.selectedTakeId ?? inferTakeId(urls[0], 0);
+  const decision = await evaluateSunoTakeSelection(input.workspaceRoot, input.songId);
+  if (!input.selectedTakeId && !latestResults.selectedTakeId && decision.status === "low_score") {
+    throw new Error(decision.reason);
+  }
+  const selectedTakeId = input.selectedTakeId ?? latestResults.selectedTakeId ?? (decision.status !== "pending" ? decision.best.takeId : inferTakeId(urls[0], 0));
   const runId = input.runId ?? latestResults.runId ?? "run-unknown";
-  const reason = input.reason ?? "selected first imported take";
+  const reason = input.reason ?? (decision.status === "selected" ? `selected best scored take (${decision.best.total})` : "selected imported take");
   const record: TakeSelectionRecord = {
     songId: input.songId,
     runId,

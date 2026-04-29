@@ -11,6 +11,8 @@ export type RuntimeEvent =
   | { type: "suno_budget_low"; songId?: string; reason: string; limit: number; used: number; timestamp: number }
   | { type: "suno_generate_retry"; songId: string; reason: string; retryCount: number; nextRetryAt?: string; timestamp: number }
   | { type: "suno_generate_failed"; songId: string; reason: string; retryCount: number; timestamp: number }
+  | { type: "take_select_pending"; songId: string; reason: string; timestamp: number }
+  | { type: "take_select_low_score"; songId: string; bestTakeId: string; score: number; reason: string; timestamp: number }
   | { type: "budget_exhausted"; reason: string; limit: number; used: number; timestamp: number }
   | { type: "bird_cooldown_triggered"; reason: string; cooldownUntil: string; timestamp: number }
   | { type: "distribution_change_detected"; songId: string; platform: "unitedMasters" | "spotify" | "appleMusic"; url: string; proposalId?: string; proposal?: ChangeSetProposal; timestamp: number }
