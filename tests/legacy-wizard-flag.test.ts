@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { routeTelegramCommand } from "../src/services/telegramCommandRouter";
-import { readTelegramPersonaSession } from "../src/services/telegramPersonaSession";
 
 function workspace(): string {
   return mkdtempSync(join(tmpdir(), "artist-runtime-legacy-wizard-"));
@@ -14,7 +13,7 @@ afterEach(() => {
 });
 
 describe("legacy wizard flag", () => {
-  it("keeps old /persona behavior when OPENCLAW_LEGACY_WIZARD=on", async () => {
+  it("keeps /persona command help available when OPENCLAW_LEGACY_WIZARD=on", async () => {
     const root = workspace();
     vi.stubEnv("OPENCLAW_LEGACY_WIZARD", "on");
 
@@ -23,12 +22,12 @@ describe("legacy wizard flag", () => {
     expect(result.responseText).toContain("Usage: /persona show");
   });
 
-  it("keeps /setup wizard entry available under the flag", async () => {
+  it("keeps /setup routed safely under the flag without reviving wizard state", async () => {
     const root = workspace();
     vi.stubEnv("OPENCLAW_LEGACY_WIZARD", "on");
 
-    await routeTelegramCommand({ text: "/setup", fromUserId: 1, chatId: 2, workspaceRoot: root });
+    const result = await routeTelegramCommand({ text: "/setup", fromUserId: 1, chatId: 2, workspaceRoot: root });
 
-    expect((await readTelegramPersonaSession(root))?.mode).toBe("setup_ai_rough");
+    expect(result.responseText).toContain("the artist:");
   });
 });

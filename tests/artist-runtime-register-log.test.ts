@@ -47,9 +47,6 @@ describe("artist-runtime command registration diagnostics", () => {
       "setup",
       "confirm",
       "cancel",
-      "skip",
-      "back",
-      "answer",
       "yes",
       "no",
       "edit",
@@ -58,9 +55,9 @@ describe("artist-runtime command registration diagnostics", () => {
     ]);
     expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: persona");
     expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: song");
-    expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: answer");
+    expect(info).toHaveBeenCalledWith("[artist-runtime] registered runtime-slash command: talk");
     expect(info).toHaveBeenCalledWith(
-      "[artist-runtime] telegram plugin command specs: persona,song,setup,confirm,cancel,skip,back,answer,yes,no,edit,one,talk (count=13, persona=true)"
+      "[artist-runtime] telegram plugin command specs: persona,song,setup,confirm,cancel,yes,no,edit,one,talk (count=10, persona=true)"
     );
     expect(warn).not.toHaveBeenCalled();
 
@@ -75,7 +72,7 @@ describe("artist-runtime command registration diagnostics", () => {
     expect(() => registerArtistRuntime({})).not.toThrow();
 
     expect(warn).toHaveBeenCalledWith("[artist-runtime] registerCommand unavailable for: persona");
-    expect(warn).toHaveBeenCalledWith("[artist-runtime] registerCommand unavailable for: answer");
+    expect(warn).toHaveBeenCalledWith("[artist-runtime] registerCommand unavailable for: talk");
     expect(info).not.toHaveBeenCalled();
 
     info.mockRestore();

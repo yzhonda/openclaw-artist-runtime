@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import registerArtistRuntime from "../src/index";
-import { readTelegramPersonaSession } from "../src/services/telegramPersonaSession";
 
 interface CapturedCommand {
   name: string;
@@ -74,7 +73,7 @@ describe("OpenClaw Telegram persona command wire", () => {
     expect(commands.get("persona")?.acceptsArgs).toBe(true);
     expect(commands.get("persona")?.requireAuth).toBe(true);
     expect(commands.get("setup")?.acceptsArgs).toBe(true);
-    expect(commands.get("answer")?.acceptsArgs).toBe(true);
+    expect(commands.get("yes")?.acceptsArgs).toBe(true);
   });
 
   it("routes /persona check through the production plugin command handler", async () => {
@@ -88,18 +87,13 @@ describe("OpenClaw Telegram persona command wire", () => {
     expect(result?.text).toContain("Custom sections: Voice");
   });
 
-  it("starts setup and accepts slash-command session answers without starting a second poller", async () => {
+  it("routes setup into the conversational artist without starting a second poller", async () => {
     const root = makeRoot();
     const commands = captureCommands(root);
 
     const setup = await commands.get("setup")?.handler(commandContext("", root));
-    const answer = await commands.get("answer")?.handler(commandContext("Neon Relay Unit", root));
-    const session = await readTelegramPersonaSession(root);
 
-    expect(setup?.text).toContain("Artist persona AI setup started");
-    expect(answer?.text).toContain("Field 1/8");
-    expect(session?.mode).toBe("setup_ai_review");
-    expect(session?.pending.aiDrafts?.[0].field).toBe("artistName");
+    expect(setup?.text).toContain("the artist:");
   });
 
   it("routes /confirm migrate through native command session control", async () => {

@@ -1,7 +1,6 @@
 import type { AiReviewProvider, PersonaField } from "../types.js";
 import { callAiProvider } from "./aiProviderClient.js";
 import { secretLikePattern, parseIntentDirectives } from "./personaMigrator.js";
-import { artistPersonaQuestions } from "./personaWizardQuestions.js";
 import { soulPersonaQuestions } from "./soulFileBuilder.js";
 
 export interface PersonaProposerSourceContext {
@@ -29,8 +28,17 @@ export interface PersonaProposerResult {
   warnings: string[];
 }
 
+export const defaultArtistPersonaFieldValues: Record<Extract<PersonaField, "artistName" | "identityLine" | "soundDna" | "obsessions" | "lyricsRules" | "socialVoice">, string> = {
+  artistName: "Unnamed OpenClaw Artist",
+  identityLine: "A public musical artist that turns observations into autonomous songs.",
+  soundDna: "alternative pop, glassy synth texture, close controlled vocal",
+  obsessions: "night infrastructure, private signals, lonely machines",
+  lyricsRules: "avoid cheap hope, direct imitation, generic slogans, and corporate uplift",
+  socialVoice: "short, observant, unsalesy, concrete"
+};
+
 const fieldDefaults = new Map<PersonaField, string>([
-  ...artistPersonaQuestions.map((question): [PersonaField, string] => [question.field, question.defaultValue]),
+  ...Object.entries(defaultArtistPersonaFieldValues) as Array<[PersonaField, string]>,
   ["soul-tone", soulPersonaQuestions[0].defaultValue],
   ["soul-refusal", soulPersonaQuestions[1].defaultValue]
 ]);

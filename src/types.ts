@@ -180,17 +180,7 @@ export type PersonaField =
   | "soul-tone"
   | "soul-refusal";
 
-export type TelegramPersonaSessionMode =
-  | "setup_artist"
-  | "setup_soul"
-  | "setup_ai_rough"
-  | "setup_ai_review"
-  | "edit_field"
-  | "reset_confirm"
-  | "migrate_confirm"
-  | "check_fill_chain";
-
-export type SongSessionMode = "song_update_chain" | "song_add_rough" | "song_add_review";
+export type TelegramPersonaSessionMode = "reset_confirm" | "migrate_confirm";
 
 export interface PersonaAnswers {
   artistName: string;
@@ -218,17 +208,12 @@ export interface TelegramPersonaSessionDraft {
 
 export interface TelegramPersonaSessionPending extends Partial<PersonaAnswers> {
   aiDrafts?: TelegramPersonaSessionDraft[];
-  skipCount?: Partial<Record<PersonaField, number>>;
-  roughSkipCount?: number;
-  editValue?: string;
 }
 
 export interface TelegramPersonaSession {
   active: boolean;
   mode: TelegramPersonaSessionMode;
   stepIndex: number;
-  field?: PersonaField;
-  checkFillQueue?: PersonaField[];
   aiReviewProvider?: AiReviewProvider;
   migrateIntent?: string;
   migrateAiReviewProvider?: AiReviewProvider;

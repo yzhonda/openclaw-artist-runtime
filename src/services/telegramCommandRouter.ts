@@ -5,20 +5,13 @@ import { AutopilotControlService } from "./autopilotControlService.js";
 import { formatDebugAiReviewResult, reviewSongDebugMaterial } from "./debugAiReviewService.js";
 import { auditPersonaCompleteness, formatPersonaAuditReport, type PersonaFieldAudit } from "./personaFieldAuditor.js";
 import { readArtistPersonaSummary } from "./personaFileBuilder.js";
-import { proposePersonaFields, type PersonaFieldDraft } from "./personaProposer.js";
+import { proposePersonaFields } from "./personaProposer.js";
 import { getSongDetail, listRecentSongs } from "./songQueryService.js";
 import { readSongMaterial } from "./songMaterialReader.js";
 import { createTelegramPersonaSession, handleTelegramPersonaSessionMessage } from "./telegramPersonaSession.js";
-import {
-  handleTelegramSongSessionMessage,
-  startTelegramSongAddSession,
-  startTelegramSongUpdateSession
-} from "./telegramSongSession.js";
 import { formatPersonaMigratePlan, planPersonaMigrate } from "./personaMigrator.js";
-import { isLegacyWizardEnabled, isPersonaProposerEnabled, isSongProposerEnabled } from "./runtimeConfig.js";
-import { formatArtistPersonaQuestion } from "./personaWizardQuestions.js";
-import { formatSoulPersonaQuestion, readSoulPersonaSummary } from "./soulFileBuilder.js";
-import type { PersonaField } from "../types.js";
+import { isLegacyWizardEnabled } from "./runtimeConfig.js";
+import { readSoulPersonaSummary } from "./soulFileBuilder.js";
 import { isConversationalSongCreate, routeTelegramConversation } from "./telegramConversationalRouter.js";
 
 export type TelegramCommandKind =
@@ -78,10 +71,6 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
   }
 
   if (input.workspaceRoot) {
-    const songSessionResponse = await handleTelegramSongSessionMessage(input.workspaceRoot, text);
-    if (songSessionResponse) {
-      return { kind: "song", responseText: songSessionResponse, shouldStoreFreeText: false };
-    }
     const personaSessionResponse = await handleTelegramPersonaSessionMessage(input.workspaceRoot, text);
     if (personaSessionResponse) {
       return { kind: "persona", responseText: personaSessionResponse, shouldStoreFreeText: false };
@@ -129,13 +118,11 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
         "/status - show autopilot status",
         "/songs - list recent songs",
         "/song <songId> - show song detail",
-        "/song update <songId> - update song files through AI draft review",
-        "/song add - create a new song draft through AI draft review",
+        "/song create [hint] - ask the artist to make a song",
         "/regen <songId> - queue a dry-run regeneration note",
         "/review <songId> - run a debug-only mock AI review",
-        "/setup - start Telegram artist persona setup",
-        "/setup soul - configure SOUL.md voice",
-        "/persona show|fields|edit <field>|check|reset|migrate - manage Telegram persona",
+        "/setup - talk with the artist about persona direction",
+        "/persona show|fields|check|reset|migrate - inspect or migrate persona files",
         "/pause - pause autopilot",
         "/resume - resume autopilot",
         "/help - show this help"
@@ -148,48 +135,15 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     if (!input.workspaceRoot) {
       return { kind: "setup", responseText: "Persona setup unavailable: workspace root missing.", shouldStoreFreeText: false };
     }
-    if (args[0]?.toLowerCase() === "soul") {
-      await createTelegramPersonaSession(input.workspaceRoot, {
-        mode: "setup_soul",
-        chatId: input.chatId,
-        userId: input.fromUserId
-      });
-      return {
-        kind: "setup",
-        responseText: ["SOUL setup started.", formatSoulPersonaQuestion(0)].join("\n"),
-        shouldStoreFreeText: false
-      };
-    }
-    if (!isPersonaProposerEnabled()) {
-      await createTelegramPersonaSession(input.workspaceRoot, {
-        mode: "setup_artist",
-        chatId: input.chatId,
-        userId: input.fromUserId
-      });
-      return {
-        kind: "setup",
-        responseText: [
-          "Artist persona setup started.",
-          formatArtistPersonaQuestion(0)
-        ].join("\n"),
-        shouldStoreFreeText: false
-      };
-    }
-    await createTelegramPersonaSession(input.workspaceRoot, {
-      mode: "setup_ai_rough",
+    const routed = await routeTelegramConversation({
+      text: args.length > 0 ? `/persona ${args.join(" ")}` : "/persona アーティストの輪郭を一緒に決めたい",
+      fromUserId: input.fromUserId,
       chatId: input.chatId,
-      userId: input.fromUserId,
+      workspaceRoot: input.workspaceRoot,
+      autopilotStatus: input.autopilotStatus,
       aiReviewProvider: input.aiReviewProvider
     });
-    return {
-      kind: "setup",
-      responseText: [
-        "Artist persona AI setup started.",
-        "Send a rough 1-2 sentence artist sketch. Example: 和風 hip-hop で社会風刺がメインの男性アーティスト、20代",
-        "Commands: /skip repeats this prompt, /cancel stops setup."
-      ].join("\n"),
-      shouldStoreFreeText: false
-    };
+    return { kind: "setup", ...routed };
   }
 
   if (command === "/persona") {
@@ -207,58 +161,12 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
       const mode = args[1]?.toLowerCase();
       const report = await auditPersonaCompleteness(input.workspaceRoot);
       if (mode === "fill") {
-        const queue = report.fields.filter(needsPersonaFill).map((field) => field.field);
-        if (queue.length === 0) {
-          return { kind: "persona", responseText: "All fields filled. Use /persona show to review it.", shouldStoreFreeText: false };
-        }
-        const [field, ...rest] = queue;
-        if (isPersonaProposerEnabled()) {
-          const [artistMd, soulMd] = await Promise.all([
-            readFile(join(input.workspaceRoot, "ARTIST.md"), "utf8").catch(() => ""),
-            readFile(join(input.workspaceRoot, "SOUL.md"), "utf8").catch(() => "")
-          ]);
-          const proposals = await proposePersonaFields({
-            fields: queue,
-            source: {
-              artistMd,
-              soulMd,
-              customSections: report.customSections
-            }
-          }, { aiReviewProvider: input.aiReviewProvider });
-          await createTelegramPersonaSession(input.workspaceRoot, {
-            mode: "check_fill_chain",
-            field,
-            checkFillQueue: rest,
-            chatId: input.chatId,
-            userId: input.fromUserId,
-            aiReviewProvider: input.aiReviewProvider,
-            pending: { aiDrafts: proposals.drafts, skipCount: {} }
-          });
-          return {
-            kind: "persona",
-            responseText: [
-              formatPersonaCheckSummary(report),
-              "",
-              "Starting AI fill chain.",
-              formatPersonaFillDraft(proposals.drafts, field, 0, queue.length),
-              proposals.warnings.length > 0 ? `Warnings: ${proposals.warnings.join("; ")}` : undefined
-            ].filter(Boolean).join("\n"),
-            shouldStoreFreeText: false
-          };
-        }
-        await createTelegramPersonaSession(input.workspaceRoot, {
-          mode: "check_fill_chain",
-          field,
-          checkFillQueue: rest,
-          chatId: input.chatId,
-          userId: input.fromUserId
-        });
         return {
           kind: "persona",
           responseText: [
             formatPersonaCheckSummary(report),
             "",
-            `Starting fill chain. First: ${field}. Send the new value, /skip, or /cancel.`
+            "Wizard fill has been retired. Tell the artist what you want changed in normal language, then approve the proposed ChangeSet with /yes."
           ].join("\n"),
           shouldStoreFreeText: false
         };
@@ -273,25 +181,15 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
       return { kind: "persona", responseText: formatPersonaCheckReport(report), shouldStoreFreeText: false };
     }
     if (subcommand === "edit") {
-      const field = parsePersonaEditField(args[1]);
-      if (!field) {
-        return {
-          kind: "persona",
-          responseText: "Usage: /persona edit <field>. Send /persona fields for editable fields.",
-          shouldStoreFreeText: false
-        };
-      }
-      await createTelegramPersonaSession(input.workspaceRoot, {
-        mode: "edit_field",
-        field,
+      const routed = await routeTelegramConversation({
+        text: `/persona ${args.slice(1).join(" ") || "personaを自然な会話で直したい"}`,
+        fromUserId: input.fromUserId,
         chatId: input.chatId,
-        userId: input.fromUserId
+        workspaceRoot: input.workspaceRoot,
+        autopilotStatus: input.autopilotStatus,
+        aiReviewProvider: input.aiReviewProvider
       });
-      return {
-        kind: "persona",
-        responseText: `Editing ${args[1]}. Send the new value, then /confirm or /cancel.`,
-        shouldStoreFreeText: false
-      };
+      return { kind: "persona", ...routed };
     }
     if (subcommand === "reset") {
       await createTelegramPersonaSession(input.workspaceRoot, {
@@ -324,7 +222,7 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
     }
     return {
       kind: "persona",
-      responseText: "Usage: /persona show | /persona fields | /persona edit <field> | /persona check [fill|suggest] | /persona reset | /persona migrate",
+      responseText: "Usage: /persona show | /persona fields | /persona check [suggest] | /persona reset | /persona migrate",
       shouldStoreFreeText: false
     };
   }
@@ -354,40 +252,46 @@ export async function routeTelegramCommand(input: TelegramRouteInput): Promise<T
   if (command === "/song") {
     const subcommand = args[0]?.toLowerCase();
     if (subcommand === "update") {
-      const songId = args[1];
-      if (!input.workspaceRoot || !songId) {
+      if (!input.workspaceRoot || !args[1]) {
         return { kind: "song", responseText: "Usage: /song update <songId>", shouldStoreFreeText: false };
       }
-      if (!isSongProposerEnabled()) {
-        return { kind: "song", responseText: "Plan v9.12 song proposer is disabled.", shouldStoreFreeText: false };
-      }
-      return {
-        kind: "song",
-        responseText: await startTelegramSongUpdateSession(input.workspaceRoot, {
-          songId,
-          chatId: input.chatId,
-          userId: input.fromUserId,
-          aiReviewProvider: input.aiReviewProvider
-        }),
-        shouldStoreFreeText: false
-      };
+      const routed = await routeTelegramConversation({
+        text: `/song ${args[1]} ${args.slice(2).join(" ") || "この曲を更新したい"}`,
+        fromUserId: input.fromUserId,
+        chatId: input.chatId,
+        workspaceRoot: input.workspaceRoot,
+        autopilotStatus: input.autopilotStatus,
+        aiReviewProvider: input.aiReviewProvider
+      });
+      return { kind: "song", ...routed };
     }
     if (subcommand === "add") {
       if (!input.workspaceRoot) {
         return { kind: "song", responseText: "Song add unavailable: workspace root missing.", shouldStoreFreeText: false };
       }
-      if (!isSongProposerEnabled()) {
-        return { kind: "song", responseText: "Plan v9.12 song proposer is disabled.", shouldStoreFreeText: false };
+      const routed = await routeTelegramConversation({
+        text: `/song create ${args.slice(1).join(" ")}`.trim(),
+        fromUserId: input.fromUserId,
+        chatId: input.chatId,
+        workspaceRoot: input.workspaceRoot,
+        autopilotStatus: input.autopilotStatus,
+        aiReviewProvider: input.aiReviewProvider
+      });
+      return { kind: "song", ...routed };
+    }
+    if (subcommand === "create") {
+      if (!input.workspaceRoot) {
+        return { kind: "song", responseText: "Song create unavailable: workspace root missing.", shouldStoreFreeText: false };
       }
-      return {
-        kind: "song",
-        responseText: await startTelegramSongAddSession(input.workspaceRoot, {
-          chatId: input.chatId,
-          userId: input.fromUserId,
-          aiReviewProvider: input.aiReviewProvider
-        }),
-        shouldStoreFreeText: false
-      };
+      const routed = await routeTelegramConversation({
+        text,
+        fromUserId: input.fromUserId,
+        chatId: input.chatId,
+        workspaceRoot: input.workspaceRoot,
+        autopilotStatus: input.autopilotStatus,
+        aiReviewProvider: input.aiReviewProvider
+      });
+      return { kind: "song", ...routed };
     }
     const songId = args[0];
     if (!input.workspaceRoot || !songId) {
@@ -533,53 +437,12 @@ async function formatPersonaSuggestions(
   ].filter(Boolean).join("\n");
 }
 
-function formatPersonaFillDraft(
-  drafts: PersonaFieldDraft[],
-  field: PersonaField,
-  index: number,
-  total: number
-): string {
-  const draft = drafts.find((candidate) => candidate.field === field);
-  if (!draft) {
-    return `Field ${index + 1}/${total}: ${field}\nSend the new value, /skip, or /cancel.`;
-  }
-  return [
-    `Field ${index + 1}/${total}: ${field}`,
-    `AI draft: ${draft.draft}`,
-    draft.reasoning ? `Reasoning: ${draft.reasoning}` : undefined,
-    "Commands: /confirm accepts, /answer <text> overrides, /skip asks for another draft, /cancel stops."
-  ].filter(Boolean).join("\n");
-}
-
 function formatPersonaFields(): string {
   return [
     "Editable persona fields:",
     "ARTIST: name, identity, sound, themes, lyrics, social",
     "SOUL: soul-tone, soul-refusal"
   ].join("\n");
-}
-
-function parsePersonaEditField(value?: string): PersonaField | undefined {
-  switch (value?.toLowerCase()) {
-    case "name":
-      return "artistName";
-    case "identity":
-      return "identityLine";
-    case "sound":
-      return "soundDna";
-    case "themes":
-      return "obsessions";
-    case "lyrics":
-      return "lyricsRules";
-    case "social":
-      return "socialVoice";
-    case "soul-tone":
-      return "soul-tone";
-    case "soul-refusal":
-      return "soul-refusal";
-    default:
-      return undefined;
-  }
 }
 
 async function formatPersonaShow(root: string): Promise<string> {

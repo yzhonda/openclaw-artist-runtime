@@ -25,7 +25,7 @@ export interface WriteSoulPersonaResult {
 }
 
 const minTextLength = (label: string, minLength: number) => (value: string): string | undefined =>
-  value.trim().length >= minLength ? undefined : `${label} must be at least ${minLength} characters. Send /skip to use the default.`;
+  value.trim().length >= minLength ? undefined : `${label} must be at least ${minLength} characters.`;
 
 export const soulPersonaQuestions: SoulPersonaQuestion[] = [
   {
@@ -87,14 +87,6 @@ export function buildSoulPersonaBlock(pending: Partial<PersonaAnswers>): string 
   ].join("\n");
 }
 
-export function formatSoulPersonaQuestion(stepIndex: number): string {
-  const question = soulPersonaQuestions[stepIndex];
-  if (!question) {
-    return formatSoulPersonaPreview({});
-  }
-  return [question.prompt, "", "Commands: /skip uses the default, /back goes back, /cancel stops setup."].join("\n");
-}
-
 export function formatSoulPersonaPreview(pending: Partial<PersonaAnswers>): string {
   const answers = completeSoulPersonaAnswers(pending);
   return [
@@ -102,7 +94,7 @@ export function formatSoulPersonaPreview(pending: Partial<PersonaAnswers>): stri
     `Conversation tone: ${answers.conversationTone}`,
     `Refusal style: ${answers.refusalStyle}`,
     "",
-    "Write this to SOUL.md? Reply /confirm or /back."
+    "Write this to SOUL.md? Reply /confirm, or keep discussing changes naturally."
   ].join("\n");
 }
 
@@ -155,4 +147,3 @@ export async function resetSoulPersonaBlock(root: string): Promise<boolean> {
   await writeFile(path, nextContents ? `${nextContents}\n` : "", "utf8");
   return true;
 }
-

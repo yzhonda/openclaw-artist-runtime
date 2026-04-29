@@ -1,10 +1,8 @@
 import type { ArtistRuntimeConfig } from "../types.js";
 import { safeRegisterCommand } from "../pluginApi.js";
 import { ArtistAutopilotService } from "../services/autopilotService.js";
-import { isLegacyWizardEnabled, resolveRuntimeConfig } from "../services/runtimeConfig.js";
+import { resolveRuntimeConfig } from "../services/runtimeConfig.js";
 import { routeTelegramCommand } from "../services/telegramCommandRouter.js";
-import { handleTelegramPersonaSessionMessage } from "../services/telegramPersonaSession.js";
-import { handleTelegramSongSessionMessage } from "../services/telegramSongSession.js";
 
 interface PluginCommandContextLike {
   senderId?: string;
@@ -91,26 +89,6 @@ async function handleRoutedCommand(name: string, ctx: PluginCommandContextLike, 
   return { text: result.responseText };
 }
 
-async function handleSessionCommand(name: string, ctx: PluginCommandContextLike, api: PluginApiWithConfig): Promise<{ text: string }> {
-  const config = await resolveCommandRuntimeConfig(ctx, api);
-  const text = name === "answer" ? (ctx.args?.trim() ?? "") : commandText(name, ctx);
-  if (!text) {
-    return { text: "Usage: /answer <wizard answer>" };
-  }
-  const songResponse = await handleTelegramSongSessionMessage(config.artist.workspaceRoot, text);
-  if (songResponse) {
-    return { text: songResponse };
-  }
-  const personaResponse = await handleTelegramPersonaSessionMessage(config.artist.workspaceRoot, text);
-  if (personaResponse) {
-    return { text: personaResponse };
-  }
-  if (!isLegacyWizardEnabled()) {
-    return handleRoutedCommand(name, ctx, api);
-  }
-  return { text: "No active artist-runtime wizard. Use /setup, /persona check fill, /song update <id>, or /song add first." };
-}
-
 function logRegistration(ok: boolean, name: string): void {
   if (ok) {
     console.info(`[artist-runtime] registered runtime-slash command: ${name}`);
@@ -144,13 +122,13 @@ export function registerCommands(api: unknown): void {
     requireAuth: true,
     handler: (ctx) => handleRoutedCommand("setup", ctx as PluginCommandContextLike, apiConfig)
   }, logRegistration);
-  for (const name of ["confirm", "cancel", "skip", "back", "answer"]) {
+  for (const name of ["confirm", "cancel"]) {
     safeRegisterCommand(api, {
       name,
-      description: `Continue an active artist-runtime persona wizard with /${name}.`,
+      description: `Confirm or cancel an active artist-runtime proposal with /${name}.`,
       acceptsArgs: true,
       requireAuth: true,
-      handler: (ctx) => handleSessionCommand(name, ctx as PluginCommandContextLike, apiConfig)
+      handler: (ctx) => handleRoutedCommand(name, ctx as PluginCommandContextLike, apiConfig)
     }, logRegistration);
   }
   for (const name of ["yes", "no", "edit", "one", "talk"]) {

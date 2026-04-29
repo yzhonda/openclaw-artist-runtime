@@ -1,7 +1,6 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { PersonaAnswers } from "../types.js";
-import { completeArtistPersonaAnswers } from "./personaWizardQuestions.js";
 
 export const artistPersonaBlockStart = "<!-- artist-runtime:persona:core:start -->";
 export const artistPersonaBlockEnd = "<!-- artist-runtime:persona:core:end -->";
@@ -9,6 +8,14 @@ export const artistPersonaBlockEnd = "<!-- artist-runtime:persona:core:end -->";
 const artistNameTbdPattern = /(^|\n)\s*Artist name:\s*TBD\s*(\n|$)/i;
 const sunoNameTbdPattern = /(^|\n)\s*name:\s*TBD\s*(\n|$)/i;
 const secretPattern = /(TELEGRAM_BOT_TOKEN|bot\d+:[A-Za-z0-9_-]{30,}|API[_ -]?KEY|COOKIE|CREDENTIAL|PASSWORD|SECRET)/i;
+const defaultArtistPersonaFieldValues = {
+  artistName: "Unnamed OpenClaw Artist",
+  identityLine: "A public musical artist that turns observations into autonomous songs.",
+  soundDna: "alternative pop, glassy synth texture, close controlled vocal",
+  obsessions: "night infrastructure, private signals, lonely machines",
+  lyricsRules: "avoid cheap hope, direct imitation, generic slogans, and corporate uplift",
+  socialVoice: "short, observant, unsalesy, concrete"
+};
 
 export interface WriteArtistPersonaResult {
   path: string;
@@ -99,6 +106,20 @@ export function buildArtistPersonaBlock(pending: Partial<PersonaAnswers>): strin
     "- Describe sonic features instead of copying named artists.",
     artistPersonaBlockEnd
   ].join("\n");
+}
+
+export function completeArtistPersonaAnswers(pending: Partial<PersonaAnswers>): Required<Pick<
+  PersonaAnswers,
+  "artistName" | "identityLine" | "soundDna" | "obsessions" | "lyricsRules" | "socialVoice"
+>> {
+  return {
+    artistName: String(pending.artistName ?? defaultArtistPersonaFieldValues.artistName),
+    identityLine: String(pending.identityLine ?? defaultArtistPersonaFieldValues.identityLine),
+    soundDna: String(pending.soundDna ?? defaultArtistPersonaFieldValues.soundDna),
+    obsessions: String(pending.obsessions ?? defaultArtistPersonaFieldValues.obsessions),
+    lyricsRules: String(pending.lyricsRules ?? defaultArtistPersonaFieldValues.lyricsRules),
+    socialVoice: String(pending.socialVoice ?? defaultArtistPersonaFieldValues.socialVoice)
+  };
 }
 
 export function assertPersonaBlockSafe(block: string): void {
