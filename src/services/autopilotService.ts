@@ -21,6 +21,7 @@ import { resetIfNewDay, tryConsumeBudget } from "./sunoBudgetLedger.js";
 import { collectObservations } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
 import { pollSongDistribution } from "./songDistributionPoller.js";
+import { cleanupExpiredCallbacks } from "./callbackLedgerMaintenance.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -206,6 +207,10 @@ export class ArtistAutopilotService {
   }
 
   async runCycle(input: RunAutopilotCycleInput): Promise<AutopilotRunState> {
+    await cleanupExpiredCallbacks(input.workspaceRoot).catch((error) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      console.warn(`[artist-runtime] callback ledger cleanup failed: ${reason}`);
+    });
     const resolvedConfig = applyConfigDefaults(input.config);
     const config = input.manualSeed
       ? { ...resolvedConfig, autopilot: { ...resolvedConfig.autopilot, enabled: true } }
