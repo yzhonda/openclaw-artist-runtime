@@ -713,6 +713,159 @@ publish gate / liveGoArmed / autopilot.dryRun=false **完全 untouched**。
 - Phase C: song spawn inject 後も同上
 - 各 phase に R10 untouched dedicated test 同梱 (`r10-daily-voice-untouched.test.ts` / `r10-commission-untouched.test.ts` / `r10-song-spawn-untouched.test.ts`)
 
+## Plan v9.18: Autopilot self-run and SONGBOOK care (2026-04-29)
+
+Plan v9.18 closes the practical gap between "song injected" and "song reaches a
+completed take." Phase E strengthens the four autopilot stages. Phase F keeps
+`artist/SONGBOOK.md` aligned with song state and public Apple Music links. R10
+controls remain untouched: this plan does not arm publish gates, does not set
+`liveGoArmed=true`, and does not flip `autopilot.dryRun=false`.
+
+### Phase E-1: Planning skeleton validator (`0d59653`)
+
+`planningSkeletonValidator` checks whether a planning-stage song has the minimum
+shape needed to move forward:
+
+- required planning fields: title, mood, tempo, duration, style notes, and lyrics
+  theme
+- source files: `songs/<id>/song.md` and `songs/<id>/brief.md`
+- secret guard on input context, AI completion response, and final drafted text
+
+If fields are missing, autopilot emits a planning-skeleton event and Telegram
+pushes an inline confirmation path.御大 can apply the suggested skeleton, skip it,
+or edit through the normal ChangeSet path. Apply moves the song toward
+`suno_compose`; skip leaves it for a later cycle. If planning stays stalled for
+the configured timeout window, default 7 days, autopilot pauses and records
+`planning_stalled_<N>days` in state instead of spinning forever.
+
+### Phase E-2: Suno generate stage (`2f33a25`)
+
+The Suno stage now has an explicit guard and retry layer:
+
+- `sunoBudgetGuard` checks daily budget before a generate attempt. Budget-low
+  cases emit a Telegram notification and pause/skip the unsafe path.
+- `sunoRetryHandler` applies bounded exponential backoff for transient Suno
+  failures.
+- hard failures emit `suno_generate_failed` and leave the artist in a recoverable
+  paused state instead of silently dropping the song.
+
+This stage still respects the existing Suno authority gates. Dry-run mode blocks
+real Suno create; Plan v9.18 only makes the internal stage transition and failure
+reporting more deterministic.
+
+### Phase E-3: Take select stage (`3b7603d`)
+
+`sunoTakeScorer` gives each imported take a score from three axes:
+
+- `lyrics_score`: lyric completeness and fit to the brief
+- `sonic_match`: match against style notes, tempo, and arrangement expectations
+- `mood_alignment`: fit against the song mood and artist voice
+
+`sunoTakeSelector` picks the best take with tie-break rules and threshold gates.
+If every take is low-score, Telegram asks御大 for a judgment with inline buttons:
+adopt the best take anyway, request Suno regeneration, or skip for later. The
+callback handlers update local stage state only; no publish flag or social arm is
+changed.
+
+### Phase E-4: Completion and full-cycle close (`314eb1d`)
+
+The completion stage now closes the dry-run-safe song loop:
+
+- `writeCompletedStage` writes completed state from selected take data.
+- SONGBOOK reflection is coupled to the completion writer with backup-protected
+  local file updates.
+- failure paths pause with an explicit reason instead of losing the selected
+  take.
+- the mock e2e covers planning -> suno -> take_select -> completed.
+
+After this phase, a commission or spawn-injected song can progress through the
+four-stage autopilot path without stopping at planning or take selection, while
+real external side effects remain governed by the existing gates.
+
+### Phase F: SONGBOOK automation (`a43bdc5`)
+
+Phase F adds a maintenance layer for `workspace/artist/SONGBOOK.md`.
+
+`songbookValidator` detects:
+
+- missing SONGBOOK rows for existing song state
+- status drift between `songs/<id>/song.md` and SONGBOOK
+- missing Apple Music links when a public iTunes/Apple candidate is available
+- incomplete rows that can be re-filled from local song state
+
+`itunesArtistLookup` uses the public iTunes Search API for used::honda:
+
+```text
+artistId: 1889924232
+country: jp
+endpoint: https://itunes.apple.com/lookup?id=1889924232&entity=song&limit=200&country=jp
+```
+
+The lookup returns public metadata and track URLs only. Responses still pass the
+secret-like guard before parsing.
+
+`songbookSyncer` combines validation and lookup results, then writes through the
+existing song-state writer. Before changing `songs/<id>/song.md` or
+`artist/SONGBOOK.md`, it takes backup entries with the same backup discipline
+used elsewhere in the runtime.
+
+Producer-facing paths:
+
+- Producer Console: Runtime SONGBOOK card shows validation issues, rows, and
+  lookup/sync buttons.
+- API: `GET /plugins/artist-runtime/api/songbook/lookup` previews validation and
+  Apple Music candidates.
+- API: `POST /plugins/artist-runtime/api/songbook/lookup` applies sync through
+  the backup-protected writer.
+- Autopilot: `OPENCLAW_SONGBOOK_AUTO_SYNC=on` allows the autopilot cycle to run
+  the sync hook. Default is off. Keep it off unless御大 wants background
+  SONGBOOK upkeep. Use it with the normal slow 12-24h autopilot operating
+  cadence; for rapid local test loops, prefer the manual API/UI path.
+
+Plan v9.18 does not add Instagram or TikTok posting. Those buttons remain absent.
+X publish remains the Plan v9.15 two-step Telegram confirmation path.
+
+### Plan v9.18 通常運転手順
+
+1. **gateway 再起動** after pulling/building the v9.18 commits:
+   ```bash
+   source scripts/openclaw-local-env.sh
+   .local/openclaw/bin/openclaw gateway stop
+   scripts/openclaw-local-gateway start
+   ```
+   If the local wrapper is already supervising the gateway, use the equivalent
+   project restart wrapper that reloads `dist/`.
+2. **R10 posture check** before live operation:
+   ```bash
+   curl -s http://127.0.0.1:43134/plugins/artist-runtime/api/status \
+     | jq '.config.autopilot.dryRun, .config.distribution.liveGoArmed, .config.distribution.platforms.x.liveGoArmed'
+   ```
+   Expected protected posture: `true`, `false`, `false`.
+3. **Manual SONGBOOK preview** from Producer Console or API:
+   ```bash
+   curl -s http://127.0.0.1:43134/plugins/artist-runtime/api/songbook/lookup | jq '.validation.issues'
+   ```
+4. **Manual SONGBOOK sync** only after the preview is expected:
+   ```bash
+   curl -s -X POST http://127.0.0.1:43134/plugins/artist-runtime/api/songbook/lookup | jq '.updated, .validation.issues'
+   ```
+5. **Optional background sync**:
+   ```bash
+   export OPENCLAW_SONGBOOK_AUTO_SYNC=on
+   ```
+   Restart the gateway after changing the environment. The default is off, so a
+   normal install will not call iTunes lookup from autopilot unless御大 opts in.
+
+### R10 守備 (Plan v9.18)
+
+- Phase E strengthens planning, Suno, take selection, and completion state
+  transitions only.
+- Phase F reads public iTunes metadata and writes local SONGBOOK state only.
+- `autopilot.dryRun`, global `liveGoArmed`, and X platform `liveGoArmed` remain
+  unchanged. Dedicated R10 tests cover planning, Suno, take-select, completion,
+  and SONGBOOK sync.
+- IG/TikTok publish remains outside Plan v9.18.
+
 ## See also
 
 - `docs/RUNTIME_CLEANUP.md`
