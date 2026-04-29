@@ -11,10 +11,15 @@ import { ManualSongCreateCard } from "./components/ManualSongCreateCard";
 import { PendingApprovalsCard } from "./components/PendingApprovalsCard";
 import { PendingChangeSetCard, type ProposalDetail } from "./components/PendingChangeSetCard";
 import { SettingsRuntimeOverridesPanel, type RuntimeOverridesSavePayload, type RuntimeOverridesValues } from "./components/SettingsRuntimeOverridesPanel";
+import { SunoDailyBudgetDetailCard, type SunoBudgetDetail } from "./components/SunoDailyBudgetDetailCard";
+import { BirdCallLedgerCard, type BirdLedgerDetail } from "./components/BirdCallLedgerCard";
+import { DistributionDetectionCard, type DistributionDetectionDetail } from "./components/DistributionDetectionCard";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
 import { instagramAuthorityModes, sunoDriverModes, sunoSubmitModes, tiktokAuthorityModes, xAuthorityModes, type DistributionEvent, type PlatformStat, type SocialPlatform } from "../../src/types";
+
+const refreshIntervalMs = 5000;
 
 type StatusResponse = {
   dryRun: boolean;
@@ -68,6 +73,7 @@ type StatusResponse = {
         unlimited: boolean;
       };
     };
+    budgetDetail?: SunoBudgetDetail;
     artifacts: SunoArtifactIndexEntry[];
     profile?: {
       stale?: boolean;
@@ -121,13 +127,10 @@ type StatusResponse = {
       cooldownReason?: string;
       nextAllowedAt?: string;
     };
+    ledger?: BirdLedgerDetail;
   };
   distribution?: {
-    detected: {
-      unitedMasters?: { url: string; detectedAt: string };
-      spotify?: { url: string; detectedAt: string };
-      appleMusic?: { url: string; detectedAt: string };
-    };
+    detected: DistributionDetectionDetail;
   };
   pendingApprovals?: {
     count: number;
@@ -657,7 +660,7 @@ export function App() {
         return;
       }
       void refresh(selectedSongId);
-    }, 3000);
+    }, refreshIntervalMs);
     return () => clearInterval(intervalId);
   }, [busy, configDirty, selectedSongId]); // eslint-disable-line -- Refresh captures the latest draft sync policy without adding a hook plugin dependency.
 
@@ -1327,6 +1330,18 @@ export function App() {
     />
   );
 
+  const sunoBudgetDetailPanel = (
+    <SunoDailyBudgetDetailCard detail={status?.suno.budgetDetail} />
+  );
+
+  const birdLedgerPanel = (
+    <BirdCallLedgerCard ledger={status?.bird?.ledger} />
+  );
+
+  const distributionDetectionPanel = (
+    <DistributionDetectionCard detected={status?.distribution?.detected} />
+  );
+
   const manualSongCreatePanel = (
     <ManualSongCreateCard
       busy={busy !== null}
@@ -1614,8 +1629,8 @@ export function App() {
 
       {activeView === "dashboard" ? <section className="two-column">{cockpitStrip}{manualSongCreatePanel}{pendingApprovalsPanel}{lastCyclePanel}{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
-      {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
-      {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
+      {activeView === "music" ? <section className="two-column">{sunoBudgetDetailPanel}{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
+      {activeView === "platforms" ? <section className="two-column">{birdLedgerPanel}{distributionDetectionPanel}{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
       {activeView === "songs" ? <section className="two-column">{songChangeSetPanel}{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}

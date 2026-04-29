@@ -13,7 +13,7 @@ import { listSongStates, readArtistMind, readSongState } from "../services/artis
 import { ArtistAutopilotService, pauseAutopilot, resumeAutopilot } from "../services/autopilotService.js";
 import { AutopilotControlService } from "../services/autopilotControlService.js";
 import { getAutopilotTicker, getAutopilotTickerIntervalMs, getLastOutcome, getLastTickAt } from "../services/autopilotTicker.js";
-import { readBirdRateLimitStatus } from "../services/birdRateLimiter.js";
+import { readBirdLedgerDetail, readBirdRateLimitStatus } from "../services/birdRateLimiter.js";
 import * as changeSetApplier from "../services/changeSetApplier.js";
 import { applyProposalToSession, clearProposalFromSession, listPendingProposalDetails, listPendingProposals, resolvePendingProposal, updateProposalFields } from "../services/conversationalSession.js";
 import { buildPlatformStats, readDistributionEvents } from "../services/distributionLedgerReader.js";
@@ -27,7 +27,7 @@ import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../service
 import { prepareSocialAssets } from "../services/socialAssets.js";
 import { buildSunoArtifactsPage, STATUS_SUNO_ARTIFACT_LIMIT } from "../services/sunoArtifacts.js";
 import { SunoBudgetTracker } from "../services/sunoBudget.js";
-import { readBudgetState as readSunoDailyBudgetState } from "../services/sunoBudgetLedger.js";
+import { readBudgetDetail as readSunoDailyBudgetDetail, readBudgetState as readSunoDailyBudgetState } from "../services/sunoBudgetLedger.js";
 import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js";
 import { buildSunoArtifactIndex, generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services/sunoRuns.js";
 import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
@@ -860,7 +860,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   const platforms = await buildPlatformStatuses(mergedConfig);
   const alerts = await collectAlerts(mergedConfig.artist.workspaceRoot, sunoWorker, platforms, mergedConfig);
   const sunoBudgetTracker = new SunoBudgetTracker(mergedConfig.artist.workspaceRoot);
-  const [sunoBudgetState, sunoBudgetResetHistory, sunoArtifacts, sunoDailyBudget, birdRateLimit, pendingApprovals] = await Promise.all([
+  const [sunoBudgetState, sunoBudgetResetHistory, sunoArtifacts, sunoDailyBudget, sunoBudgetDetail, birdRateLimit, birdLedger, pendingApprovals] = await Promise.all([
     sunoBudgetTracker.getState(
       mergedConfig.music.suno.dailyCreditLimit,
       mergedConfig.music.suno.monthlyCreditLimit
@@ -868,7 +868,9 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     sunoBudgetTracker.getResetHistory(10),
     buildSunoArtifactIndex(mergedConfig.artist.workspaceRoot),
     readSunoDailyBudgetState(mergedConfig.artist.workspaceRoot),
+    readSunoDailyBudgetDetail(mergedConfig.artist.workspaceRoot),
     readBirdRateLimitStatus(mergedConfig.artist.workspaceRoot),
+    readBirdLedgerDetail(mergedConfig.artist.workspaceRoot),
     listPendingProposals(mergedConfig.artist.workspaceRoot)
   ]);
   const [musicSummary, distributionSummary] = await Promise.all([
@@ -882,6 +884,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   ]);
   const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
   const effectiveDryRunMap = buildEffectiveDryRunMap(mergedConfig);
+  const distributionLastCheckedAt = new Date().toISOString();
   const rawConfigOverrides = await readConfigOverrides(mergedConfig.artist.workspaceRoot) as { suno?: { dailyBudget?: unknown } };
   const hasRuntimeSunoBudget = positiveIntegerFromEnv(process.env.OPENCLAW_SUNO_DAILY_BUDGET) !== undefined
     || hasOwnRecordKey(rawConfigOverrides.suno, "dailyBudget");
@@ -910,6 +913,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     ticker: buildTickerStatus(mergedConfig),
     suno: {
       budget: statusSunoBudget,
+      budgetDetail: sunoBudgetDetail,
       artifacts: sunoArtifacts.slice(0, STATUS_SUNO_ARTIFACT_LIMIT),
       profile: {
         stale: sunoWorker.sunoProfileStale,
@@ -920,10 +924,15 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     sunoWorker,
     distributionWorker,
     bird: {
-      rateLimit: birdRateLimit
+      rateLimit: birdRateLimit,
+      ledger: birdLedger
     },
     distribution: {
-      detected: {}
+      detected: {
+        unitedMasters: { lastCheckedAt: distributionLastCheckedAt },
+        spotify: { lastCheckedAt: distributionLastCheckedAt },
+        appleMusic: { lastCheckedAt: distributionLastCheckedAt }
+      }
     },
     pendingApprovals: {
       count: pendingApprovals.length,
@@ -1655,7 +1664,7 @@ export async function producerConsoleHtml(projectRoot = PLUGIN_ROOT): Promise<st
     "document.getElementById('config-form').addEventListener('submit',async(event)=>{event.preventDefault(); try{text('config-error',''); await post('/config/update',{patch:buildConfigPatch()}); configDirty=false; await refresh();}catch(error){text('config-error',String(error instanceof Error ? error.message : error));}});",
     "document.getElementById('config-reset').addEventListener('click',async()=>{configDirty=false; await refresh();});",
     "document.getElementById('config-refresh').addEventListener('click',async()=>{configDirty=false; await refresh();});",
-    "setInterval(()=>{void refresh().catch(error=>{text('debug',String(error));});},3000);",
+    "setInterval(()=>{void refresh().catch(error=>{text('debug',String(error));});},5000);",
     "refresh().catch(error=>{text('debug',String(error));});",
     "</script>",
     "</main>"

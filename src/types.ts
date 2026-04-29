@@ -857,6 +857,17 @@ export interface StatusResponse {
   ticker: AutopilotTickerStatus;
   suno: {
     budget: SunoBudgetStatus;
+    budgetDetail?: {
+      todayCalls: Array<{
+        timestamp: string;
+        amount: number;
+        kind: "consume";
+      }>;
+      lastResetAt: string;
+      remaining: number;
+      used: number;
+      limit: number;
+    };
     artifacts: SunoArtifactIndexEntry[];
     profile?: {
       stale?: boolean;
@@ -875,12 +886,24 @@ export interface StatusResponse {
       cooldownReason?: string;
       nextAllowedAt?: string;
     };
+    ledger?: {
+      todayCalls: Array<{
+        timestamp: string;
+        query?: string;
+        mode?: string;
+      }>;
+      cooldown: {
+        until?: string;
+        reason?: string;
+      };
+      nextAllowedAt?: string;
+    };
   };
   distribution?: {
     detected: {
-      unitedMasters?: { url: string; detectedAt: string };
-      spotify?: { url: string; detectedAt: string };
-      appleMusic?: { url: string; detectedAt: string };
+      unitedMasters?: { url?: string; detectedAt?: string; lastCheckedAt?: string };
+      spotify?: { url?: string; detectedAt?: string; lastCheckedAt?: string };
+      appleMusic?: { url?: string; detectedAt?: string; lastCheckedAt?: string };
     };
   };
   pendingApprovals?: {

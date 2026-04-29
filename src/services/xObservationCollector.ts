@@ -103,7 +103,7 @@ export async function collectObservations(root: string, context: XObservationCon
     const result = await runner();
     const combined = `${result.stdout}\n${result.stderr ?? ""}`;
     if (isBirdBanIndication(combined)) {
-      await recordBirdCall(root, now);
+      await recordBirdCall(root, now, { query: context.query ?? strategy.query, mode: strategy.mode });
       await triggerCooldown(root, combined.slice(0, 240), now);
       emitRuntimeEvent({
         type: "bird_cooldown_triggered",
@@ -116,14 +116,14 @@ export async function collectObservations(root: string, context: XObservationCon
     if (secretLikePattern.test(result.stdout)) {
       throw new Error("x_observation_contains_secret_like_text");
     }
-    await recordBirdCall(root, now);
+    await recordBirdCall(root, now, { query: context.query ?? strategy.query, mode: strategy.mode });
     const observations = renderObservation(filterObservationLines(result.stdout, context.personaText), now, context.query ?? strategy.query);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, `${observations.trim()}\n`, "utf8");
     return { status: "collected", path, observations };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await recordBirdCall(root, now);
+    await recordBirdCall(root, now, { query: context.query ?? strategy.query, mode: strategy.mode });
     if (isBirdBanIndication(message)) {
       await triggerCooldown(root, message, now);
       emitRuntimeEvent({

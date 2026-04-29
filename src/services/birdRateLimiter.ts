@@ -8,10 +8,25 @@ export interface BirdRateLimitConfig {
 
 export interface BirdCallLedger {
   date: string;
-  calls: string[];
+  calls: Array<string | BirdCallEntry>;
   cooldownUntil?: string;
   cooldownReason?: string;
   updatedAt: string;
+}
+
+export interface BirdCallEntry {
+  timestamp: string;
+  query?: string;
+  mode?: string;
+}
+
+export interface BirdLedgerDetail {
+  todayCalls: BirdCallEntry[];
+  cooldown: {
+    until?: string;
+    reason?: string;
+  };
+  nextAllowedAt?: string;
 }
 
 export interface BirdAcquireResult {
@@ -114,7 +129,8 @@ export async function tryAcquireBirdCall(root: string, now = new Date()): Promis
   }
   const latest = ledger.calls.at(-1);
   if (latest) {
-    const nextAllowed = new Date(new Date(latest).getTime() + limits.minIntervalMinutes * 60 * 1000);
+    const latestTimestamp = typeof latest === "string" ? latest : latest.timestamp;
+    const nextAllowed = new Date(new Date(latestTimestamp).getTime() + limits.minIntervalMinutes * 60 * 1000);
     if (nextAllowed.getTime() > now.getTime()) {
       return {
         allowed: false,
@@ -146,11 +162,16 @@ export async function readBirdRateLimitStatus(root: string, now = new Date()): P
   };
 }
 
-export async function recordBirdCall(root: string, now = new Date()): Promise<BirdCallLedger> {
+export async function recordBirdCall(root: string, now = new Date(), detail: { query?: string; mode?: string } = {}): Promise<BirdCallLedger> {
   const ledger = await readLedger(root, now);
+  const entry: BirdCallEntry = {
+    timestamp: now.toISOString(),
+    ...(detail.query ? { query: detail.query } : {}),
+    ...(detail.mode ? { mode: detail.mode } : {})
+  };
   return writeLedger(root, {
     ...ledger,
-    calls: [...ledger.calls, now.toISOString()],
+    calls: [...ledger.calls, entry],
     updatedAt: now.toISOString()
   });
 }
@@ -163,4 +184,16 @@ export async function triggerCooldown(root: string, reason: string, now = new Da
     cooldownReason: reason,
     updatedAt: now.toISOString()
   });
+}
+
+export async function readBirdLedgerDetail(root: string, now = new Date()): Promise<BirdLedgerDetail> {
+  const [ledger, acquire] = await Promise.all([readLedger(root, now), tryAcquireBirdCall(root, now)]);
+  return {
+    todayCalls: ledger.calls.map((call) => typeof call === "string" ? { timestamp: call } : call),
+    cooldown: {
+      ...(ledger.cooldownUntil ? { until: ledger.cooldownUntil } : {}),
+      ...(ledger.cooldownReason ? { reason: ledger.cooldownReason } : {})
+    },
+    ...(acquire.nextAllowedAt ? { nextAllowedAt: acquire.nextAllowedAt } : {})
+  };
 }

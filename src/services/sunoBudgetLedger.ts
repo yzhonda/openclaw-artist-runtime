@@ -7,6 +7,22 @@ export interface SunoDailyBudgetState {
   used: number;
   limit: number;
   updatedAt: string;
+  calls?: SunoDailyBudgetCall[];
+  lastResetAt?: string;
+}
+
+export interface SunoDailyBudgetCall {
+  timestamp: string;
+  amount: number;
+  kind: "consume";
+}
+
+export interface SunoDailyBudgetDetail {
+  todayCalls: SunoDailyBudgetCall[];
+  lastResetAt: string;
+  remaining: number;
+  used: number;
+  limit: number;
 }
 
 export interface SunoBudgetConsumeResult {
@@ -43,6 +59,8 @@ export async function resetIfNewDay(root: string, now = new Date()): Promise<Sun
       date,
       used: 0,
       limit,
+      calls: [],
+      lastResetAt: now.toISOString(),
       updatedAt: now.toISOString()
     });
   }
@@ -50,6 +68,8 @@ export async function resetIfNewDay(root: string, now = new Date()): Promise<Sun
     date,
     used: Math.max(0, Number(current.used ?? 0)),
     limit,
+    calls: Array.isArray(current.calls) ? current.calls as SunoDailyBudgetCall[] : [],
+    lastResetAt: typeof current.lastResetAt === "string" ? current.lastResetAt : now.toISOString(),
     updatedAt: now.toISOString()
   };
   return writeState(root, state);
@@ -72,7 +92,27 @@ export async function tryConsumeBudget(root: string, amount: number, now = new D
   const next = await writeState(root, {
     ...state,
     used: state.used + normalizedAmount,
+    calls: [
+      ...(state.calls ?? []),
+      {
+        timestamp: now.toISOString(),
+        amount: normalizedAmount,
+        kind: "consume"
+      }
+    ],
     updatedAt: now.toISOString()
   });
   return { ok: true, state: next };
+}
+
+export async function readBudgetDetail(root: string, now = new Date()): Promise<SunoDailyBudgetDetail> {
+  const state = await resetIfNewDay(root, now);
+  const calls = state.calls ?? [];
+  return {
+    todayCalls: calls,
+    lastResetAt: state.lastResetAt ?? state.updatedAt,
+    remaining: Math.max(0, state.limit - state.used),
+    used: state.used,
+    limit: state.limit
+  };
 }

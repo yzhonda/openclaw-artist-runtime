@@ -16,9 +16,9 @@ export interface BudgetRateStatusStripProps {
     nextAllowedAt?: string;
   };
   distribution?: {
-    unitedMasters?: { url: string; detectedAt: string };
-    spotify?: { url: string; detectedAt: string };
-    appleMusic?: { url: string; detectedAt: string };
+    unitedMasters?: { url?: string; detectedAt?: string; lastCheckedAt?: string };
+    spotify?: { url?: string; detectedAt?: string; lastCheckedAt?: string };
+    appleMusic?: { url?: string; detectedAt?: string; lastCheckedAt?: string };
   };
 }
 
@@ -61,9 +61,9 @@ export function BudgetRateStatusStrip(props: BudgetRateStatusStripProps) {
       <div className="strip-section">
         <div className="eyebrow">Distribution Detection</div>
         <div className="pill-row">
-          <span className="pill">UnitedMasters {distribution.unitedMasters ? "✓" : "-"}</span>
-          <span className="pill">Spotify {distribution.spotify ? "✓" : "-"}</span>
-          <span className="pill">Apple Music {distribution.appleMusic ? "✓" : "-"}</span>
+          <span className="pill">UnitedMasters {distribution.unitedMasters?.url ? "✓" : "-"}</span>
+          <span className="pill">Spotify {distribution.spotify?.url ? "✓" : "-"}</span>
+          <span className="pill">Apple Music {distribution.appleMusic?.url ? "✓" : "-"}</span>
         </div>
       </div>
     </article>

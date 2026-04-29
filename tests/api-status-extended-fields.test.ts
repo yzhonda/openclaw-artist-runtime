@@ -54,7 +54,7 @@ describe("extended status fields", () => {
       dailyMax: 5,
       minIntervalMinutes: 60
     });
-    expect(status.distribution?.detected).toEqual({});
+    expect(status.distribution?.detected.spotify?.lastCheckedAt).toEqual(expect.any(String));
     expect(status.pendingApprovals).toMatchObject({
       count: 1,
       recent: [
