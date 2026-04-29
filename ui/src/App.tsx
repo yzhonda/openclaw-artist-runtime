@@ -9,6 +9,7 @@ import { ShortcutHelpOverlay, useKeyboardShortcuts } from "./KeyboardShortcuts";
 import { BudgetRateStatusStrip } from "./components/BudgetRateStatusStrip";
 import { ManualSongCreateCard } from "./components/ManualSongCreateCard";
 import { PendingApprovalsCard } from "./components/PendingApprovalsCard";
+import { PendingChangeSetCard, type ProposalDetail } from "./components/PendingChangeSetCard";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
@@ -189,6 +190,10 @@ type StatusResponse = {
     url?: string;
     reason?: string;
   };
+};
+
+type ProposalsResponse = {
+  proposals: ProposalDetail[];
 };
 
 type ConfigResponse = {
@@ -540,6 +545,8 @@ export function App() {
   const [recovery, setRecovery] = useState<RecoveryResponse | null>(null);
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ConsoleView>("dashboard");
+  const [proposals, setProposals] = useState<ProposalDetail[]>([]);
+  const [highlightChangeSetUntil, setHighlightChangeSetUntil] = useState<number | null>(null);
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
   const [configDirty, setConfigDirty] = useState(false);
   const [platformTests, setPlatformTests] = useState<Record<string, { testedAt: string; status: PlatformDetail }>>({});
@@ -565,14 +572,15 @@ export function App() {
     setIsRefreshing(true);
     try {
       setError(null);
-      const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery] = await Promise.all([
+      const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery, nextProposals] = await Promise.all([
         apiGet<StatusResponse>("/status"),
         apiGet<SongSummary[]>("/songs"),
         apiGet<ConfigResponse>("/config"),
         apiGet<SunoStatusResponse>("/suno/status"),
         apiGet<ArtistMindResponse>("/artist-mind"),
         apiGet<AuditEntry[]>("/audit"),
-        apiGet<RecoveryResponse>("/recovery")
+        apiGet<RecoveryResponse>("/recovery"),
+        apiGet<ProposalsResponse>("/proposals")
       ]);
       const nextSelectedSongId = preferredSongId
         ?? selectedSongId
@@ -595,6 +603,7 @@ export function App() {
         setAuditEntries(nextAuditEntries);
         setPromptLedgerEntries(nextPromptLedgerEntries);
         setRecovery(nextRecovery);
+        setProposals(nextProposals.proposals);
         setSongs(nextSongs);
         setDetail(nextDetail);
         setSelectedSongId(nextSelectedSongId);
@@ -678,6 +687,51 @@ export function App() {
       setError(message);
       showErrorToast("runtime", "manual_song_create_failed", message);
       throw caughtError;
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const applyProposal = async (proposalId: string) => {
+    setBusy(`proposal-yes:${proposalId}`);
+    try {
+      await apiPost(`/proposals/${encodeURIComponent(proposalId)}/yes`);
+      await refresh(selectedSongId);
+      showErrorToast("runtime", "proposal_applied", "ChangeSet applied.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "proposal_apply_failed", message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const cancelProposal = async (proposalId: string) => {
+    setBusy(`proposal-no:${proposalId}`);
+    try {
+      await apiPost(`/proposals/${encodeURIComponent(proposalId)}/no`);
+      await refresh(selectedSongId);
+      showErrorToast("runtime", "proposal_cancelled", "ChangeSet cancelled.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "proposal_cancel_failed", message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const editProposal = async (proposalId: string, fields: Record<string, string>) => {
+    setBusy(`proposal-edit:${proposalId}`);
+    try {
+      await apiPost(`/proposals/${encodeURIComponent(proposalId)}/edit`, { fields });
+      await refresh(selectedSongId);
+      showErrorToast("runtime", "proposal_edited", "ChangeSet proposal updated.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "proposal_edit_failed", message);
     } finally {
       setBusy(null);
     }
@@ -1246,11 +1300,40 @@ export function App() {
     />
   );
 
+  const changeSetHighlighted = highlightChangeSetUntil !== null && nowMs < highlightChangeSetUntil;
+
   const pendingApprovalsPanel = (
     <PendingApprovalsCard
       count={status?.pendingApprovals?.count}
       recent={status?.pendingApprovals?.recent}
-      onViewDomain={(domain) => setActiveView(domain === "song" ? "songs" : "artist-mind")}
+      onViewDomain={(domain) => {
+        setActiveView(domain === "song" ? "songs" : "artist-mind");
+        setHighlightChangeSetUntil(Date.now() + 4000);
+      }}
+    />
+  );
+
+  const songChangeSetPanel = (
+    <PendingChangeSetCard
+      domain="song"
+      proposals={proposals}
+      busy={busy !== null}
+      highlight={changeSetHighlighted}
+      onYes={applyProposal}
+      onNo={cancelProposal}
+      onEdit={editProposal}
+    />
+  );
+
+  const personaChangeSetPanel = (
+    <PendingChangeSetCard
+      domain="persona"
+      proposals={proposals}
+      busy={busy !== null}
+      highlight={changeSetHighlighted}
+      onYes={applyProposal}
+      onNo={cancelProposal}
+      onEdit={editProposal}
     />
   );
 
@@ -1498,10 +1581,10 @@ export function App() {
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
       {activeView === "platforms" ? <section className="two-column">{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
-      {activeView === "songs" ? <section className="two-column">{songsPanel}{currentSongPanel}</section> : null}
+      {activeView === "songs" ? <section className="two-column">{songChangeSetPanel}{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}
-      {activeView === "artist-mind" ? <section className="single-column">{artistMindPanel}</section> : null}
+      {activeView === "artist-mind" ? <section className="single-column">{personaChangeSetPanel}{artistMindPanel}</section> : null}
       {activeView === "settings" ? <section className="two-column">{configPanel}{setupPanel}</section> : null}
       {activeView === "recovery" ? <section className="two-column">{recoveryPanel}{sunoPanel}{alertsPanel}</section> : null}
 

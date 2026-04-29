@@ -144,6 +144,19 @@ export interface PendingProposalSummary {
   createdAt: string;
 }
 
+export interface PendingProposalDetail extends ChangeSetProposal {}
+
+function activeProposalSessions(store: SessionStore, proposalId: string, now: number): ConversationalSession[] {
+  return store.sessions.filter((session) => session.expiresAt > now && session.pendingChangeSet?.id === proposalId);
+}
+
+function assertSingleProposalSession(sessions: ConversationalSession[], proposalId: string): ConversationalSession | undefined {
+  if (sessions.length > 1) {
+    throw new Error(`proposal_id_not_unique:${proposalId}`);
+  }
+  return sessions[0];
+}
+
 export async function listPendingProposals(root: string, now = Date.now()): Promise<PendingProposalSummary[]> {
   const store = await readStore(root);
   return store.sessions
@@ -159,4 +172,78 @@ export async function listPendingProposals(root: string, now = Date.now()): Prom
       };
     })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function listPendingProposalDetails(root: string, now = Date.now()): Promise<PendingProposalDetail[]> {
+  const store = await readStore(root);
+  return store.sessions
+    .filter((session) => session.expiresAt > now && Boolean(session.pendingChangeSet))
+    .map((session) => session.pendingChangeSet as PendingProposalDetail)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function resolvePendingProposal(root: string, proposalId: string, now = Date.now()): Promise<PendingProposalDetail | undefined> {
+  const store = await readStore(root);
+  const session = assertSingleProposalSession(activeProposalSessions(store, proposalId, now), proposalId);
+  return session?.pendingChangeSet;
+}
+
+export async function clearProposalFromSession(root: string, proposalId: string, now = Date.now()): Promise<PendingProposalDetail | undefined> {
+  const store = await readStore(root);
+  const session = assertSingleProposalSession(activeProposalSessions(store, proposalId, now), proposalId);
+  if (!session?.pendingChangeSet) {
+    return undefined;
+  }
+  const clearedProposal = session.pendingChangeSet;
+  const nextSessions = store.sessions.map((candidate) => {
+    if (sessionKey(candidate.chatId, candidate.userId) !== sessionKey(session.chatId, session.userId)) {
+      return candidate;
+    }
+    return {
+      ...candidate,
+      pendingChangeSet: undefined,
+      updatedAt: now,
+      expiresAt: now + CONVERSATIONAL_SESSION_TTL_MS
+    };
+  });
+  await writeStore(root, { sessions: nextSessions });
+  return clearedProposal;
+}
+
+export async function applyProposalToSession(root: string, proposalId: string, now = Date.now()): Promise<PendingProposalDetail | undefined> {
+  return clearProposalFromSession(root, proposalId, now);
+}
+
+export async function updateProposalFields(root: string, proposalId: string, partialFields: Record<string, string>, now = Date.now()): Promise<PendingProposalDetail | undefined> {
+  const store = await readStore(root);
+  const session = assertSingleProposalSession(activeProposalSessions(store, proposalId, now), proposalId);
+  if (!session?.pendingChangeSet) {
+    return undefined;
+  }
+  const updatedProposal: PendingProposalDetail = {
+    ...session.pendingChangeSet,
+    fields: session.pendingChangeSet.fields.map((field) => {
+      const nextValue = partialFields[field.field];
+      return typeof nextValue === "string"
+        ? {
+            ...field,
+            proposedValue: nextValue,
+            status: "proposed",
+            reasoning: field.reasoning ? `${field.reasoning}; edited in Producer Console` : "Edited in Producer Console"
+          }
+        : field;
+    })
+  };
+  const nextSessions = store.sessions.map((candidate) =>
+    sessionKey(candidate.chatId, candidate.userId) === sessionKey(session.chatId, session.userId)
+      ? {
+          ...candidate,
+          pendingChangeSet: updatedProposal,
+          updatedAt: now,
+          expiresAt: now + CONVERSATIONAL_SESSION_TTL_MS
+        }
+      : candidate
+  );
+  await writeStore(root, { sessions: nextSessions });
+  return updatedProposal;
 }
