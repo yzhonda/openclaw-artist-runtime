@@ -1,28 +1,9 @@
-import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { EventEmitter } from "node:events";
 import type { SongState, AiReviewProvider } from "../types.js";
 import type { CallbackActionEntry } from "./callbackActionRegistry.js";
 import { generateArtistResponse, readArtistVoiceContext, type ArtistVoiceContext, type ArtistVoiceResponse } from "./artistVoiceResponder.js";
+import { birdWhoami, combinedBirdOutput, parseTweetUrl as parseBirdTweetUrl, runBirdCommand, type SpawnImpl } from "./birdRunner.js";
 import { secretLikePattern } from "./personaMigrator.js";
-
-type SpawnImpl = typeof spawn;
-
-interface SpawnStreams {
-  stdout?: EventEmitter;
-  stderr?: EventEmitter;
-}
-
-interface SpawnedProcess extends EventEmitter, SpawnStreams {
-  kill?: (signal?: NodeJS.Signals) => void;
-}
-
-interface CommandResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-  errorCode?: string;
-}
 
 export type XPublishAction = "x_publish_prepare" | "x_publish_confirm" | "x_publish_cancel";
 export type XPublishStatus = "prepared" | "published" | "cancelled" | "failed";
@@ -60,6 +41,8 @@ export interface XPublishActionInput {
 const tcoUrlLength = 23;
 const maxTweetLength = 280;
 const defaultTimeoutMs = 10_000;
+
+export { parseTweetUrl } from "./birdRunner.js";
 
 export function normalizeXPostText(value: string): string {
   return value.replace(/\r\n?/g, "\n").trim();
@@ -176,103 +159,21 @@ export async function buildXPostDraft(input: {
   };
 }
 
-function buildBirdArgs(args: string[]): string[] {
-  const firefoxProfile = process.env.OPENCLAW_X_FIREFOX_PROFILE?.trim();
-  return firefoxProfile ? ["--firefox-profile", firefoxProfile, ...args] : args;
-}
-
-function runBirdCommand(spawnImpl: SpawnImpl, args: string[], timeoutMs: number): Promise<CommandResult> {
-  return new Promise((resolve) => {
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let timeout: NodeJS.Timeout | undefined;
-    const finish = (result: CommandResult) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-      resolve({ ...result, stdout: result.stdout.trim(), stderr: result.stderr.trim() });
+async function publishWithBird(text: string, spawnImpl: SpawnImpl | undefined, timeoutMs: number): Promise<XPublishActionResult> {
+  const auth = await birdWhoami({ spawnImpl, timeoutMs });
+  if (!auth.authed) {
+    return { action: "x_publish_confirm", status: "failed", reason: auth.error ?? "bird_publish_failed", birdStatus: "auth_failed" };
+  }
+  const posted = await runBirdCommand(["--plain", "tweet", text], { spawnImpl, timeoutMs });
+  if (posted.status !== "success") {
+    return {
+      action: "x_publish_confirm",
+      status: "failed",
+      reason: posted.error === "bird_command_failed" ? "bird_publish_failed" : posted.error,
+      birdStatus: "tweet_failed"
     };
-    try {
-      const child = spawnImpl("bird", args, { stdio: ["ignore", "pipe", "pipe"] }) as SpawnedProcess;
-      timeout = setTimeout(() => {
-        child.kill?.("SIGTERM");
-        finish({ code: null, stdout, stderr, errorCode: "ETIMEDOUT" });
-      }, timeoutMs);
-      child.stdout?.on("data", (chunk: Buffer | string) => {
-        stdout += chunk.toString();
-      });
-      child.stderr?.on("data", (chunk: Buffer | string) => {
-        stderr += chunk.toString();
-      });
-      child.once("error", (error: NodeJS.ErrnoException) => {
-        finish({ code: null, stdout, stderr, errorCode: error.code });
-      });
-      child.once("close", (code: number | null) => {
-        finish({ code, stdout, stderr });
-      });
-    } catch (error) {
-      finish({
-        code: null,
-        stdout,
-        stderr,
-        errorCode: error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : undefined
-      });
-    }
-  });
-}
-
-function combinedOutput(result: CommandResult): string {
-  return [result.stdout, result.stderr].filter(Boolean).join("\n");
-}
-
-function looksLikeAuthMissing(output: string): boolean {
-  return /(no auth|missing auth|not logged in|login required|cookie.*missing|credential.*missing)/i.test(output);
-}
-
-function looksLikeAuthExpired(output: string): boolean {
-  return /(401|unauthorized|could not authenticate|auth[_ ]token|expired)/i.test(output);
-}
-
-function looksLikeRateLimit(output: string): boolean {
-  return /(429|rate limit|too many requests|temporarily locked|spam)/i.test(output);
-}
-
-function mapBirdFailure(result: CommandResult): string {
-  const output = combinedOutput(result);
-  if (result.errorCode === "ENOENT") {
-    return "bird_cli_not_installed";
   }
-  if (looksLikeAuthMissing(output)) {
-    return "bird_auth_missing";
-  }
-  if (looksLikeAuthExpired(output)) {
-    return "bird_auth_expired";
-  }
-  if (looksLikeRateLimit(output)) {
-    return "bird_rate_limited";
-  }
-  return "bird_publish_failed";
-}
-
-export function parseTweetUrl(output: string): string | undefined {
-  return output.match(/https:\/\/(?:x|twitter)\.com\/[^\s/]+\/status\/\d+/i)?.[0];
-}
-
-async function publishWithBird(text: string, spawnImpl: SpawnImpl, timeoutMs: number): Promise<XPublishActionResult> {
-  const auth = await runBirdCommand(spawnImpl, buildBirdArgs(["whoami", "--plain"]), timeoutMs);
-  if (auth.code !== 0) {
-    return { action: "x_publish_confirm", status: "failed", reason: mapBirdFailure(auth), birdStatus: "auth_failed" };
-  }
-  const posted = await runBirdCommand(spawnImpl, buildBirdArgs(["--plain", "tweet", text]), timeoutMs);
-  if (posted.code !== 0) {
-    return { action: "x_publish_confirm", status: "failed", reason: mapBirdFailure(posted), birdStatus: "tweet_failed" };
-  }
-  const tweetUrl = parseTweetUrl(combinedOutput(posted));
+  const tweetUrl = parseBirdTweetUrl(combinedBirdOutput(posted));
   if (!tweetUrl) {
     return { action: "x_publish_confirm", status: "failed", reason: "bird_publish_missing_tweet_url", birdStatus: "tweet_missing_url" };
   }
@@ -306,5 +207,5 @@ export async function executeXPublishAction(input: XPublishActionInput): Promise
   if (expectedHash && hashXPostText(finalText) !== expectedHash) {
     return { action: input.action, status: "failed", reason: "x_publish_hash_mismatch" };
   }
-  return publishWithBird(finalText, input.spawnImpl ?? spawn, input.timeoutMs ?? defaultTimeoutMs);
+  return publishWithBird(finalText, input.spawnImpl, input.timeoutMs ?? defaultTimeoutMs);
 }

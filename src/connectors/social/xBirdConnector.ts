@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { EventEmitter } from "node:events";
 import type { ConnectionStatus, SocialCapability, SocialPublishRequest, SocialPublishResult } from "../../types.js";
+import { birdComposeDryRun, birdWhoami, combinedBirdOutput, runBirdCommand, type SpawnImpl } from "../../services/birdRunner.js";
 import type { SocialConnector } from "./SocialConnector.js";
 import { resolveReplyTarget, type ReplyTargetFetch } from "./resolveReplyTarget.js";
 import { extractMentionedHandles, extractTweetIdFromUrl } from "./xMediaMetadata.js";
@@ -18,22 +18,6 @@ const xCapabilities: SocialCapability = {
   scheduledPost: false,
   metrics: "unknown"
 };
-
-interface SpawnStreams {
-  stdout?: EventEmitter;
-  stderr?: EventEmitter;
-}
-
-interface SpawnedProcess extends EventEmitter, SpawnStreams {}
-
-type SpawnImpl = typeof spawn;
-
-interface CommandResult {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-  errorCode?: string;
-}
 
 interface PublishRecord {
   textHash: string;
@@ -65,119 +49,9 @@ const DRY_RUN_BLOCK_REASON = "dry-run blocks publish";
 const DRY_RUN_REPLY_BLOCK_REASON = "dry-run blocks reply";
 const LIVE_GO_BLOCK_REASON = "requires_explicit_live_go";
 
-function runCommand(spawnImpl: SpawnImpl, command: string, args: string[], timeoutMs: number): Promise<CommandResult> {
-  return new Promise((resolve) => {
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let timeoutHandle: NodeJS.Timeout | undefined;
-
-    const finish = (result: CommandResult) => {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      if (timeoutHandle) {
-        clearTimeout(timeoutHandle);
-      }
-      resolve({
-        ...result,
-        stdout: result.stdout.trim(),
-        stderr: result.stderr.trim()
-      });
-    };
-
-    try {
-      const child = spawnImpl(command, args, {
-        stdio: ["ignore", "pipe", "pipe"]
-      }) as SpawnedProcess;
-
-      timeoutHandle = setTimeout(() => {
-        if ("kill" in child && typeof child.kill === "function") {
-          child.kill("SIGTERM");
-        }
-        finish({
-          code: null,
-          stdout,
-          stderr,
-          errorCode: "ETIMEDOUT"
-        });
-      }, timeoutMs);
-
-      child.stdout?.on("data", (chunk: Buffer | string) => {
-        stdout += chunk.toString();
-      });
-      child.stderr?.on("data", (chunk: Buffer | string) => {
-        stderr += chunk.toString();
-      });
-      child.once("error", (error: NodeJS.ErrnoException) => {
-        finish({
-          code: null,
-          stdout,
-          stderr,
-          errorCode: error.code
-        });
-      });
-      child.once("close", (code: number | null) => {
-        finish({
-          code,
-          stdout,
-          stderr
-        });
-      });
-    } catch (error) {
-      finish({
-        code: null,
-        stdout,
-        stderr,
-        errorCode: error instanceof Error && "code" in error ? String((error as NodeJS.ErrnoException).code) : undefined
-      });
-    }
-  });
-}
-
-function extractAccountLabel(output: string): string | undefined {
-  const firstLine = output
-    .split("\n")
-    .map((line) => line.trim())
-    .find(Boolean);
-  return firstLine || undefined;
-}
-
-function looksLikeAuthFailure(output: string): boolean {
-  return /(401|unauthorized|could not authenticate|auth[_ ]token|expired)/i.test(output);
-}
-
-function looksLikeRateLimitFailure(output: string): boolean {
-  return /(429|rate limit|too many requests|spam|temporarily locked)/i.test(output);
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for the guarded live publish path; current runtime remains fail-closed.
 function hashText(value: string): string {
   return createHash("sha256").update(value).digest("hex");
-}
-
-function parseTweetUrl(output: string): string | undefined {
-  const match = output.match(/https:\/\/(?:x|twitter)\.com\/[^\s/]+\/status\/(\d+)/i);
-  return match?.[0];
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for parsing live bird publish output after explicit operator GO.
-function parseTweetId(output: string): string | undefined {
-  const fromUrl = parseTweetUrl(output)?.match(/status\/(\d+)/i)?.[1];
-  if (fromUrl) {
-    return fromUrl;
-  }
-  const fromKeyValue = output.match(/tweet_id\s*[:=]\s*(\d+)/i)?.[1];
-  if (fromKeyValue) {
-    return fromKeyValue;
-  }
-  const fromBareId = output.match(/\bstatus\/(\d+)\b/i)?.[1];
-  return fromBareId;
-}
-
-function buildCombinedOutput(result: CommandResult): string {
-  return [result.stdout, result.stderr].filter(Boolean).join("\n");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for future publish guard telemetry without changing current dry-run behavior.
@@ -215,49 +89,6 @@ function checkPublishGuards(
   return undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- Reserved for live publish failure mapping after explicit operator GO.
-function buildPublishFailure(result: CommandResult): SocialPublishResult {
-  const combinedOutput = buildCombinedOutput(result);
-  if (result.errorCode === "ENOENT") {
-    return {
-      accepted: false,
-      platform: "x",
-      dryRun: false,
-      reason: "bird_cli_not_installed"
-    };
-  }
-
-  if (looksLikeAuthFailure(combinedOutput)) {
-    return {
-      accepted: false,
-      platform: "x",
-      dryRun: false,
-      reason: "bird_auth_expired"
-    };
-  }
-
-  if (looksLikeRateLimitFailure(combinedOutput)) {
-    return {
-      accepted: false,
-      platform: "x",
-      dryRun: false,
-      reason: "bird_rate_limited"
-    };
-  }
-
-  return {
-    accepted: false,
-    platform: "x",
-    dryRun: false,
-    reason: "bird_publish_failed"
-  };
-}
-
-function buildBirdArgs(args: string[]): string[] {
-  const firefoxProfile = process.env.OPENCLAW_X_FIREFOX_PROFILE?.trim();
-  return firefoxProfile ? ["--firefox-profile", firefoxProfile, ...args] : args;
-}
-
 export class XBirdConnector implements SocialConnector {
   private readonly now: () => number;
   private readonly publishGuardState: PublishGuardState;
@@ -278,25 +109,31 @@ export class XBirdConnector implements SocialConnector {
   id = "x" as const;
 
   async checkConnection(): Promise<ConnectionStatus> {
-    const cliProbe = await runCommand(this.spawnImpl, "bird", ["--help"], BIRD_PROBE_TIMEOUT_MS);
-    if (cliProbe.errorCode === "ENOENT") {
+    const cliProbe = await runBirdCommand(["--help"], {
+      spawnImpl: this.spawnImpl,
+      timeoutMs: BIRD_PROBE_TIMEOUT_MS,
+      useFirefoxProfile: false
+    });
+    if (cliProbe.error === "bird_cli_not_installed") {
       return { connected: false, reason: "bird_cli_not_installed" };
     }
 
-    const whoamiProbe = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["whoami", "--plain"]), BIRD_PROBE_TIMEOUT_MS);
-    if (whoamiProbe.errorCode === "ENOENT") {
+    const whoamiProbe = await birdWhoami({
+      spawnImpl: this.spawnImpl,
+      timeoutMs: BIRD_PROBE_TIMEOUT_MS
+    });
+    if (whoamiProbe.error === "bird_cli_not_installed") {
       return { connected: false, reason: "bird_cli_not_installed" };
     }
 
-    const combinedOutput = buildCombinedOutput(whoamiProbe);
-    if (whoamiProbe.code === 0) {
+    if (whoamiProbe.authed) {
       return {
         connected: true,
-        accountLabel: extractAccountLabel(combinedOutput)
+        accountLabel: whoamiProbe.account
       };
     }
 
-    if (looksLikeAuthFailure(combinedOutput)) {
+    if (whoamiProbe.error === "bird_auth_expired" || whoamiProbe.error === "bird_auth_missing") {
       return {
         connected: false,
         reason: "bird_auth_expired"
@@ -392,8 +229,11 @@ export class XBirdConnector implements SocialConnector {
       };
     }
 
-    const authCheck = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["whoami", "--plain"]), BIRD_PROBE_TIMEOUT_MS);
-    if (authCheck.errorCode === "ENOENT") {
+    const authCheck = await birdWhoami({
+      spawnImpl: this.spawnImpl,
+      timeoutMs: BIRD_PROBE_TIMEOUT_MS
+    });
+    if (authCheck.error === "bird_cli_not_installed") {
       return {
         accepted: false,
         platform: "x",
@@ -401,18 +241,20 @@ export class XBirdConnector implements SocialConnector {
         reason: "bird_cli_not_installed"
       };
     }
-    const authOutput = buildCombinedOutput(authCheck);
-    if (authCheck.code !== 0) {
+    if (!authCheck.authed) {
       return {
         accepted: false,
         platform: "x",
         dryRun: true,
-        reason: looksLikeAuthFailure(authOutput) ? "bird_auth_expired" : "bird_probe_failed"
+        reason: authCheck.error === "bird_auth_expired" || authCheck.error === "bird_auth_missing" ? "bird_auth_expired" : "bird_probe_failed"
       };
     }
 
-    const compose = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["--plain", "compose", text]), BIRD_PUBLISH_TIMEOUT_MS);
-    if (compose.code !== 0) {
+    const compose = await birdComposeDryRun(text, {
+      spawnImpl: this.spawnImpl,
+      timeoutMs: BIRD_PUBLISH_TIMEOUT_MS
+    });
+    if (!compose.ok) {
       return {
         accepted: false,
         platform: "x",
@@ -421,14 +263,16 @@ export class XBirdConnector implements SocialConnector {
       };
     }
 
-    const submit = await runCommand(this.spawnImpl, "bird", buildBirdArgs(["--plain", "tweet", "--dry-run", text]), BIRD_PUBLISH_TIMEOUT_MS);
-    if (submit.code !== 0) {
-      const submitOutput = buildCombinedOutput(submit);
+    const submit = await runBirdCommand(["--plain", "tweet", "--dry-run", text], {
+      spawnImpl: this.spawnImpl,
+      timeoutMs: BIRD_PUBLISH_TIMEOUT_MS
+    });
+    if (submit.status !== "success") {
       return {
         accepted: false,
         platform: "x",
         dryRun: true,
-        reason: looksLikeRateLimitFailure(submitOutput) ? "bird_rate_limited" : "bird_dry_run_submit_failed"
+        reason: submit.error === "bird_rate_limited" ? "bird_rate_limited" : "bird_dry_run_submit_failed"
       };
     }
 
@@ -438,9 +282,9 @@ export class XBirdConnector implements SocialConnector {
       dryRun: true,
       reason: DRY_RUN_BLOCK_REASON,
       raw: {
-        accountLabel: extractAccountLabel(authOutput),
+        accountLabel: authCheck.account,
         stageOrder: ["auth_check", "compose", "submit"],
-        submitPreview: buildCombinedOutput(submit) || undefined
+        submitPreview: combinedBirdOutput(submit) || undefined
       }
     };
   }
