@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import type { SongState, AiReviewProvider } from "../types.js";
 import type { CallbackActionEntry } from "./callbackActionRegistry.js";
-import { generateArtistResponse, readArtistVoiceContext, type ArtistVoiceResponse } from "./artistVoiceResponder.js";
+import { generateArtistResponse, readArtistVoiceContext, type ArtistVoiceContext, type ArtistVoiceResponse } from "./artistVoiceResponder.js";
 import { secretLikePattern } from "./personaMigrator.js";
 
 type SpawnImpl = typeof spawn;
@@ -121,13 +121,31 @@ export function fitXPostText(rawText: string, url?: string): string {
 
 function draftPrompt(songState: SongState, url?: string): string {
   return [
-    "Write one X post as the artist. No secrets or unsupported claims.",
+    "Write one X post as the artist. No private data or unsupported claims.",
     "Keep body under 240 chars before URL.",
     `Song: ${songState.title} (${songState.songId}, ${songState.status})`,
     songState.selectedTakeId ? `Take: ${songState.selectedTakeId}` : undefined,
     songState.lastReason ? `Why: ${songState.lastReason}` : undefined,
     url ? `URL: ${url}` : undefined
   ].filter(Boolean).join("\n");
+}
+
+function redactSecretLikeLines(value: string): string {
+  return value
+    .split(/\r?\n/)
+    .map((line) => secretLikePattern.test(line) ? "[redacted private context line]" : line)
+    .join("\n");
+}
+
+function safeArtistVoiceContext(context: ArtistVoiceContext): ArtistVoiceContext {
+  return {
+    ...context,
+    artistMd: redactSecretLikeLines(context.artistMd),
+    soulMd: redactSecretLikeLines(context.soulMd),
+    currentState: redactSecretLikeLines(context.currentState),
+    socialVoice: redactSecretLikeLines(context.socialVoice),
+    recentHistory: context.recentHistory.map(redactSecretLikeLines)
+  };
 }
 
 export async function buildXPostDraft(input: {
@@ -143,7 +161,7 @@ export async function buildXPostDraft(input: {
   const message = draftPrompt(input.songState, url);
   const response = input.generateResponse
     ? await input.generateResponse(message)
-    : await generateArtistResponse(message, await readArtistVoiceContext(input.root, { topic: "x_publish_draft" }), {
+    : await generateArtistResponse(message, safeArtistVoiceContext(await readArtistVoiceContext(input.root, { topic: "x_publish_draft" })), {
         intent: "report",
         aiReviewProvider: input.aiReviewProvider
       });

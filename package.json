@@ -8,7 +8,7 @@
     ".": "./dist/index.js"
   },
   "files": [
-    "dist/**",
+    "dist/**/*.js",
     "ui/dist/**",
     "ui/index.html",
     "ui/package.json",

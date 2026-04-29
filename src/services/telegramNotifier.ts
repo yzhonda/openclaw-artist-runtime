@@ -5,7 +5,7 @@ import type { AiReviewProvider } from "../types.js";
 import { registerCallbackAction } from "./callbackActionRegistry.js";
 import { appendConversationTurn } from "./conversationalSession.js";
 import { proposalForDetection } from "./songDistributionPoller.js";
-import { isInlineButtonsEnabled } from "./runtimeConfig.js";
+import { isInlineButtonsEnabled, isXInlineButtonEnabled } from "./runtimeConfig.js";
 
 export interface TelegramNotifierOptions {
   token: string;
@@ -46,7 +46,7 @@ export class TelegramNotifier {
     if (!isInlineButtonsEnabled() || !this.options.workspaceRoot || typeof this.options.chatId !== "number") {
       return;
     }
-    const [write, skip] = await Promise.all([
+    const actions = [
       registerCallbackAction(this.options.workspaceRoot, {
         action: "song_songbook_write",
         songId: event.songId,
@@ -60,13 +60,24 @@ export class TelegramNotifier {
         chatId: this.options.chatId,
         messageId,
         userId: this.options.chatId
-      })
-    ]);
+      }),
+      ...(isXInlineButtonEnabled() ? [registerCallbackAction(this.options.workspaceRoot, {
+        action: "x_publish_prepare",
+        songId: event.songId,
+        draftUrl: event.urls[0],
+        chatId: this.options.chatId,
+        messageId,
+        userId: this.options.chatId
+      })] : [])
+    ];
+    const [write, skip, xPrepare] = await Promise.all(actions);
+    const buttons = [
+      { text: "📝 SONGBOOK 反映", callback_data: `cb:${write.callbackId}` },
+      { text: "⏸ 後で", callback_data: `cb:${skip.callbackId}` },
+      ...(xPrepare ? [{ text: "▶ X 投稿準備", callback_data: `cb:${xPrepare.callbackId}` }] : [])
+    ];
     await this.client.editMessageReplyMarkup(this.options.chatId, messageId, {
-      inline_keyboard: [[
-        { text: "📝 SONGBOOK 反映", callback_data: `cb:${write.callbackId}` },
-        { text: "⏸ 後で", callback_data: `cb:${skip.callbackId}` }
-      ]]
+      inline_keyboard: [buttons]
     });
   }
 

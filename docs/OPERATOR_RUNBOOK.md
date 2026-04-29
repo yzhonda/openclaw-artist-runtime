@@ -280,8 +280,32 @@ Callback Action Mirror card on Dashboard, Songs, and Platforms.
   registry as Telegram callbacks.
 - UI mirror operations do not depend on `OPENCLAW_INLINE_BUTTONS`; that flag
   only disables Telegram inline button attachment.
-- X real publish, Instagram, and TikTok buttons remain absent. This phase only
-  reflects local files or discards pending local actions.
+- Phase A only reflected local files or discarded pending local actions. X
+  publish buttons are introduced later by Plan v9.15 Phase 4f; Instagram and
+  TikTok buttons remain absent.
+
+## Plan v9.15 Phase 4f: X inline publish confirmation (2026-04-29)
+
+Completed-song Telegram pushes may now include `[▶ X 投稿準備]` next to the
+SONGBOOK buttons when `OPENCLAW_X_INLINE_BUTTON` is not `off`.
+
+1. Tap `X 投稿準備` to generate a short X draft from the artist voice and the
+   completed-song URL. The message is replaced with a preview, char count, and
+   draft hash suffix.
+2. Tap `Xに投稿` only if the preview is acceptable. The runtime re-checks the
+   hash, runs `bird whoami --plain`, then posts with `bird --plain tweet <text>`.
+3. On success, the returned tweet URL is reflected into SONGBOOK through the
+   ChangeSet applier. `autopilot.dryRun`, `liveGoArmed`, and platform arm flags
+   are not changed.
+4. Tap `やめる` to discard the draft without file or X changes.
+
+Retreat and prerequisites:
+
+- `OPENCLAW_X_INLINE_BUTTON=off` hides the X button and makes old X callbacks
+  fail closed.
+- Bird must already be authenticated; check with `bird whoami --plain`.
+- Instagram and TikTok publish buttons remain hidden pending separate auth and
+  product approval.
 
 ## Plan v9.14: Inline Button Confirmation Path (2026-04-29)
 

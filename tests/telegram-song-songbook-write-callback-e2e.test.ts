@@ -63,16 +63,19 @@ describe("telegram song completion SONGBOOK callbacks", () => {
     const actions = await readCallbackActionEntries(root);
     const write = actions.find((entry) => entry.action === "song_songbook_write");
     const skip = actions.find((entry) => entry.action === "song_skip");
+    const xPrepare = actions.find((entry) => entry.action === "x_publish_prepare");
     expect(write).toMatchObject({ songId: "where-it-played", messageId: 77, userId: 123 });
     expect(skip).toMatchObject({ songId: "where-it-played", messageId: 77, userId: 123 });
+    expect(xPrepare).toMatchObject({ songId: "where-it-played", messageId: 77, userId: 123, draftUrl: "https://suno.example/take-1" });
     const markupCall = fetchImpl.mock.calls.find((call) => String(call[0]).includes("/editMessageReplyMarkup"));
     const markupPayload = JSON.parse(String((markupCall?.[1] as RequestInit).body)) as { reply_markup: { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> } };
     const buttons = markupPayload.reply_markup.inline_keyboard.flat();
     expect(buttons).toEqual([
       { text: "📝 SONGBOOK 反映", callback_data: `cb:${write?.callbackId}` },
-      { text: "⏸ 後で", callback_data: `cb:${skip?.callbackId}` }
+      { text: "⏸ 後で", callback_data: `cb:${skip?.callbackId}` },
+      { text: "▶ X 投稿準備", callback_data: `cb:${xPrepare?.callbackId}` }
     ]);
-    expect(JSON.stringify(buttons)).not.toMatch(/X 投稿|Instagram|TikTok|IG/i);
+    expect(JSON.stringify(buttons)).not.toMatch(/Instagram|TikTok|IG/i);
 
     const client = callbackClient();
     const result = await routeTelegramCallback({

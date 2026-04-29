@@ -143,7 +143,7 @@ describe("R10 callback safety", () => {
     expect(await r10Snapshot(root)).toEqual(before);
   });
 
-  it("does not expose X, Instagram, or TikTok buttons on song completion notifications", async () => {
+  it("exposes only SONGBOOK, skip, and X prep buttons on song completion notifications", async () => {
     const root = await prepareRoot();
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(telegramResponse({ message_id: 55, chat: { id: 123 } }))
@@ -159,10 +159,11 @@ describe("R10 callback safety", () => {
     });
 
     const actions = await readCallbackActionEntries(root);
-    expect(actions.map((entry) => entry.action).sort()).toEqual(["song_skip", "song_songbook_write"].sort());
+    expect(actions.map((entry) => entry.action).sort()).toEqual(["song_skip", "song_songbook_write", "x_publish_prepare"].sort());
     const markupCall = fetchImpl.mock.calls.find((call) => String(call[0]).includes("/editMessageReplyMarkup"));
     const body = JSON.parse(String((markupCall?.[1] as RequestInit).body)) as { reply_markup: unknown };
     expect(JSON.stringify(body.reply_markup)).toContain("SONGBOOK");
-    expect(JSON.stringify(body.reply_markup)).not.toMatch(/X 投稿|Instagram|TikTok|IG/i);
+    expect(JSON.stringify(body.reply_markup)).toContain("X 投稿準備");
+    expect(JSON.stringify(body.reply_markup)).not.toMatch(/Instagram|TikTok|IG/i);
   });
 });

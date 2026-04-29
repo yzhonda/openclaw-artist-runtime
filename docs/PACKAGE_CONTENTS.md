@@ -16,8 +16,9 @@ The `files` array in `package.json` controls the tarball. Current contents:
 
 ### Runtime artifacts
 
-- `dist/**` — compiled TypeScript runtime entry points loaded by the
-  OpenClaw Gateway.
+- `dist/**/*.js` — compiled TypeScript runtime entry points loaded by the
+  OpenClaw Gateway. Type declarations stay repository-local because the
+  package does not expose a public TypeScript API.
 - `ui/dist/**`, `ui/index.html`, `ui/package.json` — the built Producer
   Console bundle (React app under `ui/dist/assets/*`) plus the bundle
   loader / package metadata used by the plugin host.

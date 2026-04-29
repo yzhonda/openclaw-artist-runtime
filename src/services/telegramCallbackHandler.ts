@@ -1,11 +1,16 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
-import { markCallbackResolved, resolveCallbackAction, type CallbackActionEntry, type CallbackActionStatus } from "./callbackActionRegistry.js";
+import { markCallbackResolved, registerCallbackAction, resolveCallbackAction, type CallbackActionEntry, type CallbackActionStatus } from "./callbackActionRegistry.js";
+import { readSongState } from "./artistState.js";
+import { applyChangeSet } from "./changeSetApplier.js";
 import { handleProposalResponse } from "./conversationalSession.js";
+import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
 import { secretLikePattern } from "./personaMigrator.js";
+import { isXInlineButtonEnabled } from "./runtimeConfig.js";
 import { handleSongPublishActionRequest, type SongPublishAction } from "./songPublishActionRegistry.js";
 import type { TelegramClient } from "./telegramClient.js";
+import { executeXPublishAction, type XPublishActionInput } from "./xPublishActionRegistry.js";
 
 export interface TelegramCallbackContext {
   root: string;
@@ -16,6 +21,7 @@ export interface TelegramCallbackContext {
   chatId?: number;
   messageId?: number;
   now?: number;
+  xPublishSpawnImpl?: XPublishActionInput["spawnImpl"];
 }
 
 export interface TelegramCallbackResult {
@@ -36,6 +42,10 @@ interface CallbackAuditEntry {
   userIdHash?: string;
   result: TelegramCallbackResult["result"];
   reason?: string;
+  draftHash?: string;
+  draftCharCount?: number;
+  tweetUrl?: string;
+  birdStatus?: string;
 }
 
 function auditPath(root: string): string {
@@ -55,7 +65,14 @@ async function appendCallbackAudit(root: string, entry: CallbackAuditEntry): Pro
   await appendFile(path, `${JSON.stringify(entry)}\n`, "utf8");
 }
 
-function auditBase(ctx: TelegramCallbackContext, callbackId: string | undefined, entry: CallbackActionEntry | undefined, result: TelegramCallbackResult["result"], reason?: string): CallbackAuditEntry {
+function auditBase(
+  ctx: TelegramCallbackContext,
+  callbackId: string | undefined,
+  entry: CallbackActionEntry | undefined,
+  result: TelegramCallbackResult["result"],
+  reason?: string,
+  extra: Partial<Pick<CallbackAuditEntry, "draftHash" | "draftCharCount" | "tweetUrl" | "birdStatus">> = {}
+): CallbackAuditEntry {
   return {
     timestamp: ctx.now ?? Date.now(),
     callbackId,
@@ -66,8 +83,53 @@ function auditBase(ctx: TelegramCallbackContext, callbackId: string | undefined,
     chatIdHash: hashIdentifier(ctx.chatId),
     userIdHash: hashIdentifier(ctx.fromUserId),
     result,
-    reason
+    reason,
+    ...extra
   };
+}
+
+function xPublishSongbookProposal(songId: string, tweetUrl: string, now: number): ChangeSetProposal {
+  return {
+    id: `x-publish-${songId}-${now.toString(36)}`,
+    domain: "song",
+    summary: `X post URL recorded for ${songId}.`,
+    fields: [
+      {
+        domain: "song",
+        targetFile: join("songs", songId, "song.md"),
+        field: "status",
+        proposedValue: "published",
+        currentValue: "",
+        reasoning: "X publish confirmed by producer inline button",
+        status: "proposed"
+      },
+      {
+        domain: "song",
+        targetFile: join("artist", "SONGBOOK.md"),
+        field: "publicLinksOther",
+        proposedValue: tweetUrl,
+        currentValue: "",
+        reasoning: "X publish callback returned a tweet URL",
+        status: "proposed"
+      }
+    ],
+    warnings: [],
+    createdAt: new Date(now).toISOString(),
+    source: "conversation",
+    songId,
+    platform: "x"
+  };
+}
+
+function xPreviewText(draftText: string, draftHash: string, draftCharCount: number): string {
+  return [
+    "X post preview:",
+    "",
+    draftText,
+    "",
+    `hash:${draftHash.slice(-8)} chars:${draftCharCount}`,
+    "Tap publish only if this exact draft is OK."
+  ].join("\n");
 }
 
 async function finish(
@@ -182,6 +244,102 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
       await ctx.client.editMessageText(entry.chatId, entry.messageId, "Song action failed. Check the runtime log.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
       return { processed: true, result: "failed", reason, callbackId };
     }
+  }
+
+  if (entry.action === "x_publish_prepare" || entry.action === "x_publish_confirm" || entry.action === "x_publish_cancel") {
+    if (!isXInlineButtonEnabled()) {
+      return finish(ctx, callbackId, entry, "failed", "x_inline_button_disabled", "X button disabled", "failed");
+    }
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    if (entry.action === "x_publish_cancel") {
+      const cancelled = await executeXPublishAction({ root: ctx.root, songId: entry.songId ?? "", action: "x_publish_cancel" });
+      await markCallbackResolved(ctx.root, callbackId, { status: "discarded", reason: cancelled.status, now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "discarded", cancelled.status));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "X投稿は取り消した。", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "discarded", reason: cancelled.status, callbackId };
+    }
+    if (entry.action === "x_publish_prepare") {
+      const song = await readSongState(ctx.root, entry.songId ?? "");
+      const prepared = await executeXPublishAction({
+        root: ctx.root,
+        songId: entry.songId ?? "",
+        action: "x_publish_prepare",
+        songState: song,
+        sunoUrl: entry.draftUrl
+      });
+      if (prepared.status !== "prepared" || !prepared.draft) {
+        await markCallbackResolved(ctx.root, callbackId, { status: "failed", reason: prepared.reason ?? prepared.status, now });
+        await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "failed", prepared.reason ?? prepared.status));
+        await ctx.client.editMessageText(entry.chatId, entry.messageId, `X投稿準備に失敗: ${prepared.reason ?? prepared.status}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+        return { processed: true, result: "failed", reason: prepared.reason ?? prepared.status, callbackId };
+      }
+      const [confirm, cancel] = await Promise.all([
+        registerCallbackAction(ctx.root, {
+          action: "x_publish_confirm",
+          songId: entry.songId,
+          draftText: prepared.draft.draftText,
+          draftHash: prepared.draft.draftHash,
+          draftCharCount: prepared.draft.draftCharCount,
+          draftUrl: prepared.draft.draftUrl,
+          chatId: entry.chatId,
+          messageId: entry.messageId,
+          userId: entry.userId,
+          now,
+          expiresAt: entry.expiresAt
+        }),
+        registerCallbackAction(ctx.root, {
+          action: "x_publish_cancel",
+          songId: entry.songId,
+          draftHash: prepared.draft.draftHash,
+          draftCharCount: prepared.draft.draftCharCount,
+          chatId: entry.chatId,
+          messageId: entry.messageId,
+          userId: entry.userId,
+          now,
+          expiresAt: entry.expiresAt
+        })
+      ]);
+      await markCallbackResolved(ctx.root, callbackId, { status: "applied", reason: "prepared", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "applied", "prepared", {
+        draftHash: prepared.draft.draftHash,
+        draftCharCount: prepared.draft.draftCharCount
+      }));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, xPreviewText(prepared.draft.draftText, prepared.draft.draftHash, prepared.draft.draftCharCount), {
+        replyMarkup: { inline_keyboard: [[
+          { text: "▶ Xに投稿", callback_data: `cb:${confirm.callbackId}` },
+          { text: "⏸ やめる", callback_data: `cb:${cancel.callbackId}` }
+        ]] }
+      }).catch(() => undefined);
+      return { processed: true, result: "applied", reason: "prepared", callbackId };
+    }
+
+    const published = await executeXPublishAction({
+      root: ctx.root,
+      songId: entry.songId ?? "",
+      action: "x_publish_confirm",
+      entry,
+      spawnImpl: ctx.xPublishSpawnImpl
+    });
+    if (published.status !== "published" || !published.tweetUrl) {
+      await markCallbackResolved(ctx.root, callbackId, { status: "failed", reason: published.reason ?? published.status, now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "failed", published.reason ?? published.status, {
+        draftHash: entry.draftHash,
+        draftCharCount: entry.draftCharCount,
+        birdStatus: published.birdStatus
+      }));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, `X投稿に失敗: ${published.reason ?? published.status}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "failed", reason: published.reason ?? published.status, callbackId };
+    }
+    await applyChangeSet(ctx.root, xPublishSongbookProposal(entry.songId ?? "", published.tweetUrl, now));
+    await markCallbackResolved(ctx.root, callbackId, { status: "applied", reason: "published", now });
+    await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "applied", "published", {
+      draftHash: entry.draftHash,
+      draftCharCount: entry.draftCharCount,
+      tweetUrl: published.tweetUrl,
+      birdStatus: published.birdStatus
+    }));
+    await ctx.client.editMessageText(entry.chatId, entry.messageId, `X投稿完了。URL: ${published.tweetUrl}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+    return { processed: true, result: "applied", reason: "published", callbackId };
   }
 
   await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "Unsupported action" });
