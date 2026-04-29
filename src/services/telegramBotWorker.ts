@@ -5,6 +5,7 @@ import { readPersonaSetupStatus } from "./personaSetupDetector.js";
 import { getTelegramOwnerUserIds } from "./telegramAuth.js";
 import { TelegramClient, type TelegramFetch, type TelegramUpdate } from "./telegramClient.js";
 import { classifyTelegramFreeText, routeTelegramCommand, storeTelegramInbox } from "./telegramCommandRouter.js";
+import { routeTelegramCallback } from "./telegramCallbackHandler.js";
 import { handleTelegramPersonaSessionMessage, readTelegramPersonaSession } from "./telegramPersonaSession.js";
 import { isLegacyWizardEnabled } from "./runtimeConfig.js";
 
@@ -164,6 +165,28 @@ export class TelegramBotWorker {
   }
 
   private async handleUpdate(client: TelegramClient, update: TelegramUpdate): Promise<boolean> {
+    if (update.callback_query) {
+      const callback = update.callback_query;
+      const chatId = callback.message?.chat.id;
+      const messageId = callback.message?.message_id;
+      if (!this.ownerUserIds.has(String(callback.from.id)) || chatId === undefined || messageId === undefined) {
+        if (this.ownerUserIds.has(String(callback.from.id))) {
+          await client.answerCallbackQuery(callback.id, { text: "Unsupported action" }).catch(() => undefined);
+        }
+        return false;
+      }
+      await routeTelegramCallback({
+        root: this.options.root,
+        client,
+        callbackQueryId: callback.id,
+        data: callback.data,
+        fromUserId: callback.from.id,
+        chatId,
+        messageId
+      });
+      return true;
+    }
+
     const message = update.message;
     const from = message?.from;
     const text = message?.text;

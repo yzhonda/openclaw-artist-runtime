@@ -1,35 +1,22 @@
+import type { TelegramMessage, TelegramReplyMarkup, TelegramUpdate } from "../types.js";
+
+export type { TelegramCallbackQuery, TelegramChat, TelegramInlineKeyboard, TelegramInlineKeyboardButton, TelegramMessage, TelegramReplyMarkup, TelegramUpdate, TelegramUser } from "../types.js";
+
 export interface TelegramApiResponse<T> {
   ok: boolean;
   result?: T;
   description?: string;
 }
 
-export interface TelegramUser {
-  id: number;
-  username?: string;
-  first_name?: string;
-}
-
-export interface TelegramChat {
-  id: number;
-  type?: string;
-}
-
-export interface TelegramMessage {
-  message_id: number;
-  text?: string;
-  chat: TelegramChat;
-  from?: TelegramUser;
-}
-
-export interface TelegramUpdate {
-  update_id: number;
-  message?: TelegramMessage;
-}
-
 export interface TelegramSendMessageOptions {
   parseMode?: "Markdown" | "MarkdownV2" | "HTML";
   disableNotification?: boolean;
+  replyMarkup?: TelegramReplyMarkup;
+}
+
+export interface TelegramAnswerCallbackQueryOptions {
+  text?: string;
+  showAlert?: boolean;
 }
 
 export type TelegramFetch = (input: string, init: RequestInit) => Promise<Response>;
@@ -51,7 +38,7 @@ export class TelegramClient {
   async getUpdates(offset?: number): Promise<TelegramUpdate[]> {
     const payload: Record<string, unknown> = {
       timeout: 25,
-      allowed_updates: ["message"]
+      allowed_updates: ["message", "callback_query"]
     };
     if (offset !== undefined) {
       payload.offset = offset;
@@ -64,7 +51,35 @@ export class TelegramClient {
       chat_id: chatId,
       text,
       parse_mode: options.parseMode,
-      disable_notification: options.disableNotification
+      disable_notification: options.disableNotification,
+      reply_markup: options.replyMarkup
+    });
+  }
+
+  async answerCallbackQuery(callbackQueryId: string, options: TelegramAnswerCallbackQueryOptions = {}): Promise<boolean> {
+    return this.call<boolean>("answerCallbackQuery", {
+      callback_query_id: callbackQueryId,
+      text: options.text,
+      show_alert: options.showAlert
+    });
+  }
+
+  async editMessageReplyMarkup(chatId: number | string, messageId: number, replyMarkup: TelegramReplyMarkup): Promise<TelegramMessage | boolean> {
+    return this.call<TelegramMessage | boolean>("editMessageReplyMarkup", {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: replyMarkup
+    });
+  }
+
+  async editMessageText(chatId: number | string, messageId: number, text: string, options: TelegramSendMessageOptions = {}): Promise<TelegramMessage | boolean> {
+    return this.call<TelegramMessage | boolean>("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: options.parseMode,
+      disable_notification: options.disableNotification,
+      reply_markup: options.replyMarkup
     });
   }
 

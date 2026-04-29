@@ -170,6 +170,49 @@ export interface TelegramConfig {
   acceptFreeText: boolean;
 }
 
+export interface TelegramUser {
+  id: number;
+  username?: string;
+  first_name?: string;
+}
+
+export interface TelegramChat {
+  id: number;
+  type?: string;
+}
+
+export interface TelegramMessage {
+  message_id: number;
+  text?: string;
+  chat: TelegramChat;
+  from?: TelegramUser;
+}
+
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+}
+
+export interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
+}
+
+export interface TelegramInlineKeyboardButton {
+  text: string;
+  callback_data?: string;
+  url?: string;
+}
+
+export type TelegramInlineKeyboard = TelegramInlineKeyboardButton[][];
+
+export interface TelegramReplyMarkup {
+  inline_keyboard?: TelegramInlineKeyboard;
+}
+
 export type PersonaField =
   | "artistName"
   | "identityLine"

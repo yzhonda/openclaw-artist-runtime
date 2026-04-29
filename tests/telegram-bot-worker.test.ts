@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { TelegramConfig } from "../src/types";
 import { TelegramBotWorker } from "../src/services/telegramBotWorker";
+import { registerCallbackAction } from "../src/services/callbackActionRegistry";
 
 const enabledConfig: TelegramConfig = {
   enabled: true,
@@ -266,5 +267,51 @@ describe("telegram bot worker", () => {
     const result = await worker.pollOnce();
 
     expect(result).toMatchObject({ enabled: true, fetched: true, processed: 0, backoffMs: 4000, error: "network down" });
+  });
+
+  it("routes callback_query updates through the callback handler", async () => {
+    const root = makeRoot();
+    const entry = await registerCallbackAction(root, {
+      action: "proposal_yes",
+      chatId: 555,
+      messageId: 10,
+      userId: 123
+    });
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ok: true,
+          result: [
+            {
+              update_id: 30,
+              callback_query: {
+                id: "callback-1",
+                from: { id: 123 },
+                message: { message_id: 10, chat: { id: 555 } },
+                data: `cb:${entry.callbackId}`
+              }
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(jsonResponse({ ok: true, result: true }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, result: true }));
+    const worker = new TelegramBotWorker({
+      root,
+      config: enabledConfig,
+      token: "token",
+      ownerUserIds: new Set(["123"]),
+      fetchImpl
+    });
+
+    const result = await worker.pollOnce();
+
+    expect(result).toMatchObject({ enabled: true, fetched: true, processed: 1, nextOffset: 31 });
+    expect(fetchImpl.mock.calls.map((call) => String(call[0]))).toEqual([
+      expect.stringContaining("/getUpdates"),
+      expect.stringContaining("/answerCallbackQuery"),
+      expect.stringContaining("/editMessageReplyMarkup")
+    ]);
   });
 });
