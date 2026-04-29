@@ -289,6 +289,7 @@ export interface DailyVoiceDraft {
   draftHash: string;
   charCount: number;
   sourceFragments: string[];
+  selectedSource?: { url?: string; author?: string };
   createdAt: string;
 }
 

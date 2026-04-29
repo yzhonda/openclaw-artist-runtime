@@ -377,7 +377,7 @@ export async function formatRuntimeEvent(
         event.draftText,
         "",
         `chars:${event.charCount} hash:${event.draftHash.slice(-8)}`,
-        event.sourceFragments.length ? `source: ${event.sourceFragments.slice(0, 2).join(" / ")}` : undefined
+        event.selectedSource ? `観察元: ${event.selectedSource.author ?? "anonymous"} (${event.selectedSource.url ? "URL あり" : "URL なし"})` : undefined
       ].filter(Boolean).join("\n");
     case "song_spawn_proposed":
       return [

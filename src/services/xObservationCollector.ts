@@ -21,6 +21,17 @@ export interface XObservationResult {
   reason?: string;
 }
 
+export interface XObservationEntry {
+  text: string;
+  author?: string;
+  url?: string;
+  postedAt?: string;
+}
+
+const tweetUrlPattern = /https:\/\/(?:t\.co\/[A-Za-z0-9]+|(?:twitter|x)\.com\/[^/\s]+\/status\/\d+)/i;
+const authorPattern = /(?:^|\s)@([A-Za-z0-9_]{1,20})\b/;
+const isoDatePattern = /\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z\b/;
+
 function jstDate(now = new Date()): string {
   return new Date(now.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
@@ -45,7 +56,25 @@ function defaultRunner(query?: string): () => Promise<{ stdout: string; stderr?:
   };
 }
 
-function filterObservationLines(source: string, personaText?: string): string[] {
+function parseBirdOutput(source: string): XObservationEntry[] {
+  return source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const url = line.match(tweetUrlPattern)?.[0];
+      const author = line.match(authorPattern)?.[1] ?? url?.match(/(?:twitter|x)\.com\/([^/\s]+)\/status/i)?.[1];
+      const postedAt = line.match(isoDatePattern)?.[0];
+      const text = line
+        .replace(tweetUrlPattern, "")
+        .replace(isoDatePattern, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return { text: text || line, author, url, postedAt };
+    });
+}
+
+function filterObservationEntries(source: string, personaText?: string): XObservationEntry[] {
   const personaWords = new Set(
     (personaText ?? "")
       .toLowerCase()
@@ -53,27 +82,33 @@ function filterObservationLines(source: string, personaText?: string): string[] 
       .filter((word) => word.length >= 3)
       .slice(0, 80)
   );
-  const lines = source
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const entries = parseBirdOutput(source);
   if (personaWords.size === 0) {
-    return lines.slice(0, 12);
+    return entries.slice(0, 12);
   }
-  const matched = lines.filter((line) => {
-    const lower = line.toLowerCase();
+  const matched = entries.filter((entry) => {
+    const lower = `${entry.text} ${entry.author ?? ""}`.toLowerCase();
     return [...personaWords].some((word) => lower.includes(word));
   });
-  return (matched.length > 0 ? matched : lines).slice(0, 12);
+  return (matched.length > 0 ? matched : entries).slice(0, 12);
 }
 
-function renderObservation(lines: string[], now: Date, query?: string): string {
+function jsonValue(value: string | undefined): string {
+  return value ? JSON.stringify(value) : "null";
+}
+
+function renderObservation(entries: XObservationEntry[], now: Date, query?: string): string {
   return [
     `# X Observations ${jstDate(now)}`,
     "",
     query ? `Query: ${query}` : "Source: timeline",
     "",
-    ...lines.map((line) => `- ${line}`)
+    ...entries.flatMap((entry) => [
+      `- text: ${JSON.stringify(entry.text)}`,
+      `  author: ${jsonValue(entry.author)}`,
+      `  url: ${jsonValue(entry.url)}`,
+      `  postedAt: ${jsonValue(entry.postedAt)}`
+    ])
   ].join("\n");
 }
 
@@ -117,7 +152,7 @@ export async function collectObservations(root: string, context: XObservationCon
       throw new Error("x_observation_contains_secret_like_text");
     }
     await recordBirdCall(root, now, { query: context.query ?? strategy.query, mode: strategy.mode });
-    const observations = renderObservation(filterObservationLines(result.stdout, context.personaText), now, context.query ?? strategy.query);
+    const observations = renderObservation(filterObservationEntries(result.stdout, context.personaText), now, context.query ?? strategy.query);
     await mkdir(dirname(path), { recursive: true });
     await writeFile(path, `${observations.trim()}\n`, "utf8");
     return { status: "collected", path, observations };
