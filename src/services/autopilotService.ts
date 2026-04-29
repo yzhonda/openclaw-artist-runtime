@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { applyConfigDefaults } from "../config/schema.js";
 import type { AutopilotRunState, AutopilotStage, AutopilotStatus, ArtistRuntimeConfig, SocialPublishLedgerEntry, SocialPublishResult, SongState } from "../types.js";
+import { composeDailyVoice } from "./artistDailyVoiceComposer.js";
+import { markPulsed, shouldPulse } from "./artistPulseRateLimiter.js";
 import { AutopilotControlService } from "./autopilotControlService.js";
 import {
   defaultAutopilotRunState,
@@ -22,6 +24,7 @@ import { collectObservations } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
 import { pollSongDistribution } from "./songDistributionPoller.js";
 import { cleanupExpiredCallbacks } from "./callbackLedgerMaintenance.js";
+import { getArtistPulseIntervalHours, isArtistPulseConfigured } from "./runtimeConfig.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -215,6 +218,23 @@ export class ArtistAutopilotService {
     const config = input.manualSeed
       ? { ...resolvedConfig, autopilot: { ...resolvedConfig.autopilot, enabled: true } }
       : resolvedConfig;
+    if (isArtistPulseConfigured(config)) {
+      await shouldPulse(input.workspaceRoot, { minIntervalHours: getArtistPulseIntervalHours(process.env, config) }).then(async (allowed) => {
+        if (!allowed) {
+          return;
+        }
+        const draft = await composeDailyVoice(input.workspaceRoot, { aiReviewProvider: config.aiReview.provider });
+        emitRuntimeEvent({
+          type: "artist_pulse_drafted",
+          ...draft,
+          timestamp: Date.now()
+        });
+        await markPulsed(input.workspaceRoot, new Date(draft.createdAt));
+      }).catch((error) => {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.warn(`[artist-runtime] artist pulse failed: ${reason}`);
+      });
+    }
     const existing = await readAutopilotRunState(input.workspaceRoot);
     if (!config.autopilot.enabled) {
       return writeStageState(input.workspaceRoot, existing, {

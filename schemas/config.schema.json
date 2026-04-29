@@ -249,6 +249,22 @@
         }
       }
     },
+    "artistPulse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "minIntervalHours": {
+          "type": "integer",
+          "minimum": 6,
+          "maximum": 168,
+          "default": 12
+        }
+      }
+    },
     "aiReview": {
       "type": "object",
       "additionalProperties": false,

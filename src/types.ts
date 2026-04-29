@@ -170,6 +170,11 @@ export interface TelegramConfig {
   acceptFreeText: boolean;
 }
 
+export interface ArtistPulseConfig {
+  enabled: boolean;
+  minIntervalHours: number;
+}
+
 export interface TelegramUser {
   id: number;
   username?: string;
@@ -269,6 +274,19 @@ export interface TelegramPersonaSession {
   expiresAt: number;
 }
 
+export interface DailyVoiceDraft {
+  draftText: string;
+  draftHash: string;
+  charCount: number;
+  sourceFragments: string[];
+  createdAt: string;
+}
+
+export interface ArtistPulseState {
+  lastPulseAt?: string;
+  updatedAt: string;
+}
+
 export interface AiReviewConfig {
   provider: AiReviewProvider;
 }
@@ -280,6 +298,7 @@ export interface ArtistRuntimeConfig {
   music: MusicConfig;
   distribution: DistributionConfig;
   telegram: TelegramConfig;
+  artistPulse: ArtistPulseConfig;
   aiReview: AiReviewConfig;
   safety: SafetyConfig;
 }

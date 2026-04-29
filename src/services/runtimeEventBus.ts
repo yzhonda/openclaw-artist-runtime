@@ -1,4 +1,5 @@
 import type { AutopilotStage, SunoImportedAssetMetadata } from "../types.js";
+import type { DailyVoiceDraft } from "../types.js";
 import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
 
 export type RuntimeEvent =
@@ -12,6 +13,7 @@ export type RuntimeEvent =
   | { type: "distribution_change_detected"; songId: string; platform: "unitedMasters" | "spotify" | "appleMusic"; url: string; proposalId?: string; proposal?: ChangeSetProposal; timestamp: number }
   | { type: "song_songbook_written"; songId: string; timestamp: number }
   | { type: "song_publish_skipped"; songId: string; timestamp: number }
+  | ({ type: "artist_pulse_drafted"; timestamp: number } & DailyVoiceDraft)
   | { type: "error"; source: string; reason: string; songId?: string; timestamp: number };
 
 export type RuntimeEventHandler = (event: RuntimeEvent) => void | Promise<void>;

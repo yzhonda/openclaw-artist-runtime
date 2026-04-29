@@ -98,6 +98,26 @@ export function isXInlineButtonEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return env.OPENCLAW_X_INLINE_BUTTON?.trim().toLowerCase() !== "off";
 }
 
+export function isArtistPulseEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.OPENCLAW_ARTIST_PULSE_ENABLED?.trim().toLowerCase();
+  return value === "on" || value === "1" || value === "true";
+}
+
+export function isArtistPulseConfigured(config: Pick<ArtistRuntimeConfig, "artistPulse">, env: NodeJS.ProcessEnv = process.env): boolean {
+  return isArtistPulseEnabled(env) || config.artistPulse.enabled;
+}
+
+export function getArtistPulseIntervalHours(
+  env: NodeJS.ProcessEnv = process.env,
+  config?: Pick<ArtistRuntimeConfig, "artistPulse">
+): number {
+  const parsed = Number.parseInt(env.OPENCLAW_ARTIST_PULSE_HOURS ?? "", 10);
+  if (!Number.isFinite(parsed)) {
+    return Math.max(6, config?.artistPulse.minIntervalHours ?? 12);
+  }
+  return Math.max(6, parsed);
+}
+
 function positiveNumber(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value) && value > 0) {
     return value;
@@ -203,6 +223,7 @@ export function mergeResolvedConfig(current: ArtistRuntimeConfig, patch: Partial
         tiktok: { ...current.distribution.platforms.tiktok, ...patch.distribution?.platforms?.tiktok }
       }
     },
+    artistPulse: { ...current.artistPulse, ...patch.artistPulse },
     safety: { ...current.safety, ...patch.safety }
   }));
 }

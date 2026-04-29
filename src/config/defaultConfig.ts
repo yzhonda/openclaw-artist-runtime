@@ -77,6 +77,10 @@ export const defaultArtistRuntimeConfig: ArtistRuntimeConfig = {
     notifyStages: true,
     acceptFreeText: true
   },
+  artistPulse: {
+    enabled: false,
+    minIntervalHours: 12
+  },
   aiReview: {
     provider: "mock"
   },

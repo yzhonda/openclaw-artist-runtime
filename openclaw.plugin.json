@@ -253,16 +253,16 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
-        },
-        "liveGoArmed": {
-          "type": "boolean",
-          "default": false
-        },
-        "dailySharing": {
-          "type": "string",
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "liveGoArmed": {
+            "type": "boolean",
+            "default": false
+          },
+          "dailySharing": {
+            "type": "string",
             "enum": [
               "off",
               "draft_only",
@@ -316,6 +316,22 @@
           "acceptFreeText": {
             "type": "boolean",
             "default": true
+          }
+        }
+      },
+      "artistPulse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "minIntervalHours": {
+            "type": "integer",
+            "minimum": 6,
+            "maximum": 168,
+            "default": 12
           }
         }
       },

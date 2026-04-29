@@ -7,7 +7,7 @@ import { applyChangeSet } from "./changeSetApplier.js";
 import { handleProposalResponse } from "./conversationalSession.js";
 import type { ChangeSetProposal } from "./freeformChangesetProposer.js";
 import { secretLikePattern } from "./personaMigrator.js";
-import { isXInlineButtonEnabled } from "./runtimeConfig.js";
+import { isArtistPulseEnabled, isXInlineButtonEnabled } from "./runtimeConfig.js";
 import { handleSongPublishActionRequest, type SongPublishAction } from "./songPublishActionRegistry.js";
 import type { TelegramClient } from "./telegramClient.js";
 import { executeXPublishAction, type XPublishActionInput } from "./xPublishActionRegistry.js";
@@ -244,6 +244,58 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
       await ctx.client.editMessageText(entry.chatId, entry.messageId, "Song action failed. Check the runtime log.", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
       return { processed: true, result: "failed", reason, callbackId };
     }
+  }
+
+  if (entry.action === "daily_voice_publish" || entry.action === "daily_voice_edit" || entry.action === "daily_voice_cancel") {
+    if (!isArtistPulseEnabled()) {
+      return finish(ctx, callbackId, entry, "failed", "artist_pulse_disabled", "Artist pulse disabled", "failed");
+    }
+    await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
+    if (entry.action === "daily_voice_cancel") {
+      await markCallbackResolved(ctx.root, callbackId, { status: "discarded", reason: "daily_voice_cancelled", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "discarded", "daily_voice_cancelled", {
+        draftHash: entry.draftHash,
+        draftCharCount: entry.draftCharCount
+      }));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, "普段の投稿は取り消した。", { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "discarded", reason: "daily_voice_cancelled", callbackId };
+    }
+    if (entry.action === "daily_voice_edit") {
+      await markCallbackResolved(ctx.root, callbackId, { status: "updated", reason: "daily_voice_edit_requested", now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "updated", "daily_voice_edit_requested", {
+        draftHash: entry.draftHash,
+        draftCharCount: entry.draftCharCount
+      }));
+      await ctx.client.sendMessage(entry.chatId, "直すなら、今の文面を踏まえて普通に返信してくれ。callback に本文は載せない。").catch(() => undefined);
+      await ctx.client.editMessageReplyMarkup(entry.chatId, entry.messageId, { inline_keyboard: [] }).catch(() => undefined);
+      return { processed: true, result: "updated", reason: "daily_voice_edit_requested", callbackId };
+    }
+    const published = await executeXPublishAction({
+      root: ctx.root,
+      songId: "",
+      action: "daily_voice_publish",
+      entry,
+      spawnImpl: ctx.xPublishSpawnImpl
+    });
+    if (published.status !== "published" || !published.tweetUrl) {
+      await markCallbackResolved(ctx.root, callbackId, { status: "failed", reason: published.reason ?? published.status, now });
+      await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "failed", published.reason ?? published.status, {
+        draftHash: entry.draftHash,
+        draftCharCount: entry.draftCharCount,
+        birdStatus: published.birdStatus
+      }));
+      await ctx.client.editMessageText(entry.chatId, entry.messageId, `X投稿に失敗: ${published.reason ?? published.status}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+      return { processed: true, result: "failed", reason: published.reason ?? published.status, callbackId };
+    }
+    await markCallbackResolved(ctx.root, callbackId, { status: "applied", reason: "daily_voice_published", now });
+    await appendCallbackAudit(ctx.root, auditBase(ctx, callbackId, entry, "applied", "daily_voice_published", {
+      draftHash: entry.draftHash,
+      draftCharCount: entry.draftCharCount,
+      tweetUrl: published.tweetUrl,
+      birdStatus: published.birdStatus
+    }));
+    await ctx.client.editMessageText(entry.chatId, entry.messageId, `X投稿完了。URL: ${published.tweetUrl}`, { replyMarkup: { inline_keyboard: [] } }).catch(() => undefined);
+    return { processed: true, result: "applied", reason: "daily_voice_published", callbackId };
   }
 
   if (entry.action === "x_publish_prepare" || entry.action === "x_publish_confirm" || entry.action === "x_publish_cancel") {

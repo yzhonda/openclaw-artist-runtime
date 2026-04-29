@@ -5,7 +5,7 @@ import { generateArtistResponse, readArtistVoiceContext, type ArtistVoiceContext
 import { birdWhoami, combinedBirdOutput, parseTweetUrl as parseBirdTweetUrl, runBirdCommand, type SpawnImpl } from "./birdRunner.js";
 import { secretLikePattern } from "./personaMigrator.js";
 
-export type XPublishAction = "x_publish_prepare" | "x_publish_confirm" | "x_publish_cancel";
+export type XPublishAction = "x_publish_prepare" | "x_publish_confirm" | "x_publish_cancel" | "daily_voice_publish";
 export type XPublishStatus = "prepared" | "published" | "cancelled" | "failed";
 
 export interface XPostDraft {
@@ -159,15 +159,15 @@ export async function buildXPostDraft(input: {
   };
 }
 
-async function publishWithBird(text: string, spawnImpl: SpawnImpl | undefined, timeoutMs: number): Promise<XPublishActionResult> {
+async function publishWithBird(action: XPublishAction, text: string, spawnImpl: SpawnImpl | undefined, timeoutMs: number): Promise<XPublishActionResult> {
   const auth = await birdWhoami({ spawnImpl, timeoutMs });
   if (!auth.authed) {
-    return { action: "x_publish_confirm", status: "failed", reason: auth.error ?? "bird_publish_failed", birdStatus: "auth_failed" };
+    return { action, status: "failed", reason: auth.error ?? "bird_publish_failed", birdStatus: "auth_failed" };
   }
   const posted = await runBirdCommand(["--plain", "tweet", text], { spawnImpl, timeoutMs });
   if (posted.status !== "success") {
     return {
-      action: "x_publish_confirm",
+      action,
       status: "failed",
       reason: posted.error === "bird_command_failed" ? "bird_publish_failed" : posted.error,
       birdStatus: "tweet_failed"
@@ -175,9 +175,9 @@ async function publishWithBird(text: string, spawnImpl: SpawnImpl | undefined, t
   }
   const tweetUrl = parseBirdTweetUrl(combinedBirdOutput(posted));
   if (!tweetUrl) {
-    return { action: "x_publish_confirm", status: "failed", reason: "bird_publish_missing_tweet_url", birdStatus: "tweet_missing_url" };
+    return { action, status: "failed", reason: "bird_publish_missing_tweet_url", birdStatus: "tweet_missing_url" };
   }
-  return { action: "x_publish_confirm", status: "published", tweetUrl, birdStatus: "tweet_posted" };
+  return { action, status: "published", tweetUrl, birdStatus: "tweet_posted" };
 }
 
 export async function executeXPublishAction(input: XPublishActionInput): Promise<XPublishActionResult> {
@@ -207,5 +207,5 @@ export async function executeXPublishAction(input: XPublishActionInput): Promise
   if (expectedHash && hashXPostText(finalText) !== expectedHash) {
     return { action: input.action, status: "failed", reason: "x_publish_hash_mismatch" };
   }
-  return publishWithBird(finalText, input.spawnImpl, input.timeoutMs ?? defaultTimeoutMs);
+  return publishWithBird(input.action, finalText, input.spawnImpl, input.timeoutMs ?? defaultTimeoutMs);
 }
