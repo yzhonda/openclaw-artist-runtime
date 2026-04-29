@@ -13,8 +13,8 @@ describe("extended status fields", () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-extended-"));
     await ensureArtistWorkspace(root);
     vi.stubEnv("OPENCLAW_SUNO_DAILY_BUDGET", "4");
-    await tryConsumeBudget(root, 1, new Date("2026-04-29T01:00:00.000Z"));
-    await recordBirdCall(root, new Date("2026-04-29T01:00:00.000Z"));
+    await tryConsumeBudget(root, 1, new Date());
+    await recordBirdCall(root, new Date());
     await createConversationalSession(root, {
       chatId: 1,
       userId: 2,

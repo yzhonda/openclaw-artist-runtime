@@ -70,7 +70,8 @@ describe("autopilot planning stage progression", () => {
 
     const state = await new ArtistAutopilotService().runCycle({
       workspaceRoot: root,
-      config: { autopilot: { enabled: true, dryRun: true }, telegram: { enabled: true } }
+      config: { autopilot: { enabled: true, dryRun: true }, telegram: { enabled: true } },
+      observationRunner: async () => ({ stdout: "planning observation" })
     });
     await vi.waitFor(async () => {
       expect((await readCallbackActionEntries(root)).some((entry) => entry.action === "planning_skeleton_apply")).toBe(true);
@@ -100,7 +101,8 @@ describe("autopilot planning stage progression", () => {
     const unsubscribe = new TelegramNotifier({ token: "token", chatId: 123, workspaceRoot: root, aiReviewProvider: "mock", fetchImpl }).subscribe(getRuntimeEventBus());
     const skipped = await new ArtistAutopilotService().runCycle({
       workspaceRoot: root,
-      config: { autopilot: { enabled: true, dryRun: true, planningTimeoutDays: 7 }, telegram: { enabled: true } }
+      config: { autopilot: { enabled: true, dryRun: true, planningTimeoutDays: 7 }, telegram: { enabled: true } },
+      observationRunner: async () => ({ stdout: "planning observation" })
     });
     await vi.waitFor(async () => {
       expect((await readCallbackActionEntries(root)).some((entry) => entry.action === "planning_skeleton_skip")).toBe(true);
@@ -127,7 +129,8 @@ describe("autopilot planning stage progression", () => {
     });
     const paused = await new ArtistAutopilotService().runCycle({
       workspaceRoot: root,
-      config: { autopilot: { enabled: true, dryRun: true, planningTimeoutDays: 7 }, telegram: { enabled: false } }
+      config: { autopilot: { enabled: true, dryRun: true, planningTimeoutDays: 7 }, telegram: { enabled: false } },
+      observationRunner: async () => ({ stdout: "planning observation" })
     });
 
     expect(paused).toMatchObject({ stage: "paused", paused: true, pausedReason: "planning_stalled_7days" });

@@ -16,13 +16,15 @@ describe("music and platform status details", () => {
     const root = mkdtempSync(join(tmpdir(), "artist-runtime-status-detail-"));
     await ensureArtistWorkspace(root);
     vi.stubEnv("OPENCLAW_SUNO_DAILY_BUDGET", "5");
+    const budgetNow = new Date();
+    const birdNow = new Date();
 
-    await tryConsumeBudget(root, 2, new Date("2026-04-29T01:00:00.000Z"));
-    await recordBirdCall(root, new Date("2026-04-29T02:00:00.000Z"), {
+    await tryConsumeBudget(root, 2, budgetNow);
+    await recordBirdCall(root, birdNow, {
       query: "rail noise",
       mode: "topical"
     });
-    await triggerCooldown(root, "rate limit smoke", new Date("2026-04-29T02:10:00.000Z"));
+    await triggerCooldown(root, "rate limit smoke", birdNow);
 
     const status = await buildStatusResponse({
       artist: { workspaceRoot: root }
@@ -34,7 +36,7 @@ describe("music and platform status details", () => {
       limit: 5,
       todayCalls: [
         {
-          timestamp: "2026-04-29T01:00:00.000Z",
+          timestamp: budgetNow.toISOString(),
           amount: 2,
           kind: "consume"
         }
@@ -44,7 +46,7 @@ describe("music and platform status details", () => {
     expect(status.bird?.ledger).toMatchObject({
       todayCalls: [
         {
-          timestamp: "2026-04-29T02:00:00.000Z",
+          timestamp: birdNow.toISOString(),
           query: "rail noise",
           mode: "topical"
         }

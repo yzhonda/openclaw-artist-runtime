@@ -77,7 +77,8 @@ describe("telegram daily voice callback e2e", () => {
 
     await new ArtistAutopilotService().runCycle({
       workspaceRoot: root,
-      config: { autopilot: { enabled: false, dryRun: true } }
+      config: { autopilot: { enabled: false, dryRun: true } },
+      observationRunner: async () => ({ stdout: "商店街の灯りが半分だけ消えていた。" })
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     unsubscribe();

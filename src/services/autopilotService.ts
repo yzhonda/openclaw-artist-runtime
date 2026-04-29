@@ -23,7 +23,7 @@ import { emitRuntimeEvent } from "./runtimeEventBus.js";
 import { resetIfNewDay } from "./sunoBudgetLedger.js";
 import { reserveSunoGenerationBudget } from "./sunoBudgetGuard.js";
 import { classifySunoGenerateFailure, nextSunoRetryDecision } from "./sunoRetryHandler.js";
-import { collectObservations } from "./xObservationCollector.js";
+import { collectObservations, type XObservationContext } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
 import { pollSongDistribution } from "./songDistributionPoller.js";
 import { cleanupExpiredCallbacks } from "./callbackLedgerMaintenance.js";
@@ -61,6 +61,7 @@ export interface RunAutopilotCycleInput {
   workspaceRoot: string;
   config?: Partial<ArtistRuntimeConfig>;
   manualSeed?: { hint: string };
+  observationRunner?: XObservationContext["runner"];
 }
 
 function nowIso(): string {
@@ -371,6 +372,25 @@ export class ArtistAutopilotService {
     const config = input.manualSeed
       ? { ...resolvedConfig, autopilot: { ...resolvedConfig.autopilot, enabled: true } }
       : resolvedConfig;
+    const artistMind = await readArtistMind(input.workspaceRoot);
+    const cycleObservation = await collectObservations(input.workspaceRoot, {
+      personaText: `${artistMind.artist}\n${artistMind.socialVoice}`,
+      query: input.manualSeed?.hint ? undefined : "music OR society OR culture",
+      manualSeed: input.manualSeed,
+      runner: input.observationRunner
+    }).catch((error) => {
+      const reason = error instanceof Error ? error.message : String(error);
+      emitRuntimeEvent({ type: "error", source: "x_observation", reason, timestamp: Date.now() });
+      return { status: "skipped" as const, path: join(input.workspaceRoot, "observations"), observations: "", reason };
+    });
+    if (cycleObservation.status === "cooldown") {
+      emitRuntimeEvent({
+        type: "bird_cooldown_triggered",
+        reason: cycleObservation.reason ?? "bird cool-down active",
+        cooldownUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        timestamp: Date.now()
+      });
+    }
     if (isArtistPulseConfigured(config)) {
       await shouldPulse(input.workspaceRoot, { minIntervalHours: getArtistPulseIntervalHours(process.env, config) }).then(async (allowed) => {
         if (!allowed) {
@@ -501,22 +521,8 @@ export class ArtistAutopilotService {
 
     try {
       if (!song) {
-        const artistMind = await readArtistMind(input.workspaceRoot);
-        const observation = await collectObservations(input.workspaceRoot, {
-          personaText: `${artistMind.artist}\n${artistMind.socialVoice}`,
-          query: input.manualSeed?.hint ? undefined : "music OR society OR culture",
-          manualSeed: input.manualSeed
-        });
-        if (observation.status === "cooldown") {
-          emitRuntimeEvent({
-            type: "bird_cooldown_triggered",
-            reason: observation.reason ?? "bird cool-down active",
-            cooldownUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-            timestamp: Date.now()
-          });
-        }
         const theme = await proposeTheme(input.workspaceRoot, {
-          observations: observation.observations,
+          observations: cycleObservation.observations,
           aiReviewProvider: config.aiReview.provider
         });
         emitRuntimeEvent({

@@ -8,6 +8,7 @@ import { ensureArtistWorkspace } from "../src/services/artistWorkspace";
 import { getRuntimeEventBus, type RuntimeEvent } from "../src/services/runtimeEventBus";
 import { ensureSongState, updateSongState } from "../src/services/artistState";
 import { createAndPersistSunoPromptPack } from "../src/services/sunoPromptPackFiles";
+import { tryConsumeBudget } from "../src/services/sunoBudgetLedger";
 
 function workspace(): string {
   return mkdtempSync(join(tmpdir(), "artist-runtime-autopilot-cycle-e2e-"));
@@ -53,12 +54,7 @@ describe("autopilot autonomous production loop", () => {
     const root = workspace();
     await seedSongForSuno(root);
     vi.stubEnv("OPENCLAW_SUNO_DAILY_BUDGET", "1");
-    await mkdir(join(root, "runtime"), { recursive: true });
-    await writeFile(
-      join(root, "runtime", "suno-budget-ledger.json"),
-      JSON.stringify({ date: "2026-04-29", used: 1, limit: 1, updatedAt: "2026-04-29T00:00:00.000Z" }),
-      "utf8"
-    );
+    await tryConsumeBudget(root, 1, new Date());
     const service = new ArtistAutopilotService();
     const events: RuntimeEvent[] = [];
     const unsubscribe = getRuntimeEventBus().subscribe((event) => events.push(event));
