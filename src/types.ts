@@ -285,6 +285,7 @@ export interface TelegramPersonaSession {
 }
 
 export interface DailyVoiceDraft {
+  voiceKind: "quote" | "musing" | "studio_whisper";
   draftText: string;
   draftHash: string;
   charCount: number;

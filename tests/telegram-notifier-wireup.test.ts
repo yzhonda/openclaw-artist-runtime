@@ -46,6 +46,7 @@ describe("telegram notifier service wireup", () => {
     await expect(startTelegramNotifierFromEnv(env(workspaceRoot))).resolves.toEqual({ started: 1 });
     getRuntimeEventBus().emit({
       type: "artist_pulse_drafted",
+      voiceKind: "musing",
       draftText: "街の端で低いベースだけ残ってる。",
       draftHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       charCount: 18,
@@ -55,7 +56,7 @@ describe("telegram notifier service wireup", () => {
     });
 
     await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledWith(expect.stringContaining("/sendMessage"), expect.any(Object)));
-    expect(JSON.parse(String((fetchImpl.mock.calls[0][1] as RequestInit).body)).text).toContain("Artist pulse draft");
+    expect(JSON.parse(String((fetchImpl.mock.calls[0][1] as RequestInit).body)).text).toContain("💭 つぶやき draft");
     await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledWith(expect.stringContaining("/editMessageReplyMarkup"), expect.any(Object)));
   });
 
@@ -106,6 +107,7 @@ describe("telegram notifier service wireup", () => {
     });
     getRuntimeEventBus().emit({
       type: "artist_pulse_drafted",
+      voiceKind: "musing",
       draftText: "off",
       draftHash: "hash",
       charCount: 3,

@@ -51,6 +51,7 @@ describe("daily voice rationale", () => {
 
   it("shows rationale in Telegram preview and omits it when absent", async () => {
     const base: DailyVoiceDraft = {
+      voiceKind: "quote",
       draftText: "街の記憶は、消えてから急に公共物みたいな顔をする。\n\nhttps://x.com/city_note/status/2222222222",
       draftHash: "1234567890abcdef",
       charCount: 28,

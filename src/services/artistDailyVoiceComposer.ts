@@ -269,6 +269,7 @@ export async function composeDailyVoice(root: string, options: ComposeDailyVoice
   const rationale = post.rationale;
   assertSafe("daily_voice_final_text", [draftText, rationale].filter(Boolean).join("\n"));
   return {
+    voiceKind: post.url ? "quote" : "musing",
     draftText,
     draftHash: hashDailyVoiceDraft(draftText),
     charCount: Array.from(post.opinion).length,

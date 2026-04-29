@@ -35,6 +35,7 @@ describe("R10 telegram notifier wireup boundary", () => {
     } as NodeJS.ProcessEnv);
     getRuntimeEventBus().emit({
       type: "artist_pulse_drafted",
+      voiceKind: "musing",
       draftText: "低い雲だけ見てる。",
       draftHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       charCount: 10,

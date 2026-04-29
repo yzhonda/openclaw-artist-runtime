@@ -327,6 +327,16 @@ async function artistReport(event: RuntimeEvent, fallback: string, options: Pick
   }
 }
 
+function dailyVoiceTitle(kind: Extract<RuntimeEvent, { type: "artist_pulse_drafted" }>["voiceKind"]): string {
+  if (kind === "studio_whisper") {
+    return "🎵 制作中のひとこと draft:";
+  }
+  if (kind === "musing") {
+    return "💭 つぶやき draft:";
+  }
+  return "🔁 引用ポスト draft:";
+}
+
 export async function formatRuntimeEvent(
   event: RuntimeEvent,
   options: Pick<TelegramNotifierOptions, "workspaceRoot" | "aiReviewProvider"> = {}
@@ -372,7 +382,7 @@ export async function formatRuntimeEvent(
       return artistReport(event, `Song completion skipped for now: ${event.songId}.`, options);
     case "artist_pulse_drafted":
       return [
-        "Artist pulse draft:",
+        dailyVoiceTitle(event.voiceKind),
         "",
         event.draftText,
         "",
