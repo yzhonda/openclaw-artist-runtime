@@ -1,5 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { defaultArtistRuntimeConfig } from "../config/defaultConfig.js";
 import { migrateConfig } from "../config/migrations.js";
 import { applyConfigDefaults, validateConfig } from "../config/schema.js";
@@ -7,6 +7,11 @@ import type { ArtistRuntimeConfig } from "../types.js";
 
 function configOverridePath(root: string): string {
   return join(root, "runtime", "config-overrides.json");
+}
+
+function configOverrideBackupPath(root: string, now = new Date()): string {
+  const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  return join(root, "runtime", `config-overrides.${stamp}.bak.json`);
 }
 
 function enforceFrozenPlatformBoundaries(config: ArtistRuntimeConfig): ArtistRuntimeConfig {
@@ -35,8 +40,37 @@ export async function readConfigOverrides(root: string): Promise<Partial<ArtistR
   return migrateConfig(JSON.parse(contents));
 }
 
+type ConfigOverridesRecord = Omit<Partial<ArtistRuntimeConfig>, "autopilot"> & {
+  suno?: { dailyBudget?: unknown };
+  bird?: { rateLimits?: { dailyMax?: unknown; minIntervalMinutes?: unknown } };
+  autopilot?: Partial<ArtistRuntimeConfig["autopilot"]> & { intervalMinutes?: unknown };
+};
+
+export interface RuntimeSafetyOverridesPatch {
+  suno?: { dailyBudget?: number };
+  bird?: { rateLimits?: { dailyMax?: number; minIntervalMinutes?: number } };
+  autopilot?: { intervalMinutes?: number };
+}
+
+function normalizeResolvedOverrideConfig(overrides: ConfigOverridesRecord): Partial<ArtistRuntimeConfig> {
+  const { suno: _suno, bird: _bird, ...rest } = overrides;
+  const autopilot = rest.autopilot
+    ? { ...rest.autopilot } as Partial<ArtistRuntimeConfig["autopilot"]> & { intervalMinutes?: unknown }
+    : undefined;
+  if (autopilot && typeof autopilot.intervalMinutes === "number" && !("cycleIntervalMinutes" in autopilot)) {
+    autopilot.cycleIntervalMinutes = autopilot.intervalMinutes;
+  }
+  if (autopilot && "intervalMinutes" in autopilot) {
+    delete autopilot.intervalMinutes;
+  }
+  return {
+    ...rest,
+    ...(autopilot ? { autopilot } : {})
+  } as Partial<ArtistRuntimeConfig>;
+}
+
 export async function readResolvedConfig(root: string): Promise<ArtistRuntimeConfig> {
-  return enforceFrozenPlatformBoundaries(applyConfigDefaults(await readConfigOverrides(root)));
+  return enforceFrozenPlatformBoundaries(applyConfigDefaults(normalizeResolvedOverrideConfig(await readConfigOverrides(root) as ConfigOverridesRecord)));
 }
 
 export function resolveDefaultWorkspaceRoot(): string {
@@ -79,6 +113,49 @@ export async function resolveSunoDailyBudget(
   const rawSuno = (overrides as { suno?: { dailyBudget?: unknown } }).suno;
   const overrideBudget = positiveNumber(rawSuno?.dailyBudget);
   return overrideBudget ?? 50;
+}
+
+function deepMergeRuntimeOverrides(current: ConfigOverridesRecord, patch: RuntimeSafetyOverridesPatch): ConfigOverridesRecord {
+  return {
+    ...current,
+    suno: {
+      ...current.suno,
+      ...patch.suno
+    },
+    bird: {
+      ...current.bird,
+      ...(patch.bird ? {
+        rateLimits: {
+          ...current.bird?.rateLimits,
+          ...patch.bird.rateLimits
+        }
+      } : {})
+    },
+    autopilot: {
+      ...current.autopilot,
+      ...patch.autopilot
+    }
+  };
+}
+
+async function writeOverridesFile(root: string, value: unknown): Promise<void> {
+  const path = configOverridePath(root);
+  const runtimeDir = dirname(path);
+  await mkdir(runtimeDir, { recursive: true });
+  const existing = await readFile(path, "utf8").catch(() => "");
+  if (existing) {
+    await copyFile(path, configOverrideBackupPath(root)).catch(() => undefined);
+  }
+  const tmpPath = `${path}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(tmpPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  await rename(tmpPath, path);
+}
+
+export async function writeRuntimeSafetyOverrides(root: string, patch: RuntimeSafetyOverridesPatch): Promise<ConfigOverridesRecord> {
+  const current = await readConfigOverrides(root) as ConfigOverridesRecord;
+  const next = deepMergeRuntimeOverrides(current, patch);
+  await writeOverridesFile(root, next);
+  return next;
 }
 
 function isRelativeWorkspaceRoot(value: string): boolean {
@@ -127,8 +204,7 @@ export async function writeConfigOverrides(root: string, config: ArtistRuntimeCo
   if (!validation.ok || !validation.value) {
     throw new Error(`invalid config: ${validation.errors.join("; ")}`);
   }
-  await mkdir(join(root, "runtime"), { recursive: true });
-  await writeFile(configOverridePath(root), `${JSON.stringify(validation.value, null, 2)}\n`, "utf8");
+  await writeOverridesFile(root, validation.value);
   return validation.value;
 }
 

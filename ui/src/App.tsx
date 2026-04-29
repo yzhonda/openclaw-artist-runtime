@@ -10,6 +10,7 @@ import { BudgetRateStatusStrip } from "./components/BudgetRateStatusStrip";
 import { ManualSongCreateCard } from "./components/ManualSongCreateCard";
 import { PendingApprovalsCard } from "./components/PendingApprovalsCard";
 import { PendingChangeSetCard, type ProposalDetail } from "./components/PendingChangeSetCard";
+import { SettingsRuntimeOverridesPanel, type RuntimeOverridesSavePayload, type RuntimeOverridesValues } from "./components/SettingsRuntimeOverridesPanel";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
@@ -194,6 +195,11 @@ type StatusResponse = {
 
 type ProposalsResponse = {
   proposals: ProposalDetail[];
+};
+
+type ConfigOverridesResponse = {
+  raw: Record<string, unknown>;
+  values: RuntimeOverridesValues;
 };
 
 type ConfigResponse = {
@@ -536,6 +542,7 @@ function platformProbeBadge(
 export function App() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [config, setConfig] = useState<ConfigResponse | null>(null);
+  const [configOverrides, setConfigOverrides] = useState<ConfigOverridesResponse | null>(null);
   const [songs, setSongs] = useState<SongSummary[]>([]);
   const [detail, setDetail] = useState<SongDetail | null>(null);
   const [sunoStatus, setSunoStatus] = useState<SunoStatusResponse | null>(null);
@@ -572,10 +579,11 @@ export function App() {
     setIsRefreshing(true);
     try {
       setError(null);
-      const [nextStatus, nextSongs, nextConfig, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery, nextProposals] = await Promise.all([
+      const [nextStatus, nextSongs, nextConfig, nextConfigOverrides, nextSunoStatus, nextArtistMind, nextAuditEntries, nextRecovery, nextProposals] = await Promise.all([
         apiGet<StatusResponse>("/status"),
         apiGet<SongSummary[]>("/songs"),
         apiGet<ConfigResponse>("/config"),
+        apiGet<ConfigOverridesResponse>("/config/overrides"),
         apiGet<SunoStatusResponse>("/suno/status"),
         apiGet<ArtistMindResponse>("/artist-mind"),
         apiGet<AuditEntry[]>("/audit"),
@@ -598,6 +606,7 @@ export function App() {
       startTransition(() => {
         setStatus(nextStatus);
         setConfig(nextConfig);
+        setConfigOverrides(nextConfigOverrides);
         setSunoStatus(nextSunoStatus);
         setArtistMind(nextArtistMind);
         setAuditEntries(nextAuditEntries);
@@ -772,6 +781,22 @@ export function App() {
       const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
       setError(message);
       showErrorToast("config-patch", "config_update_failed", message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveRuntimeOverrides = async (payload: RuntimeOverridesSavePayload) => {
+    setBusy("runtime-overrides");
+    try {
+      const updated = await apiPost<ConfigOverridesResponse>("/config/overrides", payload);
+      setConfigOverrides(updated);
+      await refresh(selectedSongId, true);
+      showErrorToast("runtime", "runtime_overrides_updated", "Settings updated.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "runtime_overrides_update_failed", message);
     } finally {
       setBusy(null);
     }
@@ -1151,6 +1176,16 @@ export function App() {
         </div>
       ) : <div className="item muted">Loading config.</div>}
     </article>
+  );
+
+  const runtimeOverridesPanel = (
+    <SettingsRuntimeOverridesPanel
+      values={configOverrides?.values}
+      dryRun={config?.autopilot.dryRun}
+      liveGoArmed={config?.distribution.liveGoArmed}
+      busy={busy !== null}
+      onSave={saveRuntimeOverrides}
+    />
   );
 
   const isArchivedSong = (status: string) => status === "scheduled" || status === "published" || status === "archived" || status === "failed";
@@ -1585,7 +1620,7 @@ export function App() {
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}
       {activeView === "artist-mind" ? <section className="single-column">{personaChangeSetPanel}{artistMindPanel}</section> : null}
-      {activeView === "settings" ? <section className="two-column">{configPanel}{setupPanel}</section> : null}
+      {activeView === "settings" ? <section className="two-column">{runtimeOverridesPanel}{configPanel}{setupPanel}</section> : null}
       {activeView === "recovery" ? <section className="two-column">{recoveryPanel}{sunoPanel}{alertsPanel}</section> : null}
 
       <section className="panel debug-panel">

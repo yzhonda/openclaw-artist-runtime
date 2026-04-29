@@ -20,7 +20,7 @@ import { buildPlatformStats, readDistributionEvents } from "../services/distribu
 import { getRuntimeEventBus } from "../services/runtimeEventBus.js";
 import { readRuntimeEvents } from "../services/runtimeEventsLedger.js";
 import { getSongPromptLedgerPath } from "../services/promptLedger.js";
-import { mergeResolvedConfig, patchResolvedConfig, resolveRuntimeConfig } from "../services/runtimeConfig.js";
+import { mergeResolvedConfig, patchResolvedConfig, readConfigOverrides, resolveRuntimeConfig, resolveSunoDailyBudget, writeRuntimeSafetyOverrides, type RuntimeSafetyOverridesPatch } from "../services/runtimeConfig.js";
 import { publishSocialAction, readLatestSocialAction } from "../services/socialPublishing.js";
 import { SocialDistributionWorker } from "../services/socialDistributionWorker.js";
 import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../services/socialDryRunResolver.js";
@@ -538,6 +538,218 @@ export async function buildConfigResponse(config?: Partial<ArtistRuntimeConfig>)
   return resolveRuntimeConfig(config);
 }
 
+type OverrideSource = "env" | "overrides" | "default";
+
+interface RuntimeOverrideField {
+  value: number;
+  source: OverrideSource;
+  editable: boolean;
+  defaultValue: number;
+  envVar?: string;
+}
+
+interface ConfigOverridesResponse {
+  raw: Record<string, unknown>;
+  values: {
+    sunoDailyBudget: RuntimeOverrideField;
+    birdDailyMax: RuntimeOverrideField;
+    birdMinIntervalMinutes: RuntimeOverrideField;
+    autopilotIntervalMinutes: RuntimeOverrideField;
+  };
+}
+
+function positiveIntegerFromEnv(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    const parsed = Number(value.trim());
+    return parsed > 0 ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function hasOwnRecordKey(value: unknown, key: string): boolean {
+  return typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function runtimeOverrideField(input: {
+  value: number;
+  defaultValue: number;
+  envVar?: string;
+  envValue?: number;
+  overridePresent: boolean;
+}): RuntimeOverrideField {
+  const source: OverrideSource = input.envValue !== undefined ? "env" : input.overridePresent ? "overrides" : "default";
+  return {
+    value: input.value,
+    source,
+    editable: source !== "env",
+    defaultValue: input.defaultValue,
+    envVar: input.envVar
+  };
+}
+
+export async function buildConfigOverridesResponse(config?: Partial<ArtistRuntimeConfig>): Promise<ConfigOverridesResponse> {
+  const mergedConfig = await resolveRuntimeConfig(config);
+  const root = mergedConfig.artist.workspaceRoot;
+  const raw = await readConfigOverrides(root) as Record<string, unknown> & {
+    suno?: { dailyBudget?: unknown };
+    bird?: { rateLimits?: { dailyMax?: unknown; minIntervalMinutes?: unknown } };
+    autopilot?: { intervalMinutes?: unknown; cycleIntervalMinutes?: unknown };
+  };
+  const bird = await readBirdRateLimitStatus(root);
+  const envSuno = positiveIntegerFromEnv(process.env.OPENCLAW_SUNO_DAILY_BUDGET);
+  const envBirdDailyMax = positiveIntegerFromEnv(process.env.OPENCLAW_BIRD_DAILY_MAX);
+  const envBirdMinInterval = positiveIntegerFromEnv(process.env.OPENCLAW_BIRD_MIN_INTERVAL_MINUTES);
+  const autopilotOverridePresent = hasOwnRecordKey(raw.autopilot, "intervalMinutes") || hasOwnRecordKey(raw.autopilot, "cycleIntervalMinutes");
+
+  return {
+    raw,
+    values: {
+      sunoDailyBudget: runtimeOverrideField({
+        value: await resolveSunoDailyBudget(root),
+        defaultValue: 50,
+        envVar: "OPENCLAW_SUNO_DAILY_BUDGET",
+        envValue: envSuno,
+        overridePresent: hasOwnRecordKey(raw.suno, "dailyBudget")
+      }),
+      birdDailyMax: runtimeOverrideField({
+        value: bird.dailyMax,
+        defaultValue: 5,
+        envVar: "OPENCLAW_BIRD_DAILY_MAX",
+        envValue: envBirdDailyMax,
+        overridePresent: hasOwnRecordKey(raw.bird?.rateLimits, "dailyMax")
+      }),
+      birdMinIntervalMinutes: runtimeOverrideField({
+        value: bird.minIntervalMinutes,
+        defaultValue: 60,
+        envVar: "OPENCLAW_BIRD_MIN_INTERVAL_MINUTES",
+        envValue: envBirdMinInterval,
+        overridePresent: hasOwnRecordKey(raw.bird?.rateLimits, "minIntervalMinutes")
+      }),
+      autopilotIntervalMinutes: runtimeOverrideField({
+        value: mergedConfig.autopilot.cycleIntervalMinutes,
+        defaultValue: 180,
+        overridePresent: autopilotOverridePresent
+      })
+    }
+  };
+}
+
+function validateRuntimeOverridePayload(payload: Record<string, unknown>): string[] {
+  const allowedRoot = new Set(["requestMethod", "requestPath", "config", "suno", "bird", "autopilot"]);
+  const errors: string[] = [];
+  for (const key of Object.keys(payload)) {
+    if (!allowedRoot.has(key)) {
+      errors.push(`unknown override key: ${key}`);
+    }
+  }
+  const suno = payload.suno as Record<string, unknown> | undefined;
+  if (suno !== undefined) {
+    if (typeof suno !== "object" || suno === null || Array.isArray(suno)) {
+      errors.push("suno must be an object");
+    } else {
+      for (const key of Object.keys(suno)) {
+        if (key !== "dailyBudget") {
+          errors.push(`unknown override key: suno.${key}`);
+        }
+      }
+    }
+  }
+  const bird = payload.bird as Record<string, unknown> | undefined;
+  const rateLimits = bird?.rateLimits as Record<string, unknown> | undefined;
+  if (bird !== undefined) {
+    if (typeof bird !== "object" || bird === null || Array.isArray(bird)) {
+      errors.push("bird must be an object");
+    } else {
+      for (const key of Object.keys(bird)) {
+        if (key !== "rateLimits") {
+          errors.push(`unknown override key: bird.${key}`);
+        }
+      }
+      if (rateLimits !== undefined) {
+        if (typeof rateLimits !== "object" || rateLimits === null || Array.isArray(rateLimits)) {
+          errors.push("bird.rateLimits must be an object");
+        } else {
+          for (const key of Object.keys(rateLimits)) {
+            if (key !== "dailyMax" && key !== "minIntervalMinutes") {
+              errors.push(`unknown override key: bird.rateLimits.${key}`);
+            }
+          }
+        }
+      }
+    }
+  }
+  const autopilot = payload.autopilot as Record<string, unknown> | undefined;
+  if (autopilot !== undefined) {
+    if (typeof autopilot !== "object" || autopilot === null || Array.isArray(autopilot)) {
+      errors.push("autopilot must be an object");
+    } else {
+      for (const key of Object.keys(autopilot)) {
+        if (key !== "intervalMinutes") {
+          errors.push(`unknown override key: autopilot.${key}`);
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+function integerInRange(value: unknown, label: string, min: number, max: number, errors: string[]): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    errors.push(`${label} must be an integer between ${min} and ${max}`);
+    return undefined;
+  }
+  return value;
+}
+
+function runtimeSafetyPatchFromPayload(payload: Record<string, unknown>): { patch?: RuntimeSafetyOverridesPatch; errors: string[] } {
+  const errors = validateRuntimeOverridePayload(payload);
+  const suno = payload.suno as { dailyBudget?: unknown } | undefined;
+  const bird = payload.bird as { rateLimits?: { dailyMax?: unknown; minIntervalMinutes?: unknown } } | undefined;
+  const autopilot = payload.autopilot as { intervalMinutes?: unknown } | undefined;
+  const dailyBudget = integerInRange(suno?.dailyBudget, "suno.dailyBudget", 1, 1000, errors);
+  const dailyMax = integerInRange(bird?.rateLimits?.dailyMax, "bird.rateLimits.dailyMax", 1, 100, errors);
+  const minIntervalMinutes = integerInRange(bird?.rateLimits?.minIntervalMinutes, "bird.rateLimits.minIntervalMinutes", 1, 1440, errors);
+  const intervalMinutes = integerInRange(autopilot?.intervalMinutes, "autopilot.intervalMinutes", 15, 1440, errors);
+  if (errors.length > 0) {
+    return { errors };
+  }
+  return {
+    errors: [],
+    patch: {
+      ...(dailyBudget !== undefined ? { suno: { dailyBudget } } : {}),
+      ...(dailyMax !== undefined || minIntervalMinutes !== undefined
+        ? { bird: { rateLimits: { ...(dailyMax !== undefined ? { dailyMax } : {}), ...(minIntervalMinutes !== undefined ? { minIntervalMinutes } : {}) } } }
+        : {}),
+      ...(intervalMinutes !== undefined ? { autopilot: { intervalMinutes } } : {})
+    }
+  };
+}
+
+async function appendConfigOverridesAudit(
+  workspaceRoot: string,
+  before: ConfigOverridesResponse,
+  after: ConfigOverridesResponse
+): Promise<void> {
+  await appendAuditLog(
+    join(workspaceRoot, "runtime", "config-overrides-audit.jsonl"),
+    createAuditEvent({
+      eventType: "config_overrides_update",
+      actor: "producer",
+      sourceRefs: ["runtime/config-overrides.json"],
+      details: {
+        before: before.values,
+        after: after.values
+      }
+    })
+  );
+}
+
 export async function buildArtistMindResponse(config?: Partial<ArtistRuntimeConfig>) {
   const mergedConfig = await resolveRuntimeConfig(config);
   return readArtistMind(mergedConfig.artist.workspaceRoot);
@@ -670,6 +882,22 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
   ]);
   const setupReadiness = await buildSetupReadiness(mergedConfig, autopilot, sunoWorker, platforms, workspaceStatus);
   const effectiveDryRunMap = buildEffectiveDryRunMap(mergedConfig);
+  const rawConfigOverrides = await readConfigOverrides(mergedConfig.artist.workspaceRoot) as { suno?: { dailyBudget?: unknown } };
+  const hasRuntimeSunoBudget = positiveIntegerFromEnv(process.env.OPENCLAW_SUNO_DAILY_BUDGET) !== undefined
+    || hasOwnRecordKey(rawConfigOverrides.suno, "dailyBudget");
+  const statusSunoBudget = hasRuntimeSunoBudget
+    ? {
+        ...sunoBudgetState,
+        limit: sunoDailyBudget.limit,
+        remaining: Math.max(0, sunoDailyBudget.limit - sunoBudgetState.consumed),
+        used: sunoDailyBudget.used,
+        resetHistory: sunoBudgetResetHistory
+      }
+    : {
+        ...sunoBudgetState,
+        used: sunoDailyBudget.used,
+        resetHistory: sunoBudgetResetHistory
+      };
 
   return {
     config: mergedConfig,
@@ -681,11 +909,7 @@ export async function buildStatusResponse(config?: Partial<ArtistRuntimeConfig>)
     autopilot,
     ticker: buildTickerStatus(mergedConfig),
     suno: {
-      budget: {
-        ...sunoBudgetState,
-        used: sunoDailyBudget.used,
-        resetHistory: sunoBudgetResetHistory
-      },
+      budget: statusSunoBudget,
       artifacts: sunoArtifacts.slice(0, STATUS_SUNO_ARTIFACT_LIMIT),
       profile: {
         stale: sunoWorker.sunoProfileStale,
@@ -816,6 +1040,33 @@ export function registerRoutes(api: unknown): void {
     method: "GET",
     path: "/plugins/artist-runtime/api/config",
     handler: async (input) => buildConfigResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: ["GET", "POST"],
+    path: "/plugins/artist-runtime/api/config/overrides",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const method = payloadRequestMethod(payload);
+      const context = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const responseConfig = { artist: { workspaceRoot: context.artist.workspaceRoot } } as Partial<ArtistRuntimeConfig>;
+      if (method === "GET") {
+        return buildConfigOverridesResponse(responseConfig);
+      }
+      const { patch, errors } = runtimeSafetyPatchFromPayload(payload);
+      if (errors.length > 0 || !patch) {
+        return {
+          error: "invalid_config_overrides",
+          statusCode: 400,
+          errors
+        };
+      }
+      const before = await buildConfigOverridesResponse(responseConfig);
+      await writeRuntimeSafetyOverrides(context.artist.workspaceRoot, patch);
+      const after = await buildConfigOverridesResponse(responseConfig);
+      await appendConfigOverridesAudit(context.artist.workspaceRoot, before, after);
+      return after;
+    }
   });
 
   safeRegisterRoute(api, {

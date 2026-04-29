@@ -12,6 +12,12 @@ import {
   submitProposalYes,
   type ProposalDetail
 } from "../ui/src/components/PendingChangeSetCard";
+import {
+  buildRuntimeOverridesSavePayload,
+  SettingsRuntimeOverridesPanel,
+  submitRuntimeOverrides,
+  type RuntimeOverridesValues
+} from "../ui/src/components/SettingsRuntimeOverridesPanel";
 
 describe("producer console cockpit cards", () => {
   it("renders budget/rate/detection status", () => {
@@ -118,5 +124,57 @@ describe("producer console cockpit cards", () => {
     );
 
     expect(html).toContain("No pending persona ChangeSet.");
+  });
+
+  it("renders runtime safety override settings and read-only env state", () => {
+    const values: RuntimeOverridesValues = {
+      sunoDailyBudget: { value: 99, source: "env", editable: false, defaultValue: 50, envVar: "OPENCLAW_SUNO_DAILY_BUDGET" },
+      birdDailyMax: { value: 5, source: "default", editable: true, defaultValue: 5, envVar: "OPENCLAW_BIRD_DAILY_MAX" },
+      birdMinIntervalMinutes: { value: 60, source: "default", editable: true, defaultValue: 60, envVar: "OPENCLAW_BIRD_MIN_INTERVAL_MINUTES" },
+      autopilotIntervalMinutes: { value: 180, source: "default", editable: true, defaultValue: 180 }
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(SettingsRuntimeOverridesPanel, {
+        values,
+        busy: false,
+        dryRun: true,
+        liveGoArmed: false,
+        onSave: vi.fn()
+      })
+    );
+
+    expect(html).toContain("Runtime Safety Settings");
+    expect(html).toContain("Suno daily budget");
+    expect(html).toContain("source: env OPENCLAW_SUNO_DAILY_BUDGET");
+    expect(html).toContain("Environment override is active");
+    expect(html).toContain("dryRun: on");
+    expect(html).toContain("liveGoArmed: held");
+  });
+
+  it("submits only editable runtime override fields", async () => {
+    const values: RuntimeOverridesValues = {
+      sunoDailyBudget: { value: 99, source: "env", editable: false, defaultValue: 50, envVar: "OPENCLAW_SUNO_DAILY_BUDGET" },
+      birdDailyMax: { value: 5, source: "default", editable: true, defaultValue: 5, envVar: "OPENCLAW_BIRD_DAILY_MAX" },
+      birdMinIntervalMinutes: { value: 60, source: "default", editable: true, defaultValue: 60, envVar: "OPENCLAW_BIRD_MIN_INTERVAL_MINUTES" },
+      autopilotIntervalMinutes: { value: 180, source: "default", editable: true, defaultValue: 180 }
+    };
+    const draft = {
+      sunoDailyBudget: "120",
+      birdDailyMax: "7",
+      birdMinIntervalMinutes: "90",
+      autopilotIntervalMinutes: "240"
+    };
+    const onSave = vi.fn();
+
+    expect(buildRuntimeOverridesSavePayload(values, draft)).toEqual({
+      bird: { rateLimits: { dailyMax: 7, minIntervalMinutes: 90 } },
+      autopilot: { intervalMinutes: 240 }
+    });
+
+    await submitRuntimeOverrides(onSave, values, draft);
+    expect(onSave).toHaveBeenCalledWith({
+      bird: { rateLimits: { dailyMax: 7, minIntervalMinutes: 90 } },
+      autopilot: { intervalMinutes: 240 }
+    });
   });
 });
