@@ -15,6 +15,7 @@ import { SunoDailyBudgetDetailCard, type SunoBudgetDetail } from "./components/S
 import { BirdCallLedgerCard, type BirdLedgerDetail } from "./components/BirdCallLedgerCard";
 import { DistributionDetectionCard, type DistributionDetectionDetail } from "./components/DistributionDetectionCard";
 import { RuntimeActionMirrorCard, type RuntimeActionMirrorEvent } from "./components/RuntimeActionMirrorCard";
+import { RuntimeSongbookCard, type SongbookLookupResult } from "./components/RuntimeSongbookCard";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
@@ -558,6 +559,7 @@ export function App() {
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ConsoleView>("dashboard");
   const [proposals, setProposals] = useState<ProposalDetail[]>([]);
+  const [songbookLookup, setSongbookLookup] = useState<SongbookLookupResult | null>(null);
   const [highlightChangeSetUntil, setHighlightChangeSetUntil] = useState<number | null>(null);
   const [configDraft, setConfigDraft] = useState<ConfigDraft | null>(null);
   const [configDirty, setConfigDirty] = useState(false);
@@ -776,6 +778,24 @@ export function App() {
       const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
       setError(message);
       showErrorToast("runtime", "proposal_edit_failed", message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const lookupSongbook = async (sync = false) => {
+    setBusy(sync ? "songbook-sync" : "songbook-lookup");
+    try {
+      const result = sync
+        ? await apiPost<SongbookLookupResult>("/songbook/lookup")
+        : await apiGet<SongbookLookupResult>("/songbook/lookup");
+      setSongbookLookup(result);
+      await refresh(selectedSongId);
+      showErrorToast("runtime", sync ? "songbook_synced" : "songbook_lookup", sync ? "SONGBOOK synced." : "SONGBOOK lookup complete.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "songbook_lookup_failed", message);
     } finally {
       setBusy(null);
     }
@@ -1418,6 +1438,16 @@ export function App() {
     />
   );
 
+  const runtimeSongbookPanel = (
+    <RuntimeSongbookCard
+      songbook={artistMind?.songbook}
+      result={songbookLookup}
+      busy={busy !== null}
+      onLookup={() => void lookupSongbook(false)}
+      onSync={() => void lookupSongbook(true)}
+    />
+  );
+
   const personaChangeSetPanel = (
     <PendingChangeSetCard
       domain="persona"
@@ -1674,7 +1704,7 @@ export function App() {
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoBudgetDetailPanel}{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
       {activeView === "platforms" ? <section className="two-column">{birdLedgerPanel}{distributionDetectionPanel}{runtimeActionMirrorPanel}{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
-      {activeView === "songs" ? <section className="two-column">{songChangeSetPanel}{runtimeActionMirrorPanel}{songsPanel}{currentSongPanel}</section> : null}
+      {activeView === "songs" ? <section className="two-column">{songChangeSetPanel}{runtimeSongbookPanel}{runtimeActionMirrorPanel}{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}
       {activeView === "artist-mind" ? <section className="single-column">{personaChangeSetPanel}{artistMindPanel}</section> : null}

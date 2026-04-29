@@ -27,11 +27,12 @@ import { collectObservations } from "./xObservationCollector.js";
 import { proposeTheme } from "./themeProposer.js";
 import { pollSongDistribution } from "./songDistributionPoller.js";
 import { cleanupExpiredCallbacks } from "./callbackLedgerMaintenance.js";
-import { getArtistPulseIntervalHours, getSongSpawnIntervalHours, isArtistPulseConfigured, isSongSpawnConfigured } from "./runtimeConfig.js";
+import { getArtistPulseIntervalHours, getSongSpawnIntervalHours, isArtistPulseConfigured, isSongbookAutoSyncEnabled, isSongSpawnConfigured } from "./runtimeConfig.js";
 import { proposeSpawn } from "./songSpawnProposer.js";
 import { shouldSpawn } from "./songSpawnRateLimiter.js";
 import { validatePlanningFiles } from "./planningSkeletonValidator.js";
 import { applyChangeSet } from "./changeSetApplier.js";
+import { syncSongbookFromITunes } from "./songbookSyncer.js";
 
 export function isPublishBlockedByDryRun(
   result: Pick<SocialPublishResult, "accepted" | "dryRun">,
@@ -444,6 +445,16 @@ export class ArtistAutopilotService {
         timestamp: Date.now()
       });
     });
+    if (isSongbookAutoSyncEnabled()) {
+      await syncSongbookFromITunes(input.workspaceRoot).catch((error) => {
+        emitRuntimeEvent({
+          type: "error",
+          source: "songbook_sync",
+          reason: error instanceof Error ? error.message : String(error),
+          timestamp: Date.now()
+        });
+      });
+    }
 
     const song = await currentSong(input.workspaceRoot, existing.currentSongId);
     const stage = stageFromSong(song);

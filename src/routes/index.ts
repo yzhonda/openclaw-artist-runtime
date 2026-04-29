@@ -34,6 +34,7 @@ import { readLatestPromptPackMetadata } from "../services/sunoPromptPackFiles.js
 import { buildSunoArtifactIndex, generateSunoRun, readAllSunoRuns, readLatestSunoRun } from "../services/sunoRuns.js";
 import { SunoBrowserWorker } from "../services/sunoBrowserWorker.js";
 import { createSongIdea } from "../services/songIdeation.js";
+import { buildSongbookLookup, syncSongbookFromITunes } from "../services/songbookSyncer.js";
 import { readTakeHistory, selectTake } from "../services/takeSelection.js";
 import { registerRuntimeEventStreamRoute } from "./runtimeEventStream.js";
 import type {
@@ -1073,6 +1074,19 @@ export function registerRoutes(api: unknown): void {
     method: "GET",
     path: "/plugins/artist-runtime/api/artist-mind",
     handler: async (input) => buildArtistMindResponse(payloadRecord(input).config as Partial<ArtistRuntimeConfig> | undefined)
+  });
+
+  safeRegisterRoute(api, {
+    method: ["GET", "POST"],
+    path: "/plugins/artist-runtime/api/songbook/lookup",
+    handler: async (input) => {
+      const payload = payloadRecord(input);
+      const config = await resolveRuntimeConfig(payload.config as Partial<ArtistRuntimeConfig> | undefined);
+      const options = { fetchImpl: fetch };
+      return payloadRequestMethod(payload) === "POST"
+        ? syncSongbookFromITunes(config.artist.workspaceRoot, options)
+        : buildSongbookLookup(config.artist.workspaceRoot, options);
+    }
   });
 
   safeRegisterRoute(api, {

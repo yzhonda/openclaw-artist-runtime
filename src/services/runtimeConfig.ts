@@ -125,6 +125,11 @@ export function isSongSpawnConfigured(config: Pick<ArtistRuntimeConfig, "songSpa
   return isSongSpawnEnabled(env) || config.songSpawn.enabled;
 }
 
+export function isSongbookAutoSyncEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.OPENCLAW_SONGBOOK_AUTO_SYNC?.trim().toLowerCase();
+  return value === "on" || value === "1" || value === "true";
+}
+
 export function getArtistPulseIntervalHours(
   env: NodeJS.ProcessEnv = process.env,
   config?: Pick<ArtistRuntimeConfig, "artistPulse">
