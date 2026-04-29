@@ -267,6 +267,22 @@ commands or change OpenClaw permissions. Secret-like input or AI responses are
 rejected for the affected field and surfaced as warnings instead of being
 written to ARTIST.md or SOUL.md.
 
+## Plan v9.15 Phase A: Producer Console callback mirror (2026-04-29)
+
+Producer Console now mirrors the safe callback actions that already exist in
+Telegram. Recent distribution detections and completed-song events appear as a
+Callback Action Mirror card on Dashboard, Songs, and Platforms.
+
+- Distribution apply/skip uses the same pending proposal flow as Telegram:
+  `/api/proposals/:id/yes` or `/api/proposals/:id/no`.
+- Song completion uses `/api/songs/:id/songbook-write` or
+  `/api/songs/:id/songbook-skip`, routed through the same SONGBOOK action
+  registry as Telegram callbacks.
+- UI mirror operations do not depend on `OPENCLAW_INLINE_BUTTONS`; that flag
+  only disables Telegram inline button attachment.
+- X real publish, Instagram, and TikTok buttons remain absent. This phase only
+  reflects local files or discards pending local actions.
+
 ## Plan v9.14: Inline Button Confirmation Path (2026-04-29)
 
 Plan v9.14 adds Telegram inline buttons to the existing text-command

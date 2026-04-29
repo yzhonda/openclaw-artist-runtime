@@ -25,6 +25,8 @@ import { SocialDistributionWorker } from "../services/socialDistributionWorker.j
 import { buildEffectiveDryRunMap, resolvePlatformSocialDryRun } from "../services/socialDryRunResolver.js";
 import { prepareSocialAssets } from "../services/socialAssets.js";
 import { readDistributionDetectionState } from "../services/songDistributionPoller.js";
+import { secretLikePattern } from "../services/personaMigrator.js";
+import { handleSongPublishActionRequest } from "../services/songPublishActionRegistry.js";
 import { buildSunoArtifactsPage, STATUS_SUNO_ARTIFACT_LIMIT } from "../services/sunoArtifacts.js";
 import { SunoBudgetTracker } from "../services/sunoBudget.js";
 import { readBudgetDetail as readSunoDailyBudgetDetail, readBudgetState as readSunoDailyBudgetState } from "../services/sunoBudgetLedger.js";
@@ -501,6 +503,13 @@ function proposalFieldsFromPayload(payload: Record<string, unknown>): Record<str
       .filter((entry): entry is [string, string] => typeof entry[1] === "string")
       .map(([field, value]) => [field, value])
   );
+}
+
+function payloadContainsSecretLikeText(payload: Record<string, unknown>, keys: string[]): boolean {
+  return keys.some((key) => {
+    const value = payload[key];
+    return typeof value === "string" && secretLikePattern.test(value);
+  });
 }
 
 function proposalRouteError(error: unknown): Record<string, unknown> {
@@ -1170,6 +1179,20 @@ export function registerRoutes(api: unknown): void {
             runId: typeof payload.runId === "string" ? payload.runId : undefined,
             selectedTakeId: typeof payload.selectedTakeId === "string" ? payload.selectedTakeId : undefined,
             reason: typeof payload.reason === "string" ? payload.reason : undefined
+          });
+        }
+        if (segments.length === 2 && (segments[1] === "songbook-write" || segments[1] === "songbook-skip")) {
+          if (payloadContainsSecretLikeText(payload, ["reason", "note"])) {
+            return {
+              error: "secret_like_payload_rejected",
+              statusCode: 400
+            };
+          }
+          return handleSongPublishActionRequest({
+            root: config.artist.workspaceRoot,
+            songId: segments[0] ?? (typeof payload.songId === "string" ? payload.songId : "song-001"),
+            action: segments[1] === "songbook-write" ? "song_songbook_write" : "song_skip",
+            actor: { kind: "ui_api" }
           });
         }
         if (segments.length === 2 && segments[1] === "social-assets") {

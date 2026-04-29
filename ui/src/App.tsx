@@ -14,6 +14,7 @@ import { SettingsRuntimeOverridesPanel, type RuntimeOverridesSavePayload, type R
 import { SunoDailyBudgetDetailCard, type SunoBudgetDetail } from "./components/SunoDailyBudgetDetailCard";
 import { BirdCallLedgerCard, type BirdLedgerDetail } from "./components/BirdCallLedgerCard";
 import { DistributionDetectionCard, type DistributionDetectionDetail } from "./components/DistributionDetectionCard";
+import { RuntimeActionMirrorCard, type RuntimeActionMirrorEvent } from "./components/RuntimeActionMirrorCard";
 import { deriveConnectionState } from "../../src/services/connectionState";
 import { defaultDistributionEventsFilter, type DistributionEventsFilterState } from "../../src/services/distributionEventsFilter";
 import { dismissErrorToast, expireErrorToasts, pushErrorToast, type ErrorToast, type ErrorToastSource } from "../../src/services/errorToastQueue";
@@ -154,6 +155,7 @@ type StatusResponse = {
     lastPlatform?: string;
   };
   recentDistributionEvents?: DistributionEvent[];
+  runtimeEvents?: RuntimeActionMirrorEvent[];
   platformStats?: Record<SocialPlatform, PlatformStat>;
   platforms: Record<string, {
     connected: boolean;
@@ -729,6 +731,36 @@ export function App() {
       const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
       setError(message);
       showErrorToast("runtime", "proposal_cancel_failed", message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const writeSongbookFromMirror = async (songId: string) => {
+    setBusy(`songbook-write:${songId}`);
+    try {
+      await apiPost(`/songs/${encodeURIComponent(songId)}/songbook-write`);
+      await refresh(songId);
+      showErrorToast("runtime", "songbook_write_applied", "SONGBOOK reflected.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "songbook_write_failed", message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const skipSongbookFromMirror = async (songId: string) => {
+    setBusy(`songbook-skip:${songId}`);
+    try {
+      await apiPost(`/songs/${encodeURIComponent(songId)}/songbook-skip`);
+      await refresh(selectedSongId);
+      showErrorToast("runtime", "songbook_write_skipped", "Song completion action skipped.");
+    } catch (caughtError) {
+      const message = caughtError instanceof Error ? caughtError.message : String(caughtError);
+      setError(message);
+      showErrorToast("runtime", "songbook_skip_failed", message);
     } finally {
       setBusy(null);
     }
@@ -1342,6 +1374,17 @@ export function App() {
     <DistributionDetectionCard detected={status?.distribution?.detected} />
   );
 
+  const runtimeActionMirrorPanel = (
+    <RuntimeActionMirrorCard
+      events={status?.runtimeEvents}
+      busy={busy !== null}
+      onDistributionApply={applyProposal}
+      onDistributionSkip={cancelProposal}
+      onSongbookWrite={writeSongbookFromMirror}
+      onSongbookSkip={skipSongbookFromMirror}
+    />
+  );
+
   const manualSongCreatePanel = (
     <ManualSongCreateCard
       busy={busy !== null}
@@ -1627,11 +1670,11 @@ export function App() {
         ))}
       </nav>
 
-      {activeView === "dashboard" ? <section className="two-column">{cockpitStrip}{manualSongCreatePanel}{pendingApprovalsPanel}{lastCyclePanel}{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
+      {activeView === "dashboard" ? <section className="two-column">{cockpitStrip}{manualSongCreatePanel}{runtimeActionMirrorPanel}{pendingApprovalsPanel}{lastCyclePanel}{setupPanel}{alertsPanel}{currentSongPanel}{distributionWorkerPanel}{observabilityPanel}{recentXResultPanel}</section> : null}
       {activeView === "setup" ? <section className="two-column">{setupPanel}{sunoPanel}{platformsPanel}{configPanel}</section> : null}
       {activeView === "music" ? <section className="two-column">{sunoBudgetDetailPanel}{sunoPanel}{currentSongPanel}{recentXResultPanel}</section> : null}
-      {activeView === "platforms" ? <section className="two-column">{birdLedgerPanel}{distributionDetectionPanel}{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
-      {activeView === "songs" ? <section className="two-column">{songChangeSetPanel}{songsPanel}{currentSongPanel}</section> : null}
+      {activeView === "platforms" ? <section className="two-column">{birdLedgerPanel}{distributionDetectionPanel}{runtimeActionMirrorPanel}{platformsPanel}{distributionWorkerPanel}{observabilityPanel}{replySimulationPanel}</section> : null}
+      {activeView === "songs" ? <section className="two-column">{songChangeSetPanel}{runtimeActionMirrorPanel}{songsPanel}{currentSongPanel}</section> : null}
       {activeView === "prompt-ledger" ? <section className="two-column">{songsPanel}{promptLedgerPanel}</section> : null}
       {activeView === "alerts" ? <section className="two-column">{alertsPanel}{auditPanel}</section> : null}
       {activeView === "artist-mind" ? <section className="single-column">{personaChangeSetPanel}{artistMindPanel}</section> : null}

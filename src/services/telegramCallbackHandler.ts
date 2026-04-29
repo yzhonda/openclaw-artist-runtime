@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { markCallbackResolved, resolveCallbackAction, type CallbackActionEntry, type CallbackActionStatus } from "./callbackActionRegistry.js";
 import { handleProposalResponse } from "./conversationalSession.js";
 import { secretLikePattern } from "./personaMigrator.js";
-import { runSongPublishAction, type SongPublishAction } from "./songPublishActionRegistry.js";
+import { handleSongPublishActionRequest, type SongPublishAction } from "./songPublishActionRegistry.js";
 import type { TelegramClient } from "./telegramClient.js";
 
 export interface TelegramCallbackContext {
@@ -162,10 +162,12 @@ export async function routeTelegramCallback(ctx: TelegramCallbackContext): Promi
   if (entry.action === "song_songbook_write" || entry.action === "song_skip") {
     await ctx.client.answerCallbackQuery(ctx.callbackQueryId, { text: "OK" });
     try {
-      const actionResult = await runSongPublishAction(entry.action as SongPublishAction, {
+      const actionResult = await handleSongPublishActionRequest({
+        action: entry.action as SongPublishAction,
         root: ctx.root,
         songId: entry.songId ?? "",
-        now
+        now,
+        actor: { kind: "telegram_callback", chatId: entry.chatId, userId: entry.userId }
       });
       const callbackStatus: Exclude<CallbackActionStatus, "pending"> = actionResult.status === "applied" ? "applied" : "discarded";
       const callbackResult: TelegramCallbackResult["result"] = actionResult.status === "applied" ? "applied" : "discarded";

@@ -20,6 +20,15 @@ export interface SongPublishActionContext {
   now?: number;
 }
 
+export interface SongPublishActionRequest extends SongPublishActionContext {
+  action: SongPublishAction;
+  actor?: {
+    kind: "telegram_callback" | "ui_api";
+    chatId?: number;
+    userId?: number;
+  };
+}
+
 export interface SongPublishActionResult {
   action: SongPublishAction;
   status: "applied" | "discarded";
@@ -82,4 +91,12 @@ export async function runSongPublishAction(action: SongPublishAction, context: S
     backups,
     safety
   };
+}
+
+export async function handleSongPublishActionRequest(request: SongPublishActionRequest): Promise<SongPublishActionResult> {
+  return runSongPublishAction(request.action, {
+    root: request.root,
+    songId: request.songId,
+    now: request.now
+  });
 }
